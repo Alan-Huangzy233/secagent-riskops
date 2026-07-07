@@ -1,0 +1,183 @@
+[
+  {
+    "title": "Define SecAgent RiskOps product scope and architecture",
+    "milestone": "v0.1 Foundation",
+    "labels": [
+      "type:architecture",
+      "priority:p0"
+    ],
+    "body": "Create initial project documents that define the product direction, system boundaries, threat model, and long-term architecture.\n\nTasks:\n- [ ] Create PROJECT_CHARTER.md\n- [ ] Create SYSTEM_ARCHITECTURE.md\n- [ ] Create THREAT_MODEL.md\n- [ ] Define authorized-use boundary\n- [ ] Define autonomy levels\n- [ ] Define core modules: SOC, GRC, Remediation, Knowledge"
+  },
+  {
+    "title": "Create backend project structure",
+    "milestone": "v0.1 Foundation",
+    "labels": [
+      "type:backend",
+      "priority:p0"
+    ],
+    "body": "Set up the initial backend structure for the RiskOps platform.\n\nTasks:\n- [ ] Create backend/app/core\n- [ ] Create backend/app/schemas\n- [ ] Create backend/app/agents\n- [ ] Create backend/app/tools\n- [ ] Create backend/app/api\n- [ ] Create backend/app/storage\n- [ ] Add basic FastAPI health endpoint"
+  },
+  {
+    "title": "Implement core data schemas",
+    "milestone": "v0.1 Foundation",
+    "labels": [
+      "type:backend",
+      "priority:p0"
+    ],
+    "body": "Implement the first version of the core RiskOps data models.\n\nTasks:\n- [ ] Asset schema\n- [ ] Alert schema\n- [ ] Finding schema\n- [ ] Evidence schema\n- [ ] Incident schema\n- [ ] Control schema\n- [ ] Risk schema\n- [ ] ActionPlan schema\n- [ ] KnowledgeItem schema\n- [ ] AgentRun schema\n- [ ] ToolCall schema"
+  },
+  {
+    "title": "Set up PostgreSQL schema and persistence layer",
+    "milestone": "v0.1 Foundation",
+    "labels": [
+      "type:backend",
+      "priority:p0"
+    ],
+    "body": "Create the initial database structure for storing assets, alerts, findings, evidence, incidents, controls, risks, and audit records.\n\nTasks:\n- [ ] Add database configuration\n- [ ] Add migrations\n- [ ] Create tables for core schemas\n- [ ] Add repository/service layer\n- [ ] Add seed script for demo data"
+  },
+  {
+    "title": "Implement audit log and evidence trace model",
+    "milestone": "v0.1 Foundation",
+    "labels": [
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Every agent decision, tool call, finding, and remediation action should be traceable to evidence.\n\nTasks:\n- [ ] Create audit_log table\n- [ ] Create evidence hash field\n- [ ] Link findings to evidence\n- [ ] Link incidents to alerts/findings/evidence\n- [ ] Link agent runs to tool calls"
+  },
+  {
+    "title": "Implement alert normalization pipeline",
+    "milestone": "v0.2 AI SOC Inbox",
+    "labels": [
+      "type:soc",
+      "priority:p0"
+    ],
+    "body": "Build a normalization layer that converts scanner findings, Suricata sample alerts, Zeek logs, and Linux auth logs into a unified Alert schema.\n\nTasks:\n- [ ] Add parser interface\n- [ ] Add SecAgent scanner parser\n- [ ] Add Suricata eve.json sample parser\n- [ ] Add Zeek conn.log / dns.log sample parser\n- [ ] Add Linux auth.log parser\n- [ ] Store normalized alerts"
+  },
+  {
+    "title": "Implement alert deduplication and grouping",
+    "milestone": "v0.2 AI SOC Inbox",
+    "labels": [
+      "type:soc",
+      "priority:p0"
+    ],
+    "body": "Group repeated alerts by asset, source, rule, entity, and time window to reduce alert noise.\n\nTasks:\n- [ ] Define grouping keys\n- [ ] Implement time-window grouping\n- [ ] Add duplicate count\n- [ ] Preserve original alert references\n- [ ] Store AlertGroup records"
+  },
+  {
+    "title": "Implement basic risk scoring engine",
+    "milestone": "v0.2 AI SOC Inbox",
+    "labels": [
+      "type:soc",
+      "priority:p0"
+    ],
+    "body": "Calculate risk score using severity, asset criticality, confidence, exposure, correlation count, and known-benign context.\n\nTasks:\n- [ ] Define scoring formula\n- [ ] Add asset criticality weight\n- [ ] Add correlation bonus\n- [ ] Add duplicate penalty\n- [ ] Add known-benign reduction\n- [ ] Return P0/P1/P2/P3 priority"
+  },
+  {
+    "title": "Create AI triage agent for alert groups",
+    "milestone": "v0.2 AI SOC Inbox",
+    "labels": [
+      "type:agent",
+      "priority:p0"
+    ],
+    "body": "The AI triage agent should summarize grouped alerts, explain why they matter, recommend a disposition, and identify whether human review is needed.\n\nTasks:\n- [ ] Define structured AI output schema\n- [ ] Implement prompt template\n- [ ] Require evidence-grounded summary\n- [ ] Output priority, confidence, disposition, and explanation\n- [ ] Add fallback behavior for low-confidence analysis"
+  },
+  {
+    "title": "Implement skeptic agent for triage validation",
+    "milestone": "v0.2 AI SOC Inbox",
+    "labels": [
+      "type:agent",
+      "priority:p1"
+    ],
+    "body": "Add a second agent that challenges the triage result and checks whether evidence is sufficient, whether the priority is over/understated, and whether suppression is safe.\n\nTasks:\n- [ ] Review AI triage output\n- [ ] Check evidence sufficiency\n- [ ] Flag overclaiming\n- [ ] Flag unsafe suppression\n- [ ] Produce validation result"
+  },
+  {
+    "title": "Build SOC Inbox frontend",
+    "milestone": "v0.2 AI SOC Inbox",
+    "labels": [
+      "type:frontend",
+      "priority:p0"
+    ],
+    "body": "Create the first SOC Inbox UI that shows only actionable incident candidates and summarizes auto-triaged/suppressed alerts.\n\nTasks:\n- [ ] Needs Review view\n- [ ] Escalated view\n- [ ] Auto-Triaged view\n- [ ] Suppressed view\n- [ ] Alert group detail page\n- [ ] AI triage explanation panel"
+  },
+  {
+    "title": "Generate daily SOC briefing",
+    "milestone": "v0.2 AI SOC Inbox",
+    "labels": [
+      "type:soc",
+      "priority:p1"
+    ],
+    "body": "Generate a daily summary of critical incidents, items needing review, auto-triaged alerts, suppressed duplicates, and tuning suggestions.\n\nTasks:\n- [ ] Summarize P0/P1/P2/P3 counts\n- [ ] Summarize top noisy rules\n- [ ] Summarize top risky assets\n- [ ] Include recommended actions\n- [ ] Export as Markdown"
+  },
+  {
+    "title": "Create initial GRC control library",
+    "milestone": "v0.3 GRC Bridge",
+    "labels": [
+      "type:grc",
+      "priority:p1"
+    ],
+    "body": "Create a small built-in control library for NIST CSF 2.0, SOC 2, and CIS Controls mappings.\n\nTasks:\n- [ ] Add control schema\n- [ ] Add seed controls\n- [ ] Add evidence requirements\n- [ ] Add related detection examples\n- [ ] Add control status field"
+  },
+  {
+    "title": "Implement finding-to-control mapping agent",
+    "milestone": "v0.3 GRC Bridge",
+    "labels": [
+      "type:agent",
+      "type:grc",
+      "priority:p1"
+    ],
+    "body": "Map confirmed findings and incidents to GRC controls and generate a control gap explanation.\n\nTasks:\n- [ ] Input incident/finding/evidence\n- [ ] Output related controls\n- [ ] Output gap explanation\n- [ ] Output evidence summary\n- [ ] Output confidence score"
+  },
+  {
+    "title": "Implement risk register generation",
+    "milestone": "v0.3 GRC Bridge",
+    "labels": [
+      "type:grc",
+      "priority:p1"
+    ],
+    "body": "Create risk register entries from confirmed incidents and control gaps.\n\nTasks:\n- [ ] Risk statement\n- [ ] Likelihood\n- [ ] Impact\n- [ ] Owner\n- [ ] Status\n- [ ] Due date\n- [ ] Residual risk"
+  },
+  {
+    "title": "Define ActionPlan schema and remediation workflow",
+    "milestone": "v0.4 Controlled Remediation",
+    "labels": [
+      "type:executor",
+      "priority:p1"
+    ],
+    "body": "Create the structure for controlled remediation plans with preflight, backup, approval, execution, verification, and rollback.\n\nTasks:\n- [ ] ActionPlan schema\n- [ ] Precondition schema\n- [ ] Backup schema\n- [ ] Verification schema\n- [ ] Rollback schema\n- [ ] Risk level classification"
+  },
+  {
+    "title": "Implement policy engine for tool and action approval",
+    "milestone": "v0.4 Controlled Remediation",
+    "labels": [
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Build a policy engine that controls which tools and actions are allowed, blocked, or require human approval.\n\nTasks:\n- [ ] Tool allowlist\n- [ ] Target allowlist\n- [ ] Risk-based approval\n- [ ] Dangerous action blocklist\n- [ ] Autonomy level support\n- [ ] Approval decision object"
+  },
+  {
+    "title": "Implement GitHub remediation adapter",
+    "milestone": "v0.4 Controlled Remediation",
+    "labels": [
+      "type:executor",
+      "priority:p1"
+    ],
+    "body": "Support safe code remediation by creating branches, applying patches, running checks, and opening pull requests.\n\nTasks:\n- [ ] Create branch\n- [ ] Apply patch\n- [ ] Commit changes\n- [ ] Run test command\n- [ ] Create PR\n- [ ] Add PR summary"
+  },
+  {
+    "title": "Implement Linux lab SSH adapter",
+    "milestone": "v0.4 Controlled Remediation",
+    "labels": [
+      "type:executor",
+      "priority:p1"
+    ],
+    "body": "Support controlled remediation in a lab Linux server using typed actions instead of arbitrary shell commands.\n\nTasks:\n- [ ] Read file\n- [ ] Create backup\n- [ ] Patch config key\n- [ ] Test nginx config\n- [ ] Reload nginx after approval\n- [ ] Verify HTTP security headers\n- [ ] Rollback backup"
+  },
+  {
+    "title": "Build remediation approval queue UI",
+    "milestone": "v0.4 Controlled Remediation",
+    "labels": [
+      "type:frontend",
+      "priority:p1"
+    ],
+    "body": "Create a UI for reviewing proposed remediation actions before execution.\n\nTasks:\n- [ ] Show action summary\n- [ ] Show risk level\n- [ ] Show diff\n- [ ] Show preflight results\n- [ ] Show rollback plan\n- [ ] Approve / Reject / Edit"
+  }
+]

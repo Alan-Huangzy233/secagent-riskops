@@ -1,0 +1,10 @@
+{
+  "finding_id": "FIND-2026-0001",
+  "asset_id": "web-01",
+  "title": "Missing HTTP security headers",
+  "severity": "medium",
+  "confidence": 0.9,
+  "source_tool": "http.check_security_headers",
+  "evidence_ids": ["EVID-2026-0001"],
+  "remediation": "Add Content-Security-Policy, X-Frame-Options, and X-Content-Type-Options headers."
+}

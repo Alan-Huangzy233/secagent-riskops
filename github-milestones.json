@@ -1,0 +1,26 @@
+[
+  {
+    "title": "v0.1 Foundation",
+    "description": "Project structure, architecture, core schemas, evidence model, and audit trail."
+  },
+  {
+    "title": "v0.2 AI SOC Inbox",
+    "description": "Alert ingestion, grouping, scoring, AI triage, skeptic agent, and SOC Inbox UI."
+  },
+  {
+    "title": "v0.3 GRC Bridge",
+    "description": "Control library, evidence packages, finding-to-control mapping, and risk register."
+  },
+  {
+    "title": "v0.4 Controlled Remediation",
+    "description": "ActionPlan schema, policy engine, approval queue, adapters, verifier, and rollback."
+  },
+  {
+    "title": "v0.5 Knowledge Loop",
+    "description": "Knowledge candidates, promotion workflow, TTL, versioning, feedback, and detection tuning."
+  },
+  {
+    "title": "v1.0 End-to-End Demo",
+    "description": "Complete workflow from raw alerts to incident, GRC evidence, remediation, verification, and knowledge update."
+  }
+]

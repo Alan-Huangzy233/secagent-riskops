@@ -1,0 +1,72 @@
+[
+  {
+    "name": "type:architecture",
+    "color": "5319e7",
+    "description": "Architecture and system design"
+  },
+  {
+    "name": "type:backend",
+    "color": "1d76db",
+    "description": "Backend implementation"
+  },
+  {
+    "name": "type:frontend",
+    "color": "fbca04",
+    "description": "Frontend implementation"
+  },
+  {
+    "name": "type:agent",
+    "color": "0e8a16",
+    "description": "AI agent logic"
+  },
+  {
+    "name": "type:soc",
+    "color": "0052cc",
+    "description": "SOC and alert triage features"
+  },
+  {
+    "name": "type:grc",
+    "color": "c2e0c6",
+    "description": "GRC, controls, evidence, risk"
+  },
+  {
+    "name": "type:executor",
+    "color": "d93f0b",
+    "description": "Remediation executor and adapters"
+  },
+  {
+    "name": "type:security",
+    "color": "b60205",
+    "description": "Security, safety, policy, threat model"
+  },
+  {
+    "name": "type:testing",
+    "color": "bfd4f2",
+    "description": "Testing and evaluation"
+  },
+  {
+    "name": "type:docs",
+    "color": "0075ca",
+    "description": "Documentation"
+  },
+  {
+    "name": "priority:p0",
+    "color": "b60205",
+    "description": "Critical priority"
+  },
+  {
+    "name": "priority:p1",
+    "color": "d93f0b",
+    "description": "High priority"
+  },
+  {
+    "name": "priority:p2",
+    "color": "fbca04",
+    "description": "Medium priority"
+  },
+  {
+    "name": "priority:p3",
+    "color": "cfd3d7",
+    "description": "Low priority"
+  }
+]
