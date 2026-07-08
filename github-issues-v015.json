@@ -1,0 +1,69 @@
+[
+  {
+    "title": "Design flow-based execution model",
+    "milestone": "v0.1.5 Agent Workflow Runtime",
+    "labels": [
+      "type:architecture",
+      "priority:p0"
+    ],
+    "body": "Design the internal Flow / Task / Step / ToolCall / Artifact model used by SOC investigations, GRC mapping, remediation workflows, and knowledge review.\n\nTasks:\n- [ ] Define Flow schema\n- [ ] Define Task schema\n- [ ] Define Step schema\n- [ ] Define ToolCall schema\n- [ ] Define Artifact schema\n- [ ] Link Flow to Evidence\n- [ ] Define state transitions\n\nAcceptance Criteria:\n- [ ] Flow model supports SOC, GRC, remediation, and knowledge review workflows\n- [ ] Each workflow step can be linked to evidence and audit logs\n- [ ] State transitions are documented"
+  },
+  {
+    "title": "Implement flow runtime state machine",
+    "milestone": "v0.1.5 Agent Workflow Runtime",
+    "labels": [
+      "type:backend",
+      "priority:p0"
+    ],
+    "body": "Implement basic state transitions for long-running agent workflows.\n\nStates:\n- created\n- queued\n- running\n- waiting_for_approval\n- completed\n- failed\n- cancelled\n\nTasks:\n- [ ] Add Flow state enum\n- [ ] Add Task state enum\n- [ ] Add Step state enum\n- [ ] Implement transition validation\n- [ ] Log all state transitions to audit trail\n- [ ] Add tests for invalid transitions\n\nAcceptance Criteria:\n- [ ] Flow, Task, and Step state transitions are enforced\n- [ ] Invalid transitions are blocked\n- [ ] Every transition is auditable"
+  },
+  {
+    "title": "Implement agent activity timeline",
+    "milestone": "v0.1.5 Agent Workflow Runtime",
+    "labels": [
+      "type:frontend",
+      "type:agent",
+      "priority:p1"
+    ],
+    "body": "Create a UI timeline that shows what each agent did, which tool it called, what evidence it used, and what decision it made.\n\nTasks:\n- [ ] Show agent run timeline\n- [ ] Show tool calls\n- [ ] Show evidence references\n- [ ] Show blocked actions\n- [ ] Show decision records\n- [ ] Show errors and low-confidence decisions\n\nAcceptance Criteria:\n- [ ] A user can inspect why an alert was escalated, auto-triaged, or suppressed\n- [ ] Tool calls and evidence references are visible\n- [ ] Blocked or approval-required actions are visible"
+  },
+  {
+    "title": "Design memory model for SOC, GRC, and remediation",
+    "milestone": "v0.1.5 Agent Workflow Runtime",
+    "labels": [
+      "type:architecture",
+      "priority:p1"
+    ],
+    "body": "Create memory types for long-term knowledge, working memory, and episodic memory.\n\nTasks:\n- [ ] Define long-term memory schema\n- [ ] Define working memory schema\n- [ ] Define episodic memory schema\n- [ ] Add provenance fields\n- [ ] Add TTL fields\n- [ ] Add versioning fields\n- [ ] Define promotion workflow from candidate to active\n\nAcceptance Criteria:\n- [ ] Memory entries include source, confidence, timestamp, TTL, and version\n- [ ] AI can only create candidate memory\n- [ ] Active memory requires validation or approval"
+  },
+  {
+    "title": "Implement supervisor agent and stuck-state detection",
+    "milestone": "v0.1.5 Agent Workflow Runtime",
+    "labels": [
+      "type:agent",
+      "type:security",
+      "priority:p1"
+    ],
+    "body": "Detect repeated tool calls, no-progress loops, unsafe suppression recommendations, and failed remediation retries.\n\nTasks:\n- [ ] Add repeated tool call detection\n- [ ] Add max tool call threshold\n- [ ] Add no-progress detection\n- [ ] Trigger review for unsafe suppression recommendations\n- [ ] Add remediation retry limit\n- [ ] Store supervisor decision record\n\nAcceptance Criteria:\n- [ ] Repetitive or low-progress agent loops are detected\n- [ ] Unsafe suppression recommendations trigger skeptic/supervisor review\n- [ ] Failed remediation retries stop safely"
+  },
+  {
+    "title": "Add evaluation and replay framework design",
+    "milestone": "v0.1.5 Agent Workflow Runtime",
+    "labels": [
+      "type:testing",
+      "type:architecture",
+      "priority:p0"
+    ],
+    "body": "Design the replay and evaluation framework used to measure triage reliability, suppression safety, GRC mapping quality, and remediation outcomes.\n\nTasks:\n- [ ] Define replay dataset format\n- [ ] Define expected labels format\n- [ ] Define triage accuracy metrics\n- [ ] Define false suppression metrics\n- [ ] Define missed escalation metrics\n- [ ] Define control mapping metrics\n- [ ] Define regression test workflow\n\nAcceptance Criteria:\n- [ ] Evaluation design includes false suppression and missed escalation metrics\n- [ ] Replay framework can be used before enabling auto-suppression\n- [ ] Documentation is added under docs/evaluation-replay.md"
+  },
+  {
+    "title": "Add current capability boundaries to README",
+    "milestone": "v0.1 Foundation",
+    "labels": [
+      "type:docs",
+      "type:security",
+      "priority:p1"
+    ],
+    "body": "Document what SecAgent RiskOps currently does and does not do.\n\nTasks:\n- [ ] Add authorized-use boundary\n- [ ] Add not-a-SIEM-replacement-yet statement\n- [ ] Add no unrestricted autonomous shell statement\n- [ ] Add no unapproved medium/high-risk remediation statement\n- [ ] Add suppression safety boundary\n- [ ] Cross-link SECURITY.md and docs/capability-boundaries.md\n\nAcceptance Criteria:\n- [ ] README contains a Current Capability Boundaries section\n- [ ] Boundaries are consistent with SECURITY.md\n- [ ] Autonomy levels are referenced"
+  }
+]

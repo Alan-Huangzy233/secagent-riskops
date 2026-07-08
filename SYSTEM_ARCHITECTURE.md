@@ -97,3 +97,29 @@ Observability & Governance
 - Agent orchestration: internal orchestrator first; optional future integration with agent frameworks
 - Search/event store: PostgreSQL first; OpenSearch/ClickHouse later
 - Executor adapters: GitHub first, Linux SSH lab second
+
+## Agent Workflow Runtime
+
+SecAgent RiskOps uses a Flow-based runtime inspired by security automation platforms, but adapted for defensive SOC, GRC, and controlled remediation workflows.
+
+```text
+Flow
+  ↓
+Task
+  ↓
+Step
+  ↓
+ToolCall
+  ↓
+Evidence / Artifact
+```
+
+This runtime supports:
+- SOC investigations
+- GRC mapping
+- Remediation planning
+- Approval workflows
+- Knowledge review
+- Replay/evaluation runs
+
+See [Agent Workflow Runtime](./docs/workflow-runtime.md).

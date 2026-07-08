@@ -70,3 +70,19 @@ examples/      Sample alerts, findings, and reports
 scripts/       GitHub/bootstrap helper scripts
 .github/       Issue templates
 ```
+
+## Current Capability Boundaries
+
+SecAgent RiskOps is currently an early-stage AI-assisted security operations platform prototype.
+
+Current boundaries:
+
+- It is not a SIEM replacement.
+- It does not provide unrestricted autonomous shell access.
+- It does not execute medium/high-risk remediation without approval.
+- It is intended only for authorized environments.
+- AI triage decisions must be evidence-grounded and auditable.
+- Suppression rules must be scoped, explainable, reversible, and time-limited.
+- The system prioritizes analyst assistance and controlled automation over fully autonomous security operations.
+
+See [Current Capability Boundaries](./docs/capability-boundaries.md) and [Security Policy](./SECURITY.md).

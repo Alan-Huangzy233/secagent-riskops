@@ -22,5 +22,9 @@
   {
     "title": "v1.0 End-to-End Demo",
     "description": "Complete workflow from raw alerts to incident, GRC evidence, remediation, verification, and knowledge update."
+  },
+  {
+    "title": "v0.1.5 Agent Workflow Runtime",
+    "description": "Build the Flow / Task / Step / ToolCall / Artifact runtime that powers SOC investigations, GRC mapping, remediation workflows, and knowledge review."
   }
 ]
