@@ -12,6 +12,18 @@ Deliverables:
 - PostgreSQL persistence
 - Evidence and audit trace model
 
+## v0.1.5 Agent Workflow Runtime
+
+Goal: Build the Flow / Task / Step / ToolCall / Artifact runtime that powers SOC investigations, GRC mapping, remediation workflows, and knowledge review.
+
+Deliverables:
+- Flow / Task / Step / ToolCall / Artifact model
+- Workflow state machine
+- Agent activity timeline
+- Memory model for SOC, GRC, and remediation
+- Supervisor agent and stuck-state detection
+- Evaluation and replay framework design
+
 ## v0.2 AI SOC Inbox
 
 Goal: Reduce alert fatigue by normalizing, grouping, scoring, and triaging alerts.
@@ -62,15 +74,3 @@ Deliverables:
 ## v1.0 End-to-End Demo
 
 Goal: Demonstrate the full workflow from raw alerts to incident, GRC evidence, remediation, verification, and knowledge update.
-
-## v0.1.5 Agent Workflow Runtime
-
-Goal: Build the Flow / Task / Step / ToolCall / Artifact runtime that powers SOC investigations, GRC mapping, remediation workflows, and knowledge review.
-
-Deliverables:
-- Flow / Task / Step / ToolCall / Artifact model
-- Workflow state machine
-- Agent activity timeline
-- Memory model for SOC, GRC, and remediation
-- Supervisor agent and stuck-state detection
-- Evaluation and replay framework design
