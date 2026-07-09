@@ -86,3 +86,14 @@ Current boundaries:
 - The system prioritizes analyst assistance and controlled automation over fully autonomous security operations.
 
 See [Current Capability Boundaries](./docs/capability-boundaries.md) and [Security Policy](./SECURITY.md).
+
+## External Intelligence Ingestion
+
+SecAgent RiskOps includes an External Intelligence Ingestion Layer for collecting trusted external security knowledge such as CVEs, CISA KEV status, EPSS scores, ATT&CK techniques, GitHub Security Advisories, OSV advisories, and vendor security advisories.
+
+External intelligence is treated as untrusted input until validated. Connectors and crawlers create knowledge candidates, not active knowledge. Candidate promotion requires provenance, confidence, TTL, and validation.
+
+See:
+- [External Intelligence Ingestion](./docs/external-intelligence-ingestion.md)
+- [Crawler Safety and Intelligence Governance](./docs/crawler-safety-governance.md)
+- [Source Registry](./docs/source-registry.md)

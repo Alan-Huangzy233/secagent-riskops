@@ -26,5 +26,9 @@
   {
     "title": "v0.1.5 Agent Workflow Runtime",
     "description": "Build the Flow / Task / Step / ToolCall / Artifact runtime that powers SOC investigations, GRC mapping, remediation workflows, and knowledge review."
+  },
+  {
+    "title": "v0.1.6 External Intelligence Ingestion",
+    "description": "Build the source registry, connector, crawler-safety, raw document, extracted entity, and knowledge candidate foundation for external security intelligence enrichment."
   }
 ]

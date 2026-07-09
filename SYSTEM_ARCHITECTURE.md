@@ -123,3 +123,43 @@ This runtime supports:
 - Replay/evaluation runs
 
 See [Agent Workflow Runtime](./docs/workflow-runtime.md).
+
+## External Intelligence Ingestion Layer
+
+The External Intelligence Ingestion Layer expands SecAgent RiskOps with trusted external security knowledge.
+
+```text
+External Source
+  ↓
+Connector / Fetcher
+  ↓
+Raw Intelligence Document
+  ↓
+Parser / Extractor
+  ↓
+Entity Resolver
+  ↓
+Deduplication
+  ↓
+Source Reputation Check
+  ↓
+Knowledge Candidate
+  ↓
+Validation / Human Review / TTL
+  ↓
+Active Knowledge Base
+```
+
+Initial source priorities:
+- NVD CVE API
+- CISA KEV
+- FIRST EPSS
+- MITRE ATT&CK
+- GitHub Security Advisories
+- OSV.dev
+- CWE / CAPEC
+- Vendor security advisories
+
+Design rule: external intelligence can enrich SOC triage, GRC mapping, risk scoring, and remediation planning, but raw external content must never directly become active knowledge.
+
+See [External Intelligence Ingestion](./docs/external-intelligence-ingestion.md).
