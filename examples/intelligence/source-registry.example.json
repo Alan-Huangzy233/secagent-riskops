@@ -1,0 +1,74 @@
+[
+  {
+    "source_id": "SRC-NVD-CVE",
+    "name": "NVD CVE API",
+    "source_type": "api",
+    "trust_level": "high",
+    "base_url": "https://services.nvd.nist.gov/rest/json/cves/2.0",
+    "enabled": true,
+    "update_frequency": "daily",
+    "rate_limit_policy": "configured",
+    "robots_policy": "not_applicable",
+    "primary_use": "CVE metadata enrichment"
+  },
+  {
+    "source_id": "SRC-CISA-KEV",
+    "name": "CISA Known Exploited Vulnerabilities Catalog",
+    "source_type": "structured_feed",
+    "trust_level": "high",
+    "base_url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog",
+    "enabled": true,
+    "update_frequency": "daily",
+    "rate_limit_policy": "respect_source_default",
+    "robots_policy": "not_applicable",
+    "primary_use": "Known exploited vulnerability status"
+  },
+  {
+    "source_id": "SRC-FIRST-EPSS",
+    "name": "FIRST EPSS",
+    "source_type": "api",
+    "trust_level": "high",
+    "base_url": "https://api.first.org/data/v1/epss",
+    "enabled": true,
+    "update_frequency": "daily",
+    "rate_limit_policy": "respect_source_default",
+    "robots_policy": "not_applicable",
+    "primary_use": "Exploit probability enrichment"
+  },
+  {
+    "source_id": "SRC-MITRE-ATTACK",
+    "name": "MITRE ATT&CK",
+    "source_type": "stix_taxii",
+    "trust_level": "high",
+    "base_url": "https://attack.mitre.org/",
+    "enabled": true,
+    "update_frequency": "monthly",
+    "rate_limit_policy": "respect_source_default",
+    "robots_policy": "respect_source_default",
+    "primary_use": "Technique and tactic enrichment"
+  },
+  {
+    "source_id": "SRC-GHSA",
+    "name": "GitHub Security Advisories",
+    "source_type": "api",
+    "trust_level": "high",
+    "base_url": "https://github.com/advisories",
+    "enabled": true,
+    "update_frequency": "daily",
+    "rate_limit_policy": "configured",
+    "robots_policy": "not_applicable",
+    "primary_use": "Package vulnerability advisories"
+  },
+  {
+    "source_id": "SRC-OSV",
+    "name": "OSV.dev",
+    "source_type": "api",
+    "trust_level": "high",
+    "base_url": "https://api.osv.dev/",
+    "enabled": true,
+    "update_frequency": "daily",
+    "rate_limit_policy": "respect_source_default",
+    "robots_policy": "not_applicable",
+    "primary_use": "Open source vulnerability advisories"
+  }
+]

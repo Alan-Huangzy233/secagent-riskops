@@ -74,3 +74,19 @@ Deliverables:
 ## v1.0 End-to-End Demo
 
 Goal: Demonstrate the full workflow from raw alerts to incident, GRC evidence, remediation, verification, and knowledge update.
+
+## v0.1.6 External Intelligence Ingestion
+
+Goal: Build the source registry, connector, crawler-safety, raw document, extracted entity, and knowledge candidate foundation for external security intelligence enrichment.
+
+Deliverables:
+- External intelligence ingestion architecture
+- Source Registry
+- Raw Intelligence Document schema
+- Extracted Entity schema
+- Knowledge Candidate schema
+- NVD and CISA KEV connector skeletons
+- EPSS enrichment design
+- ATT&CK enrichment design
+- Crawler safety and governance policy
+- External intelligence integration into risk scoring design

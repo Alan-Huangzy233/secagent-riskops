@@ -1,0 +1,88 @@
+[
+  {
+    "title": "Design external intelligence ingestion layer",
+    "milestone": "v0.1.6 External Intelligence Ingestion",
+    "labels": [
+      "type:architecture",
+      "priority:p0"
+    ],
+    "body": "Design the External Intelligence Ingestion Layer that collects, normalizes, validates, and promotes external security knowledge.\n\nTasks:\n- [ ] Define source registry model\n- [ ] Define raw intelligence document schema\n- [ ] Define extracted entity schema\n- [ ] Define knowledge candidate schema\n- [ ] Define promotion workflow\n- [ ] Define TTL / provenance / confidence model\n- [ ] Define where this layer fits into SOC, GRC, remediation, and knowledge workflows\n\nAcceptance Criteria:\n- [ ] Architecture documented in docs/external-intelligence-ingestion.md\n- [ ] Source-to-candidate workflow is defined\n- [ ] External knowledge cannot directly become active knowledge without validation"
+  },
+  {
+    "title": "Implement source registry for approved intelligence sources",
+    "milestone": "v0.1.6 External Intelligence Ingestion",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Create a registry of approved external intelligence sources.\n\nTasks:\n- [ ] Create SourceRegistryEntry schema\n- [ ] Add source_type field\n- [ ] Add trust_level field\n- [ ] Add update_frequency field\n- [ ] Add rate_limit_policy field\n- [ ] Add robots_policy / terms field\n- [ ] Add enabled/disabled flag\n- [ ] Add example source registry JSON\n\nAcceptance Criteria:\n- [ ] Connectors can only use registered sources\n- [ ] Disabled sources are not fetched\n- [ ] Source trust metadata is available to validation and promotion logic"
+  },
+  {
+    "title": "Implement raw intelligence document and extracted entity schemas",
+    "milestone": "v0.1.6 External Intelligence Ingestion",
+    "labels": [
+      "type:backend",
+      "priority:p0"
+    ],
+    "body": "Implement schemas for storing raw external intelligence and extracted entities.\n\nTasks:\n- [ ] Create RawIntelligenceDocument schema\n- [ ] Create ExtractedIntelligenceEntity schema\n- [ ] Add content hash field\n- [ ] Add source reference field\n- [ ] Add retrieval timestamp\n- [ ] Add parser version\n- [ ] Add processing status\n- [ ] Add error metadata\n\nAcceptance Criteria:\n- [ ] Raw intelligence and extracted entities are stored separately\n- [ ] Every extracted entity links back to raw source evidence\n- [ ] Content hash supports deduplication"
+  },
+  {
+    "title": "Implement NVD and CISA KEV connectors",
+    "milestone": "v0.1.6 External Intelligence Ingestion",
+    "labels": [
+      "type:backend",
+      "priority:p1"
+    ],
+    "body": "Fetch CVE metadata and known exploited vulnerability data from structured official sources.\n\nTasks:\n- [ ] Implement NVD connector skeleton\n- [ ] Implement CISA KEV connector skeleton\n- [ ] Store raw response as RawIntelligenceDocument\n- [ ] Extract CVE entities\n- [ ] Deduplicate by CVE ID and content hash\n- [ ] Add source provenance\n- [ ] Add connector error handling\n\nAcceptance Criteria:\n- [ ] CVE entities can be imported from NVD\n- [ ] KEV status can be imported from CISA\n- [ ] Raw data is preserved with provenance\n- [ ] No active knowledge is created directly by connectors"
+  },
+  {
+    "title": "Implement EPSS enrichment connector",
+    "milestone": "v0.1.6 External Intelligence Ingestion",
+    "labels": [
+      "type:backend",
+      "priority:p1"
+    ],
+    "body": "Enrich CVE entities with EPSS probability and percentile.\n\nTasks:\n- [ ] Implement EPSS connector skeleton\n- [ ] Query EPSS by CVE ID\n- [ ] Store EPSS probability\n- [ ] Store EPSS percentile\n- [ ] Store last_updated timestamp\n- [ ] Link EPSS enrichment to CVE entity\n- [ ] Expose EPSS as risk scoring input\n\nAcceptance Criteria:\n- [ ] CVE entities can include EPSS probability and percentile\n- [ ] EPSS data is timestamped\n- [ ] Risk scoring can consume EPSS enrichment"
+  },
+  {
+    "title": "Implement MITRE ATT&CK enrichment importer",
+    "milestone": "v0.1.6 External Intelligence Ingestion",
+    "labels": [
+      "type:backend",
+      "type:grc",
+      "priority:p1"
+    ],
+    "body": "Import ATT&CK tactics and techniques for alert, incident, and control mapping.\n\nTasks:\n- [ ] Define AttackTechnique schema\n- [ ] Define AttackTactic schema\n- [ ] Import or stub ATT&CK STIX/TAXII data source\n- [ ] Store technique IDs and names\n- [ ] Link alert/finding types to techniques\n- [ ] Expose technique context to triage and GRC mapping\n\nAcceptance Criteria:\n- [ ] ATT&CK technique data can be represented internally\n- [ ] Alert/finding types can reference techniques\n- [ ] GRC mapping can use ATT&CK context"
+  },
+  {
+    "title": "Design crawler safety and governance policy",
+    "milestone": "v0.1.6 External Intelligence Ingestion",
+    "labels": [
+      "type:docs",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Define rules for safe crawler and external intelligence behavior.\n\nTasks:\n- [ ] Define allowlist policy\n- [ ] Define robots.txt / terms handling\n- [ ] Define rate limit policy\n- [ ] Define prohibited behaviors\n- [ ] Define source reputation model\n- [ ] Define conflict handling\n- [ ] Define promotion workflow\n- [ ] Document no automatic exploit execution\n\nAcceptance Criteria:\n- [ ] Crawler governance documented in docs/crawler-safety-governance.md\n- [ ] Broad crawling is blocked by default\n- [ ] External content is candidate-only until validated"
+  },
+  {
+    "title": "Implement knowledge candidate review queue",
+    "milestone": "v0.1.6 External Intelligence Ingestion",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p1"
+    ],
+    "body": "Prevent raw crawler or connector output from directly becoming active knowledge.\n\nTasks:\n- [ ] Define KnowledgeCandidate schema\n- [ ] Add candidate status model\n- [ ] Add confidence score\n- [ ] Add source reputation score\n- [ ] Add reviewer decision fields\n- [ ] Add promote / reject / expire transitions\n- [ ] Add audit log integration\n\nAcceptance Criteria:\n- [ ] Imported intelligence enters candidate state first\n- [ ] Candidate promotion is explicit and auditable\n- [ ] Expired or rejected candidates are not used in triage or remediation"
+  },
+  {
+    "title": "Integrate external intelligence into risk scoring design",
+    "milestone": "v0.1.6 External Intelligence Ingestion",
+    "labels": [
+      "type:architecture",
+      "type:soc",
+      "priority:p1"
+    ],
+    "body": "Define how external intelligence influences SOC risk scoring.\n\nTasks:\n- [ ] Define risk scoring inputs\n- [ ] Define external intelligence weighting\n- [ ] Define freshness and TTL handling\n- [ ] Define missing-data behavior\n- [ ] Define conflict handling\n\nAcceptance Criteria:\n- [ ] Risk scoring design can consume CVE/KEV/EPSS/ATT&CK context\n- [ ] Missing or stale intelligence does not create false confidence\n- [ ] External intelligence source references are preserved in scoring evidence"
+  }
+]

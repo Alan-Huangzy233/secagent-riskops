@@ -1,0 +1,30 @@
+{
+  "candidate_id": "KC-0001",
+  "candidate_type": "vulnerability_knowledge",
+  "status": "candidate",
+  "title": "CVE known exploited status enrichment",
+  "entities": [
+    {
+      "entity_type": "cve",
+      "value": "CVE-YYYY-NNNN"
+    }
+  ],
+  "source_refs": [
+    {
+      "source_id": "SRC-CISA-KEV",
+      "raw_document_id": "RAW-0001",
+      "retrieved_at": "2026-07-08T00:00:00Z"
+    }
+  ],
+  "confidence": 0.8,
+  "ttl_days": 30,
+  "provenance": {
+    "created_by": "external_intelligence_connector",
+    "parser_version": "0.1.0"
+  },
+  "promotion": {
+    "requires_review": true,
+    "reviewed_by": null,
+    "reviewed_at": null
+  }
+}
