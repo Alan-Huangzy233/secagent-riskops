@@ -1,0 +1,6 @@
+[
+  {
+    "title": "v0.1.7 Authorized Security Validation",
+    "description": "Build a safe, scoped, read-only validation layer that checks authorized targets and converts results into findings, evidence, risks, controls, and remediation plans."
+  }
+]

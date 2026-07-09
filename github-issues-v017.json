@@ -1,0 +1,81 @@
+[
+  {
+    "title": "Design authorized security validation layer",
+    "milestone": "v0.1.7 Authorized Security Validation",
+    "labels": [
+      "type:architecture",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Design the layer that performs safe, scoped, authorized checks against target systems.\n\nTasks:\n- [ ] Define AssessmentTarget schema\n- [ ] Define AssessmentScope schema\n- [ ] Define ValidationJob schema\n- [ ] Define ValidationCheck schema\n- [ ] Define ScanResult schema\n- [ ] Define safety policy integration\n- [ ] Define evidence linkage\n- [ ] Define how validation results become Findings\n\nAcceptance Criteria:\n- [ ] Architecture documented in docs/authorized-security-validation.md\n- [ ] Validation workflow documented\n- [ ] No-exploit default policy is included\n- [ ] Validation output feeds SOC, GRC, remediation, and knowledge workflows"
+  },
+  {
+    "title": "Implement assessment scope and authorization model",
+    "milestone": "v0.1.7 Authorized Security Validation",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Ensure validation jobs only run against explicitly authorized targets.\n\nTasks:\n- [ ] Add AssessmentTarget schema\n- [ ] Add AssessmentScope schema\n- [ ] Add allowed targets field\n- [ ] Add allowed ports and protocols\n- [ ] Add validity window\n- [ ] Add safety level\n- [ ] Add rate limit field\n- [ ] Add authorization record\n\nAcceptance Criteria:\n- [ ] Validation jobs cannot run without an active scope\n- [ ] Targets outside scope are blocked\n- [ ] Expired scopes are rejected\n- [ ] Authorization decisions are auditable"
+  },
+  {
+    "title": "Implement scanner orchestrator skeleton",
+    "milestone": "v0.1.7 Authorized Security Validation",
+    "labels": [
+      "type:backend",
+      "priority:p1"
+    ],
+    "body": "Create a service that schedules and tracks validation checks.\n\nTasks:\n- [ ] Create ValidationJob object\n- [ ] Create ValidationCheck queue model\n- [ ] Integrate with Flow runtime\n- [ ] Integrate with ToolCall model\n- [ ] Add status tracking\n- [ ] Add error handling\n- [ ] Add audit logging\n\nAcceptance Criteria:\n- [ ] A validation job can be created from a scope\n- [ ] Checks can be queued and status-tracked\n- [ ] ToolCall and Evidence linkage is supported"
+  },
+  {
+    "title": "Implement safe service discovery checks",
+    "milestone": "v0.1.7 Authorized Security Validation",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p1"
+    ],
+    "body": "Perform read-only service discovery on authorized targets.\n\nTasks:\n- [ ] Add host reachability check\n- [ ] Add allowed port discovery\n- [ ] Add service fingerprinting placeholder\n- [ ] Add banner capture placeholder\n- [ ] Store raw output as evidence\n- [ ] Enforce rate limiting\n- [ ] Block targets outside scope\n\nAcceptance Criteria:\n- [ ] Only authorized targets are checked\n- [ ] Discovery is read-only\n- [ ] Results are stored as evidence\n- [ ] Findings can be generated from discovery results"
+  },
+  {
+    "title": "Implement web security baseline checks",
+    "milestone": "v0.1.7 Authorized Security Validation",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p1"
+    ],
+    "body": "Check common web security posture without exploitation.\n\nTasks:\n- [ ] Check security headers\n- [ ] Check TLS configuration\n- [ ] Check HTTP methods\n- [ ] Check redirect behavior\n- [ ] Check CORS configuration\n- [ ] Detect directory listing signal\n- [ ] Store evidence for each check\n\nAcceptance Criteria:\n- [ ] Web baseline checks are non-destructive\n- [ ] Missing or risky configurations generate findings\n- [ ] Evidence links are created for every finding"
+  },
+  {
+    "title": "Integrate validation findings with external intelligence",
+    "milestone": "v0.1.7 Authorized Security Validation",
+    "labels": [
+      "type:backend",
+      "type:soc",
+      "priority:p1"
+    ],
+    "body": "Enrich discovered services and versions with NVD, CISA KEV, EPSS, GHSA, OSV, and vendor advisory data.\n\nTasks:\n- [ ] Map service/version to CVE candidates\n- [ ] Enrich CVE candidates with CISA KEV status\n- [ ] Enrich CVE candidates with EPSS score\n- [ ] Link enrichment to evidence\n- [ ] Feed enrichment into risk scoring\n- [ ] Preserve source references\n\nAcceptance Criteria:\n- [ ] Validation findings can use external intelligence context\n- [ ] Risk scoring can consume enrichment\n- [ ] Missing or low-confidence enrichment does not create false certainty"
+  },
+  {
+    "title": "Convert validation results into normalized findings",
+    "milestone": "v0.1.7 Authorized Security Validation",
+    "labels": [
+      "type:backend",
+      "type:soc",
+      "priority:p1"
+    ],
+    "body": "Convert scanner and validation results into normalized Finding objects.\n\nTasks:\n- [ ] Define ValidationFinding mapping\n- [ ] Add finding severity\n- [ ] Add finding confidence\n- [ ] Add evidence linkage\n- [ ] Add asset linkage\n- [ ] Add control mapping candidate\n- [ ] Add remediation candidate\n\nAcceptance Criteria:\n- [ ] Validation output becomes normalized Finding objects\n- [ ] Findings link to target, asset, evidence, and validation job\n- [ ] Findings can be consumed by SOC, GRC, and remediation workflows"
+  },
+  {
+    "title": "Define and enforce no-exploit default policy",
+    "milestone": "v0.1.7 Authorized Security Validation",
+    "labels": [
+      "type:security",
+      "type:docs",
+      "priority:p0"
+    ],
+    "body": "Document and enforce that validation is non-destructive and no-exploit by default.\n\nTasks:\n- [ ] Document no exploit execution by default\n- [ ] Document no brute force\n- [ ] Document no credential attacks\n- [ ] Document no payload upload\n- [ ] Document no lateral movement\n- [ ] Document no destructive checks\n- [ ] Define future exception model\n- [ ] Add blocked action audit behavior\n\nAcceptance Criteria:\n- [ ] Policy documented in docs/validation-safety-policy.md\n- [ ] Unsafe actions are blocked by default\n- [ ] Future active validation requires explicit policy and approval"
+  }
+]

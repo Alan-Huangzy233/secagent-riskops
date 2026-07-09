@@ -1,0 +1,31 @@
+{
+  "scope_id": "SCOPE-001",
+  "title": "Lab web validation",
+  "status": "active",
+  "authorized_by": "alan",
+  "valid_from": "2026-07-09T00:00:00Z",
+  "valid_until": "2026-07-16T00:00:00Z",
+  "allowed_targets": [
+    "TGT-001"
+  ],
+  "allowed_ports": [
+    80,
+    443,
+    22
+  ],
+  "allowed_protocols": [
+    "tcp",
+    "http",
+    "https",
+    "tls"
+  ],
+  "safety_level": "level_2_baseline_configuration",
+  "rate_limit": "low",
+  "prohibited_actions": [
+    "exploit_execution",
+    "brute_force",
+    "payload_upload",
+    "lateral_movement",
+    "privilege_escalation"
+  ]
+}

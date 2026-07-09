@@ -1,0 +1,34 @@
+{
+  "validation_job_id": "VJOB-001",
+  "scope_id": "SCOPE-001",
+  "flow_id": "FLOW-001",
+  "status": "running",
+  "requested_by": "alan",
+  "targets": [
+    {
+      "target_id": "TGT-001",
+      "asset_id": "ASSET-001",
+      "target_type": "web_service",
+      "hostname": "web-01.example.internal",
+      "url": "https://web-01.example.internal"
+    }
+  ],
+  "checks": [
+    {
+      "validation_check_id": "VCHECK-001",
+      "check_type": "http_security_headers",
+      "target_id": "TGT-001",
+      "tool_name": "web.headers_check",
+      "status": "queued",
+      "risk_level": "low"
+    },
+    {
+      "validation_check_id": "VCHECK-002",
+      "check_type": "tls_configuration",
+      "target_id": "TGT-001",
+      "tool_name": "web.tls_check",
+      "status": "queued",
+      "risk_level": "low"
+    }
+  ]
+}

@@ -16,3 +16,16 @@ This enables the platform to answer questions such as:
 - Is there vendor guidance or a patched version?
 
 The ingestion layer must use allowlisted sources, provenance, TTL, confidence scoring, and candidate review before knowledge promotion.
+
+## Authorized Security Validation
+
+SecAgent RiskOps should support safe target validation in addition to passive alert ingestion.
+
+This allows the platform to answer:
+- What services are exposed on an authorized target?
+- Are safe baseline checks passing?
+- Are any known-risk services or configurations present?
+- Which findings map to controls and risks?
+- What remediation plan should be proposed?
+
+The validation layer must remain scoped, auditable, and no-exploit by default.

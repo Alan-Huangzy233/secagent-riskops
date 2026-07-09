@@ -97,3 +97,26 @@ See:
 - [External Intelligence Ingestion](./docs/external-intelligence-ingestion.md)
 - [Crawler Safety and Intelligence Governance](./docs/crawler-safety-governance.md)
 - [Source Registry](./docs/source-registry.md)
+
+## Authorized Security Validation
+
+SecAgent RiskOps includes an Authorized Security Validation Layer for safely checking explicitly authorized targets.
+
+This layer supports read-only service discovery, web security baseline checks, configuration validation, evidence collection, external intelligence enrichment, finding generation, GRC mapping, and remediation planning.
+
+Default boundaries:
+
+- explicit scope required
+- target allowlist required
+- read-only by default
+- no exploit execution by default
+- no brute force
+- no payload upload
+- no lateral movement
+- all checks must be auditable
+
+See:
+- [Authorized Security Validation](./docs/authorized-security-validation.md)
+- [Validation Safety Policy](./docs/validation-safety-policy.md)
+- [Assessment Scope Model](./docs/assessment-scope-model.md)
+- [Security Validation Workflow](./docs/security-validation-workflow.md)

@@ -90,3 +90,19 @@ Deliverables:
 - ATT&CK enrichment design
 - Crawler safety and governance policy
 - External intelligence integration into risk scoring design
+
+## v0.1.7 Authorized Security Validation
+
+Goal: Build a safe, scoped, read-only validation layer that checks authorized targets and converts results into findings, evidence, risks, controls, and remediation plans.
+
+Deliverables:
+- Authorized Security Validation architecture
+- AssessmentTarget schema
+- AssessmentScope schema
+- ValidationJob schema
+- ValidationCheck schema
+- Scanner orchestrator skeleton
+- Safe service discovery checks
+- Web security baseline checks
+- External intelligence enrichment for validation findings
+- No-exploit default policy

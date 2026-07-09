@@ -163,3 +163,37 @@ Initial source priorities:
 Design rule: external intelligence can enrich SOC triage, GRC mapping, risk scoring, and remediation planning, but raw external content must never directly become active knowledge.
 
 See [External Intelligence Ingestion](./docs/external-intelligence-ingestion.md).
+
+## Authorized Security Validation Layer
+
+The Authorized Security Validation Layer allows SecAgent RiskOps to actively check explicitly authorized systems while remaining defensive, scoped, read-only by default, and auditable.
+
+```text
+Assessment Request
+  ↓
+Scope Validation
+  ↓
+Safety Policy Check
+  ↓
+Validation Flow Created
+  ↓
+Service Discovery
+  ↓
+Safe Configuration Checks
+  ↓
+External Intelligence Enrichment
+  ↓
+Finding Generation
+  ↓
+Evidence Package
+  ↓
+Risk Scoring
+  ↓
+GRC Control Mapping
+  ↓
+Remediation ActionPlan
+```
+
+Design rule: validation jobs require explicit scope and must not execute exploits, brute force, upload payloads, or perform lateral movement by default.
+
+See [Authorized Security Validation](./docs/authorized-security-validation.md).

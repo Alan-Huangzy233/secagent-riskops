@@ -1,0 +1,24 @@
+{
+  "finding_id": "FIND-VALIDATION-001",
+  "source": "authorized_security_validation",
+  "target_id": "TGT-001",
+  "validation_job_id": "VJOB-001",
+  "title": "Missing HTTP Strict-Transport-Security header",
+  "category": "web_security_baseline",
+  "severity": "medium",
+  "confidence": "high",
+  "evidence_ids": [
+    "EVID-001"
+  ],
+  "control_mapping_candidates": [
+    {
+      "framework": "CIS",
+      "control": "Secure Configuration"
+    }
+  ],
+  "remediation_candidate": {
+    "action_type": "configuration_change",
+    "requires_approval": true,
+    "summary": "Add HSTS header after confirming HTTPS-only behavior."
+  }
+}
