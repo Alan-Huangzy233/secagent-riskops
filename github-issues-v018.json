@@ -1,0 +1,110 @@
+[
+  {
+    "title": "Design curated knowledge intake architecture",
+    "milestone": "v0.1.8 Curated Knowledge Intake",
+    "labels": [
+      "type:architecture",
+      "priority:p0"
+    ],
+    "body": "Implement: Design curated knowledge intake architecture.\n\nAcceptance Criteria:\n- [ ] Design is documented\n- [ ] Provenance and audit logging are preserved\n- [ ] Manual content remains candidate-only until review\n- [ ] Public-repository examples use sanitized placeholders\n"
+  },
+  {
+    "title": "Implement secure manual upload API",
+    "milestone": "v0.1.8 Curated Knowledge Intake",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Implement: Implement secure manual upload API.\n\nAcceptance Criteria:\n- [ ] Design is documented\n- [ ] Provenance and audit logging are preserved\n- [ ] Manual content remains candidate-only until review\n- [ ] Public-repository examples use sanitized placeholders\n"
+  },
+  {
+    "title": "Implement upload batch, document, and chunk schemas",
+    "milestone": "v0.1.8 Curated Knowledge Intake",
+    "labels": [
+      "type:backend",
+      "priority:p0"
+    ],
+    "body": "Implement: Implement upload batch, document, and chunk schemas.\n\nAcceptance Criteria:\n- [ ] Design is documented\n- [ ] Provenance and audit logging are preserved\n- [ ] Manual content remains candidate-only until review\n- [ ] Public-repository examples use sanitized placeholders\n"
+  },
+  {
+    "title": "Implement security document parser pipeline",
+    "milestone": "v0.1.8 Curated Knowledge Intake",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p1"
+    ],
+    "body": "Implement: Implement security document parser pipeline.\n\nAcceptance Criteria:\n- [ ] Design is documented\n- [ ] Provenance and audit logging are preserved\n- [ ] Manual content remains candidate-only until review\n- [ ] Public-repository examples use sanitized placeholders\n"
+  },
+  {
+    "title": "Extract CVE, ATT&CK, product, mitigation, and control entities",
+    "milestone": "v0.1.8 Curated Knowledge Intake",
+    "labels": [
+      "type:agent",
+      "type:backend",
+      "priority:p1"
+    ],
+    "body": "Implement: Extract CVE, ATT&CK, product, mitigation, and control entities.\n\nAcceptance Criteria:\n- [ ] Design is documented\n- [ ] Provenance and audit logging are preserved\n- [ ] Manual content remains candidate-only until review\n- [ ] Public-repository examples use sanitized placeholders\n"
+  },
+  {
+    "title": "Implement knowledge candidate preview and editing",
+    "milestone": "v0.1.8 Curated Knowledge Intake",
+    "labels": [
+      "type:frontend",
+      "type:knowledge",
+      "priority:p1"
+    ],
+    "body": "Implement: Implement knowledge candidate preview and editing.\n\nAcceptance Criteria:\n- [ ] Design is documented\n- [ ] Provenance and audit logging are preserved\n- [ ] Manual content remains candidate-only until review\n- [ ] Public-repository examples use sanitized placeholders\n"
+  },
+  {
+    "title": "Implement manual knowledge review queue",
+    "milestone": "v0.1.8 Curated Knowledge Intake",
+    "labels": [
+      "type:backend",
+      "type:frontend",
+      "priority:p1"
+    ],
+    "body": "Implement: Implement manual knowledge review queue.\n\nAcceptance Criteria:\n- [ ] Design is documented\n- [ ] Provenance and audit logging are preserved\n- [ ] Manual content remains candidate-only until review\n- [ ] Public-repository examples use sanitized placeholders\n"
+  },
+  {
+    "title": "Add malware, secret, PII, and prompt-injection scanning for uploads",
+    "milestone": "v0.1.8 Curated Knowledge Intake",
+    "labels": [
+      "type:security",
+      "type:backend",
+      "priority:p0"
+    ],
+    "body": "Implement: Add malware, secret, PII, and prompt-injection scanning for uploads.\n\nAcceptance Criteria:\n- [ ] Design is documented\n- [ ] Provenance and audit logging are preserved\n- [ ] Manual content remains candidate-only until review\n- [ ] Public-repository examples use sanitized placeholders\n"
+  },
+  {
+    "title": "Convert authorized lab writeups into defensive knowledge candidates",
+    "milestone": "v0.1.8 Curated Knowledge Intake",
+    "labels": [
+      "type:agent",
+      "type:soc",
+      "priority:p1"
+    ],
+    "body": "Implement: Convert authorized lab writeups into defensive knowledge candidates.\n\nAcceptance Criteria:\n- [ ] Design is documented\n- [ ] Provenance and audit logging are preserved\n- [ ] Manual content remains candidate-only until review\n- [ ] Public-repository examples use sanitized placeholders\n"
+  },
+  {
+    "title": "Integrate manual uploads with deduplication and cross-source validation",
+    "milestone": "v0.1.8 Curated Knowledge Intake",
+    "labels": [
+      "type:backend",
+      "type:knowledge",
+      "priority:p1"
+    ],
+    "body": "Implement: Integrate manual uploads with deduplication and cross-source validation.\n\nAcceptance Criteria:\n- [ ] Design is documented\n- [ ] Provenance and audit logging are preserved\n- [ ] Manual content remains candidate-only until review\n- [ ] Public-repository examples use sanitized placeholders\n"
+  },
+  {
+    "title": "Add public repository privacy and secret audit",
+    "milestone": "v0.1.8 Curated Knowledge Intake",
+    "labels": [
+      "type:security",
+      "type:devops",
+      "priority:p0"
+    ],
+    "body": "Implement: Add public repository privacy and secret audit.\n\nAcceptance Criteria:\n- [ ] Design is documented\n- [ ] Provenance and audit logging are preserved\n- [ ] Manual content remains candidate-only until review\n- [ ] Public-repository examples use sanitized placeholders\n"
+  }
+]

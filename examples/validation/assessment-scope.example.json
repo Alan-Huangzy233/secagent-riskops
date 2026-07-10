@@ -2,7 +2,7 @@
   "scope_id": "SCOPE-001",
   "title": "Lab web validation",
   "status": "active",
-  "authorized_by": "alan",
+  "authorized_by": "security-operator",
   "valid_from": "2026-07-09T00:00:00Z",
   "valid_until": "2026-07-16T00:00:00Z",
   "allowed_targets": [

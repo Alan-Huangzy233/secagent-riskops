@@ -1,0 +1,9 @@
+{
+  "upload_batch_id": "UPLOAD-001",
+  "submitted_by": "security-operator",
+  "submitted_at": "2026-07-09T00:00:00Z",
+  "status": "processing",
+  "document_count": 1,
+  "source_description": "Authorized lab writeup",
+  "rights_confirmation": true
+}

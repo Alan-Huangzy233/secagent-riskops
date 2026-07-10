@@ -1,0 +1,22 @@
+{
+  "candidate_id": "KC-MANUAL-001",
+  "candidate_type": "lab_defensive_knowledge",
+  "status": "candidate",
+  "title": "Management interface weak-credential defensive guidance",
+  "summary": "Sanitized defensive lessons derived from an authorized training environment.",
+  "lab_only": true,
+  "production_validated": false,
+  "confidence": 0.65,
+  "ttl_days": 180,
+  "source_refs": [
+    {
+      "document_id": "DOC-001",
+      "source_type": "manual_upload"
+    }
+  ],
+  "review": {
+    "requires_human_review": true,
+    "decision": null,
+    "reviewed_by": null
+  }
+}

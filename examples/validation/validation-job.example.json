@@ -3,7 +3,7 @@
   "scope_id": "SCOPE-001",
   "flow_id": "FLOW-001",
   "status": "running",
-  "requested_by": "alan",
+  "requested_by": "security-operator",
   "targets": [
     {
       "target_id": "TGT-001",

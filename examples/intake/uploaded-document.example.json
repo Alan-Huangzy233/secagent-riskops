@@ -1,0 +1,15 @@
+{
+  "document_id": "DOC-001",
+  "upload_batch_id": "UPLOAD-001",
+  "filename": "authorized-lab-writeup.md",
+  "mime_type": "text/markdown",
+  "file_size": 4096,
+  "content_hash": "sha256:REPLACE_WITH_HASH",
+  "storage_uri": "object://manual-intake/DOC-001",
+  "source_type": "manual_upload",
+  "classification": "authorized_training",
+  "processing_status": "parsed",
+  "source_url": "https://example.com/authorized-source",
+  "license": "review_required",
+  "redistribution_allowed": false
+}

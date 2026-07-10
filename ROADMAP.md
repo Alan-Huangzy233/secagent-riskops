@@ -106,3 +106,19 @@ Deliverables:
 - Web security baseline checks
 - External intelligence enrichment for validation findings
 - No-exploit default policy
+
+## v0.1.8 Curated Knowledge Intake
+
+Goal: Build a secure manual upload, parsing, review, and promotion workflow for user-provided security documents, authorized lab writeups, advisories, rules, and remediation guidance.
+
+Deliverables:
+- UploadBatch, UploadedDocument, and DocumentChunk schemas
+- Secure manual upload API
+- Safe parser pipeline
+- Defensive entity extraction
+- Candidate preview and editing
+- Manual review queue
+- Malware, secret, PII, and prompt-injection screening
+- Lab-writeup-to-defensive-knowledge transformation
+- Deduplication and cross-source validation
+- Public repository privacy and secret audit

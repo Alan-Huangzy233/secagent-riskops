@@ -25,3 +25,11 @@ If you find a vulnerability in SecAgent RiskOps, please open a private security 
 - Enforce target allowlists.
 - Require structured ActionPlans for remediation.
 - Maintain rollback paths where possible.
+
+## Public Repository and Upload Safety
+
+- Do not commit runtime uploads, evidence, secrets, or operational data.
+- Manually uploaded documents are untrusted and must not be executed.
+- Uploaded content must pass secret, personal-data, malware, and prompt-injection checks.
+- Public examples must use neutral placeholders.
+- Run `bash scripts/check_public_repo.sh` before publication.

@@ -1,0 +1,28 @@
+
+
+# Public repository safety
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+secrets.json
+runtime-data/
+uploads/
+evidence/
+artifacts/
+.local-audit/
+.DS_Store
+
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/

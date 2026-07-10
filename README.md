@@ -120,3 +120,14 @@ See:
 - [Validation Safety Policy](./docs/validation-safety-policy.md)
 - [Assessment Scope Model](./docs/assessment-scope-model.md)
 - [Security Validation Workflow](./docs/security-validation-workflow.md)
+
+## Curated Knowledge Intake
+
+SecAgent RiskOps supports secure manual submission of authorized security documents, lab writeups, advisories, rules, remediation guidance, pasted text, and source URLs.
+
+Manual submissions pass through security and privacy scanning, parsing, deduplication, cross-validation, and human review before becoming active knowledge.
+
+See:
+- [Curated Knowledge Intake](./docs/curated-knowledge-intake.md)
+- [Manual Upload Security](./docs/manual-upload-security.md)
+- [Public Repository Security](./docs/public-repository-security.md)

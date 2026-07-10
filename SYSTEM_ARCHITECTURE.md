@@ -197,3 +197,23 @@ Remediation ActionPlan
 Design rule: validation jobs require explicit scope and must not execute exploits, brute force, upload payloads, or perform lateral movement by default.
 
 See [Authorized Security Validation](./docs/authorized-security-validation.md).
+
+## Curated Knowledge Intake Layer
+
+```text
+External Connector ──────┐
+Manual Upload / Paste ───┼─> Raw Document
+Internal Learning ───────┘
+                              ↓
+                         Parse / Extract
+                              ↓
+                         Deduplicate
+                              ↓
+                      Knowledge Candidate
+                              ↓
+                    Validation / Human Review
+                              ↓
+                     Active Knowledge Base
+```
+
+Uploaded content is untrusted, candidate-only, and must pass security, privacy, provenance, and rights checks before promotion.
