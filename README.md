@@ -56,6 +56,15 @@ Knowledge Update
 
 See [ROADMAP.md](./ROADMAP.md).
 
+## Architecture Baseline
+
+- [Project Charter](./PROJECT_CHARTER.md)
+- [System Architecture](./SYSTEM_ARCHITECTURE.md)
+- [Threat Model](./THREAT_MODEL.md)
+- [Security Policy](./SECURITY.md)
+- [Autonomy Levels](./docs/autonomy-levels.md)
+- [Agent Integration Boundary](./docs/agent-integration.md)
+
 ## Authorized Use
 
 SecAgent RiskOps is intended only for authorized security assessment, monitoring, compliance, and remediation workflows. It must not be used against systems without explicit permission.
@@ -86,6 +95,8 @@ Current boundaries:
 - The system prioritizes analyst assistance and controlled automation over fully autonomous security operations.
 
 See [Current Capability Boundaries](./docs/capability-boundaries.md) and [Security Policy](./SECURITY.md).
+
+The configured autonomy level is only a maximum capability. Role, target, tool, risk, and approval policies may further restrict every action.
 
 ## External Intelligence Ingestion
 

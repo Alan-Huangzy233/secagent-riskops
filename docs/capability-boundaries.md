@@ -11,6 +11,7 @@ SecAgent RiskOps is an early-stage AI-assisted security operations platform prot
 - AI triage decisions must be evidence-grounded and auditable.
 - Suppression rules must be scoped, explainable, reversible, and time-limited.
 - The system prioritizes analyst assistance and controlled automation over fully autonomous security operations.
+- The documented architecture is a target design; the current repository is not yet a runnable SOC or remediation service.
 
 ## Design Philosophy
 
@@ -34,3 +35,13 @@ Audit records everything.
 - Knowledge promotion without provenance
 - Remediation without preflight, backup, verification, and rollback
 - Treating target-provided text as trusted instructions
+- Treating possession of credentials or network reachability as authorization
+- Treating a configured autonomy level as permission to bypass policy
+
+## Related Baselines
+
+- [Project Charter](../PROJECT_CHARTER.md)
+- [System Architecture](../SYSTEM_ARCHITECTURE.md)
+- [Threat Model](../THREAT_MODEL.md)
+- [Autonomy Levels](./autonomy-levels.md)
+- [Security Policy](../SECURITY.md)
