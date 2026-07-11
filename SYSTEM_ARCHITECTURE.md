@@ -1,219 +1,237 @@
 # SecAgent RiskOps System Architecture
 
-## High-Level Architecture
+## Purpose
+
+This document defines the initial logical architecture, system boundary, trust boundaries, module responsibilities, and decision controls for SecAgent RiskOps. It describes the target architecture; implementation status is documented separately in [Current Capability Boundaries](./docs/capability-boundaries.md).
+
+## System Context
+
+```text
+Authorized users and systems
+        |
+        v
+API / Web UI / Connector boundary
+        |
+        v
+SecAgent RiskOps control plane
+  - SOC
+  - GRC
+  - Remediation
+  - Knowledge
+        |
+        +----> PostgreSQL / evidence and artifact storage
+        +----> approved AI provider
+        +----> approved intelligence sources
+        +----> typed executor adapters
+                          |
+                          v
+                 explicitly authorized targets
+```
+
+SecAgent RiskOps is a control and decision platform. External sources, AI providers, and target systems remain outside its trust boundary and must be accessed through validated adapters.
+
+## Logical Architecture
 
 ```text
 Data Sources
-├── Code Scanner
-├── Linux / Windows Logs
+├── Code scanner and manual findings
+├── Linux / Windows logs
 ├── Suricata / Zeek / Packetbeat
-├── Cloud Logs
-├── GitHub Security Alerts
-├── SIEM Connectors
-└── Manual Findings
+├── Cloud and GitHub security alerts
+├── Approved external intelligence sources
+└── Authorized manual uploads
 
-Ingestion Layer
-├── Parser
-├── Normalizer
-├── Deduplicator
-├── Event Store
-└── Evidence Store
+Ingress and Validation
+├── Authentication and authorization
+├── Scope and source validation
+├── Parser and schema validation
+├── Secret / PII / malicious-content screening
+└── Raw evidence capture
 
-Context Layer
-├── Asset Inventory
-├── Identity Graph
-├── Entity Risk Graph
-├── Control Library
-├── Threat Intel
-└── Historical Baseline
+Core Processing
+├── Normalization and deduplication
+├── Correlation and enrichment
+├── Deterministic rules and risk scoring
+├── Flow / Task / Step runtime
+└── Evidence and artifact linkage
 
-Detection & Triage Layer
-├── Deterministic Rules
-├── Sigma / Custom Rules
-├── Correlation Engine
-├── Risk Scoring Engine
-├── AI Triage Agent
-├── Skeptic Agent
-└── Disposition Engine
+Product Modules
+├── SOC
+├── GRC
+├── Remediation
+└── Knowledge
 
-SOC Layer
-├── SOC Inbox
-├── Incident Timeline
-├── Attack Story Graph
-├── MITRE ATT&CK Mapping
-├── Suppression Rules
-└── Daily Briefing
+Control Plane
+├── Policy engine
+├── Approval service
+├── Typed tool registry
+├── Autonomy-level enforcement
+└── Audit and observability
 
-GRC Layer
-├── Control Mapping
-├── Evidence-as-Code
-├── Risk Register
-├── Control Status
-├── Audit Package
-└── OSCAL-like Export
-
-Remediation Layer
-├── Action Planner
-├── Policy Engine
-├── Approval Queue
-├── Typed Executor
-├── Verifier
-├── Rollback Manager
-└── Remediation Report
-
-Knowledge Layer
-├── Detection Knowledge
-├── Suppression Knowledge
-├── Remediation Knowledge
-├── Control Knowledge
-├── Feedback Loop
-└── Versioning / TTL
-
-Observability & Governance
-├── Agent Trace
-├── Tool Call Logs
-├── Approval Logs
-├── Model Evaluation
-├── Prompt Injection Tests
-└── Admin Policies
+Persistence
+├── PostgreSQL system of record
+├── Evidence / artifact storage
+├── Immutable or append-oriented audit records
+└── Secrets stored outside application records
 ```
 
-## Core Design Principles
+## Core Module Boundaries
 
-1. Evidence first: every conclusion must link back to evidence.
-2. Deterministic detection first: LLMs triage, enrich, and explain; they do not replace deterministic detection.
-3. AI proposes; policy decides; executor acts.
-4. High-risk actions require human approval.
-5. Suppression must be explainable, scoped, reversible, and time-limited.
-6. Knowledge promotion requires validation.
-7. All agent decisions, tool calls, approvals, and remediation actions must be auditable.
+| Module | Owns | Consumes | Produces | Must not do |
+|---|---|---|---|---|
+| SOC | alerts, groups, triage, incidents | telemetry, assets, intelligence, evidence | dispositions, incidents, tuning candidates | destroy source evidence or silently activate risky suppression |
+| GRC | controls, mappings, gaps, risks | confirmed findings/incidents and evidence | control mappings, evidence packages, risk records | certify compliance or accept risk autonomously |
+| Remediation | ActionPlans, approvals, execution lifecycle | findings, risks, policy and target context | verified changes, rollback and reports | execute raw model output or bypass policy |
+| Knowledge | candidate and active knowledge lifecycle | reviewed operational learning and external content | versioned defensive knowledge | activate unreviewed content |
 
-## First Technical Stack Proposal
+Cross-cutting services such as assets, identities, evidence, workflow runtime, policy, authorization, and audit are platform capabilities rather than separate product outcomes.
 
-- Backend: FastAPI
-- Storage: PostgreSQL
-- Live updates: WebSocket or SSE
-- Frontend: React + TypeScript
-- Agent orchestration: internal orchestrator first; optional future integration with agent frameworks
-- Search/event store: PostgreSQL first; OpenSearch/ClickHouse later
-- Executor adapters: GitHub first, Linux SSH lab second
+## Primary Data Flow
 
-## Agent Workflow Runtime
+```text
+Authorized input
+  -> validate source and scope
+  -> retain raw evidence
+  -> normalize and correlate
+  -> deterministic scoring
+  -> evidence-grounded AI assistance
+  -> policy/skeptic validation
+  -> human-reviewable incident or candidate
+  -> GRC mapping and risk candidate
+  -> structured remediation plan
+  -> policy evaluation and approval
+  -> typed execution
+  -> independent verification
+  -> rollback on failure
+  -> reviewed knowledge candidate
+```
 
-SecAgent RiskOps uses a Flow-based runtime inspired by security automation platforms, but adapted for defensive SOC, GRC, and controlled remediation workflows.
+The flow is not required to continue through every stage. A policy failure, insufficient evidence, low confidence, expired authorization, or failed verification stops or pauses processing.
+
+## Evidence and Audit Model
+
+Evidence is not a final child of an incident; it is a cross-cutting record that can support alerts, findings, triage decisions, incidents, control mappings, approvals, tool calls, and verification results.
+
+Every material decision should record:
+
+- actor or agent identity
+- input and evidence references
+- policy and model version where applicable
+- structured output and confidence
+- timestamp and workflow state
+- approval or rejection decision
+- tool input/output with sensitive values redacted
+
+Raw evidence should be content-addressed or integrity-protected. Audit records should be append-oriented and corrections should create new records rather than silently rewriting history.
+
+## Trust Boundaries
+
+### 1. User and API Boundary
+
+Requests are untrusted until authenticated, authorized, schema-validated, rate-limited, and checked against tenant and role scope.
+
+### 2. Ingestion Boundary
+
+Logs, alerts, documents, repository content, and external intelligence are untrusted data. They may contain malformed content, secrets, personal data, or prompt injection.
+
+### 3. Model Boundary
+
+AI providers are probabilistic external processors. Model output is never an authorization decision and cannot directly invoke an executor.
+
+### 4. Tool and Target Boundary
+
+All target access crosses a high-risk boundary. The policy engine must validate actor, target, tool, parameters, scope, risk, autonomy level, and approval before dispatch.
+
+### 5. Persistence Boundary
+
+Application records, sensitive evidence, credentials, and audit records have different retention and access requirements. Secrets must use a dedicated secret store and must not be copied into prompts, normal logs, or audit payloads.
+
+## Decision and Execution Control
+
+```text
+Agent recommendation
+        |
+        v
+Structured schema validation
+        |
+        v
+Policy evaluation ---- blocked ----> audit + stop
+        |
+        v
+Approval if required -- rejected ---> audit + stop
+        |
+        v
+Typed tool dispatch
+        |
+        v
+Verification ---------- failed -----> stop / rollback / review
+```
+
+The policy engine is independent of the agent that proposes the action. Executor adapters accept typed operations and validated parameters, not arbitrary instructions from retrieved content or model output.
+
+## Workflow Runtime
 
 ```text
 Flow
-  ↓
-Task
-  ↓
-Step
-  ↓
-ToolCall
-  ↓
-Evidence / Artifact
+  -> Task
+    -> Step
+      -> ToolCall
+        -> Evidence / Artifact
 ```
 
-This runtime supports:
-- SOC investigations
-- GRC mapping
-- Remediation planning
-- Approval workflows
-- Knowledge review
-- Replay/evaluation runs
+The runtime supports SOC investigations, GRC mapping, remediation, approval, knowledge review, and replay. Every state transition must be validated and auditable. See [Agent Workflow Runtime](./docs/workflow-runtime.md).
 
-See [Agent Workflow Runtime](./docs/workflow-runtime.md).
+## Agent Integration Boundary
 
-## External Intelligence Ingestion Layer
+Agents are replaceable executors inside the Flow runtime. Product modules request an agent capability through a registry; they do not import a provider-specific implementation or call a model SDK directly.
 
-The External Intelligence Ingestion Layer expands SecAgent RiskOps with trusted external security knowledge.
+The stable integration seams are:
 
-```text
-External Source
-  ↓
-Connector / Fetcher
-  ↓
-Raw Intelligence Document
-  ↓
-Parser / Extractor
-  ↓
-Entity Resolver
-  ↓
-Deduplication
-  ↓
-Source Reputation Check
-  ↓
-Knowledge Candidate
-  ↓
-Validation / Human Review / TTL
-  ↓
-Active Knowledge Base
-```
+- Agent Contract for metadata, bounded context, and structured result
+- Agent Registry for capability and version resolution
+- Model Provider boundary for vendor-neutral inference
+- Tool Gateway for policy-controlled typed operations
+- Structured Handoff for orchestrator-mediated multi-agent cooperation
+- Supervisor constraints for scheduling without privileged bypass
 
-Initial source priorities:
-- NVD CVE API
-- CISA KEV
-- FIRST EPSS
-- MITRE ATT&CK
-- GitHub Security Advisories
-- OSV.dev
-- CWE / CAPEC
-- Vendor security advisories
+Single-agent and multi-agent workflows use the same Flow / Task / Step model. Agents cannot communicate or execute tools outside the orchestrator, policy, evidence, and audit boundaries.
 
-Design rule: external intelligence can enrich SOC triage, GRC mapping, risk scoring, and remediation planning, but raw external content must never directly become active knowledge.
+See [Agent Integration Boundary](./docs/agent-integration.md).
 
-See [External Intelligence Ingestion](./docs/external-intelligence-ingestion.md).
+## Initial Technical Architecture
 
-## Authorized Security Validation Layer
+- Backend API: FastAPI and Pydantic.
+- System of record: PostgreSQL with explicit migrations.
+- Frontend: React and TypeScript.
+- Live updates: SSE first; WebSocket only where bidirectional communication is required.
+- Background work: durable job abstraction with explicit retry, timeout, cancellation, and idempotency semantics.
+- Agent orchestration: internal workflow runtime before adopting a general agent framework.
+- Evidence storage: PostgreSQL metadata plus an object-storage-compatible artifact interface.
+- Search: PostgreSQL first; introduce OpenSearch or ClickHouse only when measured requirements justify it.
+- Executors: GitHub patch/PR adapter first; restricted Linux lab adapter later.
+- Secrets: external secret manager or environment injection, never database plaintext.
 
-The Authorized Security Validation Layer allows SecAgent RiskOps to actively check explicitly authorized systems while remaining defensive, scoped, read-only by default, and auditable.
+## Deployment Boundaries
 
-```text
-Assessment Request
-  ↓
-Scope Validation
-  ↓
-Safety Policy Check
-  ↓
-Validation Flow Created
-  ↓
-Service Discovery
-  ↓
-Safe Configuration Checks
-  ↓
-External Intelligence Enrichment
-  ↓
-Finding Generation
-  ↓
-Evidence Package
-  ↓
-Risk Scoring
-  ↓
-GRC Control Mapping
-  ↓
-Remediation ActionPlan
-```
+The first deployment may be a modular monolith: one API service, one worker process, PostgreSQL, artifact storage, and a frontend. Module boundaries should be enforced in code and data ownership before splitting services.
 
-Design rule: validation jobs require explicit scope and must not execute exploits, brute force, upload payloads, or perform lateral movement by default.
+This avoids premature distributed-system complexity while preserving clear seams for later scaling.
 
-See [Authorized Security Validation](./docs/authorized-security-validation.md).
+## Core Design Principles
 
-## Curated Knowledge Intake Layer
+1. Evidence first.
+2. Deterministic detection and policy controls before probabilistic assistance.
+3. AI proposes; policy decides; typed executors act.
+4. Authorization is explicit, scoped, time-bound, and auditable.
+5. High-risk actions require human accountability.
+6. Suppression is scoped, explainable, reversible, and time-limited.
+7. Knowledge promotion requires validation.
+8. Safe failure means stop, request review, or roll back.
 
-```text
-External Connector ──────┐
-Manual Upload / Paste ───┼─> Raw Document
-Internal Learning ───────┘
-                              ↓
-                         Parse / Extract
-                              ↓
-                         Deduplicate
-                              ↓
-                      Knowledge Candidate
-                              ↓
-                    Validation / Human Review
-                              ↓
-                     Active Knowledge Base
-```
+## Related Architecture Extensions
 
-Uploaded content is untrusted, candidate-only, and must pass security, privacy, provenance, and rights checks before promotion.
+- [Agent Integration Boundary](./docs/agent-integration.md)
+- [External Intelligence Ingestion](./docs/external-intelligence-ingestion.md)
+- [Authorized Security Validation](./docs/authorized-security-validation.md)
+- [Curated Knowledge Intake](./docs/curated-knowledge-intake.md)
+- [Controlled Remediation Workflow](./docs/remediation-workflow.md)

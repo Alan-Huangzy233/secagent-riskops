@@ -4,6 +4,10 @@
 
 SecAgent RiskOps is designed for authorized security monitoring, compliance, and remediation workflows. Do not use this project against systems without explicit permission.
 
+Authorization must identify the responsible actor, allowed purpose, target or data scope, permitted operations, and validity period. Credentials, connectivity, public exposure, or ownership assumptions do not substitute for explicit authorization.
+
+When authorization is missing, ambiguous, expired, or conflicts with policy, the system must fail closed and record the blocked attempt without exposing sensitive values.
+
 ## Reporting Security Issues
 
 If you find a vulnerability in SecAgent RiskOps, please open a private security advisory or contact the maintainer directly.
@@ -16,6 +20,8 @@ If you find a vulnerability in SecAgent RiskOps, please open a private security 
 - All execution should be auditable.
 - Target systems must be allowlisted.
 - Sensitive data should be redacted before AI processing.
+- AI output is advisory and cannot authorize its own tool calls.
+- Configured autonomy is a maximum; role, target, tool, risk, and approval policy may further restrict it.
 
 ## Agent Safety Requirements
 
@@ -25,6 +31,22 @@ If you find a vulnerability in SecAgent RiskOps, please open a private security 
 - Enforce target allowlists.
 - Require structured ActionPlans for remediation.
 - Maintain rollback paths where possible.
+- Bind approvals to the exact ActionPlan version, target, operation, and expiry.
+- Stop or request review when evidence, confidence, authorization, or verification is insufficient.
+
+## Active Validation and Remediation Preconditions
+
+Before dispatching a target-facing tool, the platform must verify:
+
+- authenticated and authorized actor
+- active scope and allowlisted target
+- allowlisted typed tool and parameters
+- permitted autonomy level
+- action risk classification
+- required approval
+- audit and evidence linkage
+
+No-exploit, no-brute-force, no-payload-upload, and no-lateral-movement are the default validation policy.
 
 ## Public Repository and Upload Safety
 
