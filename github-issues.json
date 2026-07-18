@@ -519,5 +519,106 @@
       "priority:p0"
     ],
     "body": "Implement: Add public repository privacy and secret audit.\n\nAcceptance Criteria:\n- [ ] Design is documented\n- [ ] Provenance and audit logging are preserved\n- [ ] Manual content remains candidate-only until review\n- [ ] Public-repository examples use sanitized placeholders\n"
+  },
+  {
+    "title": "Implement assessment authorization attestation and evidence references",
+    "milestone": "v0.1.9 Assessment Authorization and Rules of Engagement",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Build the accountable authorization record required before active validation. This extends the baseline assessment model in #38.\n\nTasks:\n- [ ] Add AssessmentAuthorization schema and persistence lifecycle\n- [ ] Capture requestor, authorizing party, purpose, validity, and evidence reference\n- [ ] Support draft, verified, expired, revoked, and rejected states\n- [ ] Apply tenant authorization and separation-of-duties policy where configured\n- [ ] Keep raw authorization documents out of general audit logs\n\nAcceptance Criteria:\n- [ ] Level 1 or higher validation is denied without verified, current authorization\n- [ ] Revocation and expiry prevent new target-facing dispatches\n- [ ] Audit events reference protected evidence without copying sensitive contents\n- [ ] Unit tests cover missing, expired, revoked, and cross-tenant authorization"
+  },
+  {
+    "title": "Implement scope draft and AI interpretation contract",
+    "milestone": "v0.1.9 Assessment Authorization and Rules of Engagement",
+    "labels": [
+      "type:agent",
+      "type:backend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Convert optional natural-language scope and Rules of Engagement input into a non-authoritative structured draft.\n\nTasks:\n- [ ] Add AssessmentScopeDraft input and output schemas\n- [ ] Extract typed targets, exclusions, ports, protocols, windows, limits, techniques, and stop conditions\n- [ ] Return per-field confidence, source rationale, conflicts, and unresolved questions\n- [ ] Prevent the model from inferring ownership, adding targets, or weakening deny rules\n- [ ] Preserve structured user input separately from model interpretation\n\nAcceptance Criteria:\n- [ ] Blank input never produces an unrestricted allow policy\n- [ ] Ambiguity that could broaden scope sets needs_clarification\n- [ ] Model output cannot activate a scope or authorize a tool call\n- [ ] Adversarial and contradictory input fixtures are covered by tests"
+  },
+  {
+    "title": "Build assessment scope and Rules of Engagement review UI",
+    "milestone": "v0.1.9 Assessment Authorization and Rules of Engagement",
+    "labels": [
+      "type:frontend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Build the preflight experience for authorization, structured scope, optional natural-language instructions, and effective-policy confirmation.\n\nTasks:\n- [ ] Add authorization attestation and evidence-reference step\n- [ ] Add structured allow targets, exclusions, ports, protocols, time window, and safety controls\n- [ ] Add optional natural-language input and AI parsing action\n- [ ] Show effective allow/deny policy, field confidence, conflicts, and unresolved questions\n- [ ] Add explicit confirmation and emergency-contact requirements\n- [ ] Keep Level 1 or higher start action disabled until policy is valid and approved\n\nAcceptance Criteria:\n- [ ] Blank scope visibly fails closed instead of implying no restrictions\n- [ ] Users can correct every AI-interpreted field before approval\n- [ ] Exclusions, limits, expiry, prohibited actions, and policy version are visible at confirmation\n- [ ] Accessibility and error-state tests cover the complete preflight flow"
+  },
+  {
+    "title": "Implement deterministic scope compiler and canonical policy hashing",
+    "milestone": "v0.1.9 Assessment Authorization and Rules of Engagement",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Compile reviewed scope drafts into deterministic effective policies independently of the AI parser.\n\nTasks:\n- [ ] Validate and normalize typed scope and RoE fields\n- [ ] Apply precedence: platform deny, tenant deny, scope deny, scope allow, default deny\n- [ ] Reject empty allow rules, invalid matchers, expired windows, absent limits, and policy conflicts\n- [ ] Produce a human-readable effective-policy preview\n- [ ] Canonicalize policy representation and generate a stable SHA-256 hash\n\nAcceptance Criteria:\n- [ ] Semantically identical inputs produce the same canonical policy hash\n- [ ] Compilation is deterministic and does not invoke an AI model\n- [ ] Unsupported safety levels and unresolved broadening ambiguity fail closed\n- [ ] Compiler decisions return stable machine-readable reason codes"
+  },
+  {
+    "title": "Implement immutable scope versioning and approval binding",
+    "milestone": "v0.1.9 Assessment Authorization and Rules of Engagement",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Bind validation authorization to an immutable AssessmentScopeVersion and exact canonical policy hash.\n\nTasks:\n- [ ] Persist immutable scope versions and lifecycle states\n- [ ] Bind approval to scope ID, version, policy hash, actor, safety level, and expiry\n- [ ] Invalidate prior approval after any material scope or RoE change\n- [ ] Support activation, supersession, expiration, revocation, and immediate scope shrink\n- [ ] Add scope-extension request and reapproval workflow\n\nAcceptance Criteria:\n- [ ] A ValidationJob cannot start with a stale or mismatched approval\n- [ ] Scope expansion always creates a new version and requires approval\n- [ ] Scope shrink and revocation block queued actions immediately\n- [ ] Version and approval transitions are append-oriented and auditable"
+  },
+  {
+    "title": "Implement typed target matchers and deny precedence",
+    "milestone": "v0.1.9 Assessment Authorization and Rules of Engagement",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Implement canonical target matching for exact hosts, domain suffixes, URL origins and paths, IP addresses, CIDR ranges, inventory assets, and cloud-resource identities.\n\nTasks:\n- [ ] Define typed matcher schemas and normalization rules\n- [ ] Make apex and subdomain wildcard semantics explicit\n- [ ] Normalize IDNs, case, trailing dots, IP forms, ports, and URL origins safely\n- [ ] Apply exclusions and higher-level denials before allow rules\n- [ ] Add private, loopback, link-local, and cloud-metadata boundary controls\n\nAcceptance Criteria:\n- [ ] Look-alike domains and suffix-boundary errors do not match\n- [ ] Explicit exclusions override broad allow rules\n- [ ] IPv4, IPv6, CIDR, IDN, URL, and cloud-identity tests cover edge cases\n- [ ] Invalid or non-normalizable matcher input fails closed"
+  },
+  {
+    "title": "Enforce scope at every target-facing runtime boundary",
+    "milestone": "v0.1.9 Assessment Authorization and Rules of Engagement",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Integrate immutable scope evaluation into the Tool Gateway and scanner runtime so authorization is checked continuously rather than only at job creation.\n\nTasks:\n- [ ] Require scope ID, version, policy hash, actor, tool, parameters, and normalized target in dispatch context\n- [ ] Recheck after DNS resolution and immediately before connection\n- [ ] Recheck redirects, discovered links and services, ports, protocols, and credential use\n- [ ] Add long-running job checkpoints and queued-action reevaluation\n- [ ] Deny on missing context, policy timeout, evaluator failure, or review_required\n\nAcceptance Criteria:\n- [ ] DNS rebinding and cross-origin redirect fixtures remain blocked\n- [ ] Discovery produces evidence but never expands scope automatically\n- [ ] Every target-facing ToolCall records the evaluated scope version and decision reason\n- [ ] Policy-engine failure cannot fall back to execution"
+  },
+  {
+    "title": "Implement Rules of Engagement limits and emergency stop",
+    "milestone": "v0.1.9 Assessment Authorization and Rules of Engagement",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Enforce operational Rules of Engagement, including time windows, request rate, concurrency, crawl bounds, data-handling constraints, automated stop conditions, and manual emergency stop.\n\nTasks:\n- [ ] Enforce timezone-aware execution windows\n- [ ] Enforce request, concurrency, crawl-depth, and redirect limits\n- [ ] Add target error-rate and contact-request stop conditions\n- [ ] Add emergency stop that prevents dispatch and cancels queued work\n- [ ] Define bounded cancellation and review-before-resume behavior\n\nAcceptance Criteria:\n- [ ] Jobs cannot start or continue outside their approved window\n- [ ] Rate and concurrency counters are safe across workers\n- [ ] Emergency stop prevents new dispatches and records final state\n- [ ] Resumption requires explicit review and a still-valid policy"
+  },
+  {
+    "title": "Add authorization and scope audit events with stable reason codes",
+    "milestone": "v0.1.9 Assessment Authorization and Rules of Engagement",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p1"
+    ],
+    "body": "Make authorization, scope interpretation, approval, enforcement, and stop decisions explainable without leaking sensitive values.\n\nTasks:\n- [ ] Define lifecycle audit events for authorization and scope versions\n- [ ] Define allow, deny, and review-required reason-code taxonomy\n- [ ] Record AI draft provenance and unresolved-question outcomes\n- [ ] Record DNS, redirect, discovered-target, limit, and emergency-stop decisions\n- [ ] Redact credentials, raw authorization documents, and sensitive target data\n\nAcceptance Criteria:\n- [ ] Every blocked and allowed target-facing action has a stable reason code\n- [ ] Audit records bind to scope version and policy hash\n- [ ] Corrections create new events instead of rewriting history\n- [ ] Redaction tests prevent protected values from entering general logs"
+  },
+  {
+    "title": "Add adversarial assessment scope enforcement test suite",
+    "milestone": "v0.1.9 Assessment Authorization and Rules of Engagement",
+    "labels": [
+      "type:testing",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Create evaluation fixtures and end-to-end tests for the authorization, compilation, approval, and runtime enforcement contract.\n\nTasks:\n- [ ] Cover blank, ambiguous, contradictory, expired, revoked, and cross-tenant scope\n- [ ] Cover wildcard confusion, IDN look-alikes, IPv4/IPv6 normalization, and CIDR boundaries\n- [ ] Cover DNS rebinding, private/link-local resolution, redirects, and discovered targets\n- [ ] Cover stale approval, hash mismatch, policy timeout, rate limits, and emergency stop\n- [ ] Add replayable expected decision reason codes\n\nAcceptance Criteria:\n- [ ] All fail-closed cases prove that no target-facing dispatch occurred\n- [ ] Tests verify both policy result and audit evidence\n- [ ] CI runs deterministic policy tests without external target access\n- [ ] Regression fixtures are added for every discovered scope-escape defect"
   }
 ]

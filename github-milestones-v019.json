@@ -1,0 +1,6 @@
+[
+  {
+    "title": "v0.1.9 Assessment Authorization and Rules of Engagement",
+    "description": "Turn user-provided assessment scope and pentest constraints into an explicit, reviewable, versioned, and deterministically enforced authorization policy."
+  }
+]
