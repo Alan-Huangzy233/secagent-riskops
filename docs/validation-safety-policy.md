@@ -20,15 +20,20 @@ Record everything.
 
 Every validation job must have:
 
-- explicit user request or approval
-- assessment scope
-- target allowlist
+- verified authorization and an accountable requestor
+- an approved, immutable assessment scope version
+- at least one typed target allow rule
+- explicit exclusions when required
 - allowed protocols and ports
-- rate limits
+- allowed check types and prohibited actions
+- numeric rate and concurrency limits
 - expiration time
 - safety level
+- stop conditions and an emergency contact
 - audit log
 - evidence storage
+
+A blank, missing, ambiguous, expired, or unapproved scope must fail closed. It never grants unrestricted access. Level 0 passive import may remain available because it does not contact a target.
 
 ## Safety Levels
 
@@ -105,6 +110,14 @@ A validation job must not run unless all of the following are true:
 - tool is registered
 - policy engine approves the tool call
 
+Explicit deny rules override allow rules. Platform and tenant policy override project scope. Discovery, DNS resolution, redirects, credentials, or previous successful access do not expand authorization.
+
+Scope enforcement must occur before dispatch, after DNS resolution, before following redirects or discovered links, before credential use, and at checkpoints during long-running jobs. A policy timeout or evaluator error is a denial.
+
+AI may propose a scope draft, identify ambiguity, and explain the effective policy. AI output cannot approve scope, infer target ownership, add targets, or weaken a policy denial.
+
+See [Assessment Authorization and Rules of Engagement](./assessment-authorization-and-rules-of-engagement.md).
+
 ## Evidence Requirements
 
 Every validation check should produce:
@@ -127,6 +140,16 @@ Do not run the check.
 Create audit log.
 Mark validation check as blocked.
 Surface reason to user.
+```
+
+If a stop condition or emergency stop is triggered:
+
+```text
+Prevent new dispatches.
+Cancel queued target-facing actions.
+Attempt bounded cancellation of running checks.
+Record final target and tool state.
+Require review before resumption.
 ```
 
 If verification or parsing fails:

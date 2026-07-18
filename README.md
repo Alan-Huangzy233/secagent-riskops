@@ -118,7 +118,11 @@ This layer supports read-only service discovery, web security baseline checks, c
 Default boundaries:
 
 - explicit scope required
+- blank or ambiguous scope fails closed; it never means unrestricted access
 - target allowlist required
+- AI may draft scope but cannot authorize, approve, or expand it
+- approved scope and Rules of Engagement are immutable, versioned, and time-bound
+- DNS results, redirects, discovered targets, and every target-facing tool call are rechecked at runtime
 - read-only by default
 - no exploit execution by default
 - no brute force
@@ -128,6 +132,7 @@ Default boundaries:
 
 See:
 - [Authorized Security Validation](./docs/authorized-security-validation.md)
+- [Assessment Authorization and Rules of Engagement](./docs/assessment-authorization-and-rules-of-engagement.md)
 - [Validation Safety Policy](./docs/validation-safety-policy.md)
 - [Assessment Scope Model](./docs/assessment-scope-model.md)
 - [Security Validation Workflow](./docs/security-validation-workflow.md)

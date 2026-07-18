@@ -122,3 +122,21 @@ Deliverables:
 - Lab-writeup-to-defensive-knowledge transformation
 - Deduplication and cross-source validation
 - Public repository privacy and secret audit
+
+## v0.1.9 Assessment Authorization and Rules of Engagement
+
+Goal: Turn user-provided assessment scope and pentest constraints into an explicit, reviewable, versioned, and deterministically enforced authorization policy.
+
+Deliverables:
+- Authorization attestation and evidence-reference model
+- Structured scope and Rules of Engagement form
+- Optional natural-language scope input
+- AI-assisted parsing with per-field confidence, conflicts, and unresolved questions
+- Effective-policy preview and human confirmation flow
+- Immutable AssessmentScopeVersion and approval binding
+- Typed allow and deny target matchers
+- Time window, rate, concurrency, crawl, credential, data-handling, and stop-condition controls
+- Default-deny behavior for blank, ambiguous, expired, and unapproved scope
+- Runtime checks for DNS, redirects, discovered services, credentials, and every target-facing tool call
+- Scope extension, revocation, expiration, and emergency-stop workflows
+- Stable policy decision reason codes and audit events

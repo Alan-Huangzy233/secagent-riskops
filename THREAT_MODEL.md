@@ -202,6 +202,30 @@ Controls:
 - Preserve conflicting results independently and require deterministic or human resolution.
 - Prevent Supervisors from approving actions, raising autonomy, or bypassing the Tool Gateway.
 
+### TM-14: Scope Interpretation or Approval Confusion
+
+Blank, ambiguous, or adversarial natural-language instructions are interpreted as broad permission, or an approval is reused after scope changes.
+
+Controls:
+
+- Require typed allow rules, exclusions, expiry, and numeric execution limits for active validation.
+- Treat AI interpretation as an unapproved draft with confidence, source rationale, conflicts, and unresolved questions.
+- Compile policy deterministically and show the effective policy before human confirmation.
+- Bind approval to immutable scope version and canonical policy hash.
+- Default deny when scope is blank, ambiguous, expired, unapproved, or conflicts with higher-level policy.
+
+### TM-15: Target Identity and Scope Escape
+
+DNS rebinding, cross-origin redirects, discovered services, wildcard confusion, or cloud-resource indirection causes the scanner to contact an unauthorized target.
+
+Controls:
+
+- Use typed, normalized matchers for exact hosts, domain suffixes, URL origins, IP addresses, CIDR ranges, and cloud-resource identities.
+- Define wildcard and apex semantics explicitly; deny rules override allow rules.
+- Recheck normalized hostname, resolved IP, port, protocol, redirect destination, and discovered target before access.
+- Treat discovery as evidence only; require a new scope version and approval before expansion.
+- Stop on policy timeout, evaluator error, DNS anomaly, or unresolved target identity.
+
 ## Safe Failure Rules
 
 The system must stop, pause for review, or roll back when:
