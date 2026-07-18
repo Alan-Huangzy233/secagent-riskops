@@ -1,0 +1,48 @@
+{
+  "scope_draft_id": "SCOPEDRAFT-001",
+  "authorization_id": "AUTH-001",
+  "natural_language_input": "Validate *.example.test and 192.0.2.0/28 during the approved maintenance window. Exclude payments.example.test and third-party services. Read-only web and TLS checks only. Stop if error rate exceeds 2%.",
+  "structured_input": {
+    "valid_from": "2026-07-18T07:00:00Z",
+    "valid_until": "2026-07-18T13:00:00Z",
+    "timezone": "America/Los_Angeles"
+  },
+  "ai_interpretation": {
+    "allow_targets": [
+      {
+        "type": "domain_suffix",
+        "value": "example.test",
+        "include_apex": false,
+        "confidence": 0.99
+      },
+      {
+        "type": "cidr",
+        "value": "192.0.2.0/28",
+        "confidence": 0.99
+      }
+    ],
+    "deny_targets": [
+      {
+        "type": "exact_host",
+        "value": "payments.example.test",
+        "confidence": 0.99
+      }
+    ],
+    "safety_level": "level_2_baseline_configuration",
+    "stop_conditions": [
+      {
+        "type": "target_error_rate",
+        "operator": ">",
+        "value": 0.02,
+        "confidence": 0.98
+      }
+    ]
+  },
+  "unresolved_questions": [
+    "Should the apex domain example.test also be included?",
+    "Which exact third-party hosts must be excluded?",
+    "What request-rate and concurrency limits are approved?"
+  ],
+  "status": "needs_clarification",
+  "can_start_active_validation": false
+}

@@ -43,7 +43,8 @@ Data Sources
 
 Ingress and Validation
 ├── Authentication and authorization
-├── Scope and source validation
+├── Authorization evidence and scope-draft validation
+├── Rules of Engagement compilation and approval
 ├── Parser and schema validation
 ├── Secret / PII / malicious-content screening
 └── Raw evidence capture
@@ -64,6 +65,7 @@ Product Modules
 Control Plane
 ├── Policy engine
 ├── Approval service
+├── Immutable scope-version registry
 ├── Typed tool registry
 ├── Autonomy-level enforcement
 └── Audit and observability
@@ -140,7 +142,7 @@ AI providers are probabilistic external processors. Model output is never an aut
 
 ### 4. Tool and Target Boundary
 
-All target access crosses a high-risk boundary. The policy engine must validate actor, target, tool, parameters, scope, risk, autonomy level, and approval before dispatch.
+All target access crosses a high-risk boundary. The policy engine must validate actor, target, tool, parameters, immutable scope version, policy hash, Rules of Engagement, risk, autonomy level, and approval before dispatch. It repeats checks after DNS resolution and before redirects, discovered-target access, and credential use. Discovery never expands scope.
 
 ### 5. Persistence Boundary
 
@@ -168,6 +170,36 @@ Verification ---------- failed -----> stop / rollback / review
 ```
 
 The policy engine is independent of the agent that proposes the action. Executor adapters accept typed operations and validated parameters, not arbitrary instructions from retrieved content or model output.
+
+## Assessment Authorization Gate
+
+```text
+Authorization attestation and evidence
+        +
+Structured scope / Rules of Engagement
+        +
+Optional natural-language instructions
+        |
+        v
+AI interpretation draft (non-authoritative)
+        |
+        v
+Schema, ambiguity, and conflict validation
+        |
+        v
+Platform + tenant policy overlay
+        |
+        v
+Effective-policy preview and human approval
+        |
+        v
+Canonical hash + immutable active scope version
+        |
+        v
+Runtime policy evaluation at every target boundary
+```
+
+Blank or ambiguous scope cannot pass this gate for active validation. Material changes create a new scope version and invalidate approvals tied to the previous policy hash. See [Assessment Authorization and Rules of Engagement](./docs/assessment-authorization-and-rules-of-engagement.md).
 
 ## Workflow Runtime
 
@@ -233,5 +265,6 @@ This avoids premature distributed-system complexity while preserving clear seams
 - [Agent Integration Boundary](./docs/agent-integration.md)
 - [External Intelligence Ingestion](./docs/external-intelligence-ingestion.md)
 - [Authorized Security Validation](./docs/authorized-security-validation.md)
+- [Assessment Authorization and Rules of Engagement](./docs/assessment-authorization-and-rules-of-engagement.md)
 - [Curated Knowledge Intake](./docs/curated-knowledge-intake.md)
 - [Controlled Remediation Workflow](./docs/remediation-workflow.md)

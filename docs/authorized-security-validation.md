@@ -35,7 +35,13 @@ Evaluation Layer
 ```text
 Assessment Request
   ↓
-Scope Validation
+Authorization Verification
+  ↓
+Scope and Rules of Engagement Draft
+  ↓
+AI-Assisted Interpretation and Human Review
+  ↓
+Scope Compilation, Approval, and Activation
   ↓
 Safety Policy Check
   ↓
@@ -97,6 +103,8 @@ The validation layer must not perform the following by default:
 ```text
 AssessmentTarget
 AssessmentScope
+AssessmentScopeVersion
+ScopeApproval
 ValidationJob
 ValidationCheck
 ScanResult
@@ -121,11 +129,17 @@ ToolCall / Evidence / Finding
 
 ## Design Rules
 
-1. Every validation job must reference an explicit scope.
-2. Every target must be allowlisted.
-3. Every tool call must be logged.
-4. Every result must link to evidence.
-5. Every generated finding must preserve target, scope, and tool provenance.
-6. No exploit execution is allowed by default.
-7. External intelligence enrichment must include source references.
-8. Validation output should feed SOC, GRC, remediation, and knowledge workflows.
+1. Every validation job must reference an approved scope version and canonical policy hash.
+2. Blank, ambiguous, expired, or unapproved scope fails closed and never means unrestricted access.
+3. Every target must match a typed allow rule and must not match an exclusion.
+4. AI may draft and explain scope but cannot authorize, approve, or expand it.
+5. DNS results, redirects, discovered services, ports, protocols, and credentials are revalidated at runtime.
+6. Every tool call must be logged with a stable policy decision reason.
+7. Every result must link to evidence.
+8. Every generated finding must preserve target, scope version, policy hash, and tool provenance.
+9. No exploit execution is allowed by default.
+10. External intelligence enrichment must include source references.
+11. Scope expansion requires a new version and approval; emergency stop takes effect immediately.
+12. Validation output should feed SOC, GRC, remediation, and knowledge workflows.
+
+See [Assessment Authorization and Rules of Engagement](./assessment-authorization-and-rules-of-engagement.md) for the full preflight, policy compilation, and runtime enforcement design.

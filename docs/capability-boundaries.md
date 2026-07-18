@@ -8,6 +8,8 @@ SecAgent RiskOps is an early-stage AI-assisted security operations platform prot
 - It does not provide unrestricted autonomous shell access.
 - It does not execute medium/high-risk remediation without approval.
 - It is intended only for authorized environments.
+- The current repository documents target behavior for assessment authorization and scope enforcement; it does not yet provide a production policy compiler or target-facing scanner.
+- Blank or ambiguous scope must not be interpreted as permission for active validation.
 - AI triage decisions must be evidence-grounded and auditable.
 - Suppression rules must be scoped, explainable, reversible, and time-limited.
 - The system prioritizes analyst assistance and controlled automation over fully autonomous security operations.
@@ -36,6 +38,8 @@ Audit records everything.
 - Remediation without preflight, backup, verification, and rollback
 - Treating target-provided text as trusted instructions
 - Treating possession of credentials or network reachability as authorization
+- Treating blank scope, AI interpretation, DNS results, redirects, or discovered assets as authorization
+- Enforcing scope only in a model prompt or only once at job creation
 - Treating a configured autonomy level as permission to bypass policy
 
 ## Related Baselines
@@ -45,3 +49,4 @@ Audit records everything.
 - [Threat Model](../THREAT_MODEL.md)
 - [Autonomy Levels](./autonomy-levels.md)
 - [Security Policy](../SECURITY.md)
+- [Assessment Authorization and Rules of Engagement](./assessment-authorization-and-rules-of-engagement.md)

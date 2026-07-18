@@ -8,6 +8,8 @@ Authorization must identify the responsible actor, allowed purpose, target or da
 
 When authorization is missing, ambiguous, expired, or conflicts with policy, the system must fail closed and record the blocked attempt without exposing sensitive values.
 
+A blank scope is not an unrestricted scope. Active target-facing validation requires at least one typed allow rule, an immutable approved scope version, and a valid approval bound to its canonical policy hash. AI-generated interpretations remain drafts and cannot establish ownership, authorization, or permission.
+
 ## Reporting Security Issues
 
 If you find a vulnerability in SecAgent RiskOps, please open a private security advisory or contact the maintainer directly.
@@ -45,6 +47,8 @@ Before dispatching a target-facing tool, the platform must verify:
 - action risk classification
 - required approval
 - audit and evidence linkage
+
+The platform must repeat target checks after DNS resolution, before redirects and discovered-target access, before credential use, and when a long-running job crosses a policy checkpoint. Explicit exclusions and platform or tenant denials override scope allow rules. Scope expansion requires a new version and approval.
 
 No-exploit, no-brute-force, no-payload-upload, and no-lateral-movement are the default validation policy.
 

@@ -1,31 +1,65 @@
 {
   "scope_id": "SCOPE-001",
+  "version": 1,
   "title": "Lab web validation",
   "status": "active",
-  "authorized_by": "security-operator",
-  "valid_from": "2026-07-09T00:00:00Z",
-  "valid_until": "2026-07-16T00:00:00Z",
-  "allowed_targets": [
-    "TGT-001"
-  ],
-  "allowed_ports": [
-    80,
-    443,
-    22
-  ],
-  "allowed_protocols": [
-    "tcp",
-    "http",
-    "https",
-    "tls"
+  "authorization_id": "AUTH-001",
+  "purpose": "Read-only validation of the approved lab web tier",
+  "valid_from": "2026-07-18T07:00:00Z",
+  "valid_until": "2026-07-18T13:00:00Z",
+  "timezone": "America/Los_Angeles",
+  "allow": {
+    "targets": [
+      {
+        "type": "domain_suffix",
+        "value": "example.test",
+        "include_apex": true
+      },
+      {
+        "type": "cidr",
+        "value": "192.0.2.0/28"
+      }
+    ],
+    "ports": [80, 443],
+    "protocols": ["http", "https", "tls"],
+    "check_types": [
+      "http_headers",
+      "tls_configuration",
+      "redirect_behavior"
+    ]
+  },
+  "deny": {
+    "targets": [
+      {
+        "type": "exact_host",
+        "value": "payments.example.test"
+      }
+    ],
+    "actions": [
+      "exploit_execution",
+      "brute_force",
+      "payload_upload",
+      "lateral_movement",
+      "privilege_escalation"
+    ]
+  },
+  "limits": {
+    "requests_per_second": 2,
+    "max_concurrency": 3,
+    "max_crawl_depth": 2,
+    "max_redirects": 3
+  },
+  "stop_conditions": [
+    {
+      "type": "target_error_rate",
+      "operator": ">",
+      "value": 0.02
+    },
+    {
+      "type": "manual_stop",
+      "contact_role": "operations"
+    }
   ],
   "safety_level": "level_2_baseline_configuration",
-  "rate_limit": "low",
-  "prohibited_actions": [
-    "exploit_execution",
-    "brute_force",
-    "payload_upload",
-    "lateral_movement",
-    "privilege_escalation"
-  ]
+  "policy_hash": "sha256:REDACTED_EXAMPLE"
 }

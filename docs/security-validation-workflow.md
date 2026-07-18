@@ -5,7 +5,15 @@
 ```text
 User requests validation
   ↓
-Assessment scope is selected or created
+Authorization is attested and verified
+  ↓
+Structured scope and Rules of Engagement are selected or entered
+  ↓
+AI optionally parses natural-language instructions into a draft
+  ↓
+User reviews ambiguity, exclusions, limits, and effective policy
+  ↓
+Immutable scope version is approved and activated
   ↓
 Policy engine checks target and allowed actions
   ↓
@@ -31,6 +39,28 @@ ActionPlans are proposed
   ↓
 Knowledge candidates are created from repeated patterns
 ```
+
+Blank scope, unresolved ambiguity that could broaden access, missing authorization, or policy conflict stops the flow before active validation. Passive import may continue under Safety Level 0.
+
+## Scope Preflight
+
+```text
+Authorization evidence
+  + structured scope / RoE
+  + optional natural-language instructions
+  ↓
+AI draft with confidence and unresolved questions
+  ↓
+Deterministic schema validation and policy compilation
+  ↓
+Effective-policy preview
+  ↓
+Human confirmation / required approval
+  ↓
+Canonical policy hash and immutable active version
+```
+
+Any material change, including adding a target, port, technique, credential profile, or execution window, creates a new version and repeats approval.
 
 ## Example: Web Service Validation
 
@@ -80,6 +110,9 @@ AI should not directly execute arbitrary commands.
 
 AI can:
 
+- parse natural-language scope into a structured draft
+- identify ambiguity and conflicts
+- explain the effective scope and exclusions
 - suggest validation plan
 - prioritize safe checks
 - summarize evidence
@@ -89,8 +122,15 @@ AI can:
 
 AI must not:
 
+- treat blank or ambiguous input as unrestricted permission
+- infer ownership or authorization
+- approve or expand its own scope
 - bypass scope
 - run unregistered tools
 - execute exploit code by default
 - ignore policy engine
 - create high-confidence findings without evidence
+
+## Runtime Boundary Checks
+
+The policy engine rechecks the approved scope before each target-facing tool call and whenever target identity changes. DNS answers, cross-origin redirects, discovered services, and links remain out of scope unless independently matched by an explicit allow rule. A discovered target may generate a scope-extension proposal but cannot be contacted until a new scope version is approved.

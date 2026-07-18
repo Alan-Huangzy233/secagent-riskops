@@ -17,6 +17,12 @@
 - AgentRun
 - ToolCall
 - Approval
+- AssessmentAuthorization
+- AssessmentScopeDraft
+- AssessmentScopeVersion
+- ScopeApproval
+- ValidationJob
+- ValidationCheck
 
 ## Key Relationships
 
@@ -25,7 +31,11 @@ Asset -> Alert -> AlertGroup -> Incident -> Evidence
 Incident -> Control -> Risk -> ActionPlan
 ActionPlan -> Approval -> Execution -> Verification -> RemediationReport
 Incident -> KnowledgeCandidate -> KnowledgeItem
+AssessmentAuthorization -> AssessmentScopeDraft -> AssessmentScopeVersion
+AssessmentScopeVersion -> ScopeApproval -> ValidationJob -> ValidationCheck
 ```
+
+An active target-facing `ValidationJob` must preserve `scope_id`, `scope_version`, and the canonical `policy_hash`. Scope drafts and AI interpretations cannot authorize execution.
 
 ## Initial Schema Requirements
 
