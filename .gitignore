@@ -22,7 +22,9 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 
-# Python cache
-__pycache__/
-*.py[cod]
-.pytest_cache/
+# Python build / env artifacts
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
