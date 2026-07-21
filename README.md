@@ -2,6 +2,28 @@
 
 SecAgent RiskOps reduces alert fatigue, converts security incidents into compliance evidence, and safely executes approved remediation with verification and rollback.
 
+> **Status: early development (`v0.2`).** Most documents in this repository
+> describe the *target design*. One **runnable, tested end-to-end vertical
+> slice** now exists (the "walking skeleton"). See
+> [Implementation Status](./docs/implementation-status.md) for exactly what is
+> implemented in code versus still design-only.
+
+## Quickstart (walking skeleton)
+
+```bash
+make install   # or: pip install -e .[dev]
+make test      # 22 tests, incl. adversarial policy-enforcement suite
+make demo      # end-to-end run on the bundled sample alerts
+make run       # FastAPI dev server on :8000  (GET /docs)
+```
+
+The demo ingests the sanitized sample alerts, retains raw evidence, groups and
+scores them, runs evidence-grounded AI triage, opens an incident, maps it to a
+control and a risk, drafts a remediation ActionPlan, and then has the
+**independent policy engine deny execution** (fail-closed) — proving the
+"AI proposes; policy decides; typed executors act" boundary in code. It finishes
+by replaying the whole flow from retained evidence and confirming reproduction.
+
 ## Vision
 
 SecAgent RiskOps is an AI-assisted SOC, GRC, and controlled remediation platform for small security teams and security engineers operating with limited human capacity.

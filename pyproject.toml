@@ -1,0 +1,33 @@
+[project]
+name = "secagent-riskops"
+version = "0.2.0"
+description = "AI-assisted SOC, GRC, and controlled-remediation platform (MVP walking skeleton)"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.111",
+    "pydantic>=2.6",
+    "uvicorn>=0.29",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "httpx>=0.27",
+]
+
+# The MVP walking skeleton persists to SQLite (stdlib) so `pytest` runs with no
+# external database. The production target remains PostgreSQL behind the same
+# Repository interface (see backend/app/storage/repository.py).
+
+[tool.setuptools.packages.find]
+where = ["backend"]
+include = ["app*"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+pythonpath = ["backend"]
+testpaths = ["backend/tests"]
+addopts = "-q"

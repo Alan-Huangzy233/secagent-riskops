@@ -1,5 +1,15 @@
 # SecAgent RiskOps Roadmap
 
+> **Reading note.** Entries below are grouped by theme, not strict chronological
+> order — the `v0.1.6`–`v0.1.9` sections are early increments that were appended
+> after the `v0.2`–`v1.0` outline, not work that follows `v1.0`. For what is
+> actually built versus still design-only, see
+> [docs/implementation-status.md](./docs/implementation-status.md).
+>
+> **Delivered so far:** a runnable, tested end-to-end *walking skeleton* (`v0.2`
+> foundations) that ingests sample alerts and carries them through triage →
+> incident → GRC mapping → a policy-gated remediation plan, with replay.
+
 ## v0.1 Foundation
 
 Goal: Establish the project structure, architecture, core schemas, evidence model, and audit trail.
