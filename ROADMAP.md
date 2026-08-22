@@ -19,7 +19,7 @@ Deliverables:
 - System architecture
 - Threat model
 - Core data schemas
-- PostgreSQL persistence
+- PostgreSQL persistence *(moved to `v0.2.4`, where the approval and auth tables land)*
 - Evidence and audit trace model
 
 ## v0.1.5 Agent Workflow Runtime
@@ -44,7 +44,7 @@ Deliverables:
 - Risk scoring
 - AI triage agent
 - Skeptic agent
-- SOC Inbox UI
+- SOC Inbox UI *(moved to `v0.2.5 Web Console`)*
 - Daily SOC briefing
 
 ## v0.2.4 Approval Service and Local Authentication
@@ -138,12 +138,18 @@ Deliverables:
 
 ## v0.4 Controlled Remediation
 
-Goal: Propose and execute approved remediation actions with verification and rollback.
+Goal: Execute already-approved remediation actions with verification and rollback.
+
+Approval and policy decision-making are no longer part of this milestone. The
+fail-closed policy engine and the `ActionPlan` schema shipped with the walking
+skeleton; approval moved to `v0.2.4`. What remains here is the execution layer —
+the part that was always meant to come last.
 
 Deliverables:
-- ActionPlan schema
-- Policy engine
-- Approval queue
+- ~~ActionPlan schema~~ *(delivered in the walking skeleton)*
+- ~~Policy engine~~ *(delivered in the walking skeleton)*
+- ~~Approval queue~~ *(moved to `v0.2.4` / `v0.2.5`)*
+- Precondition, backup, verification, and rollback schemas
 - GitHub adapter
 - Linux SSH lab adapter
 - Verifier and rollback manager

@@ -40,10 +40,11 @@ These are documented in `docs/` but have **no code** yet:
 - Curated knowledge intake (upload/parse/review) — `curated-knowledge-intake.md`
 - Full Rules-of-Engagement UI and natural-language scope parsing — `assessment-authorization-and-rules-of-engagement.md`
 - Knowledge lifecycle (candidate → reviewed → active) — `grc-workflow.md`, product docs
-- Approval service, real typed executors (GitHub/SSH), verification, rollback — `remediation-workflow.md`
-- Frontend UI — `frontend/README.md`
+- Approval service and local authentication — `v0.2.4`, `remediation-workflow.md`
+- Real typed executors (GitHub/SSH), verification, rollback — `v0.4`, `remediation-workflow.md`
+- Frontend UI — `v0.2.5`, `frontend/README.md`
 - Real model-provider integration behind the agent seam
-- PostgreSQL + Alembic migrations (SQLite is the current stand-in)
+- PostgreSQL + Alembic migrations (SQLite is the current stand-in) — `v0.2.4`
 
 ## Known limitations of the skeleton
 

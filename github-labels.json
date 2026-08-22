@@ -50,6 +50,16 @@
     "description": "Documentation"
   },
   {
+    "name": "type:knowledge",
+    "color": "5319e7",
+    "description": "Knowledge ingestion, validation, and lifecycle"
+  },
+  {
+    "name": "type:devops",
+    "color": "0e8a16",
+    "description": "CI/CD, repository automation, and operational tooling"
+  },
+  {
     "name": "priority:p0",
     "color": "b60205",
     "description": "Critical priority"
