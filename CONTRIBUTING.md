@@ -1,5 +1,13 @@
 # Contributing
 
+> [!IMPORTANT]
+> **Outside contributions are not being accepted yet.** The project is in active
+> single-maintainer development; pull requests are not being merged. See the
+> notice at the top of [README.md](./README.md).
+>
+> The guidance below is the standard the codebase is held to, and it is what
+> contributions will be reviewed against once the project opens up.
+
 ## Development Principles
 
 1. Evidence-grounded outputs only.

@@ -2,6 +2,20 @@
 
 SecAgent RiskOps reduces alert fatigue, converts security incidents into compliance evidence, and safely executes approved remediation with verification and rollback.
 
+> [!IMPORTANT]
+> **This project is not accepting outside contributions yet.**
+>
+> SecAgent RiskOps is in active single-maintainer development and the
+> architecture is still changing. Pull requests and collaboration requests are
+> being declined for now — the design needs to settle before other people build
+> on top of it.
+>
+> **This will change.** Once there is a working program rather than a walking
+> skeleton, the project opens up for community bug reports and fixes, and this
+> notice is replaced with real contribution guidelines.
+>
+> Until then: issues and feedback are welcome. Pull requests are not being merged.
+
 > **Status: early development (`v0.2`).** Most documents in this repository
 > describe the *target design*. One **runnable, tested end-to-end vertical
 > slice** now exists (the "walking skeleton"). See
