@@ -47,6 +47,84 @@ Deliverables:
 - SOC Inbox UI
 - Daily SOC briefing
 
+## v0.2.4 Approval Service and Local Authentication
+
+Goal: Give the fail-closed policy engine a counterpart that can actually grant
+approval, with an authenticated identity behind every decision, and move
+persistence to PostgreSQL before the new tables land.
+
+Approval is not execution. An approval only lifts the policy `DENY` for a
+specific plan; no executor is introduced in this milestone.
+
+Deliverables:
+- ApprovalRequest / ApprovalDecision schemas, bound to the ActionPlan canonical hash
+- Approval state machine (`PENDING → APPROVED / REJECTED / EXPIRED / VOIDED`), single-direction terminal states
+- Automatic request creation when the policy engine returns `APPROVAL_REQUIRED`
+- Plan-hash rebinding: a changed plan voids outstanding approvals
+- Local session authentication (argon2 password hashing, opaque server-side revocable sessions, httpOnly + SameSite cookies, CSRF protection)
+- Role model (`viewer / analyst / approver / admin`) and role-based approval routing
+- Risk-tiered self-approval rules (see below)
+- Approval TTL and expiry sweep
+- Approval API (`/auth/*`, `/approvals`, approve/reject)
+- Existing endpoints moved behind authentication (`/health` excepted)
+- Notification dispatch interface (reserved seam; no transport implemented)
+- PostgreSQL persistence behind the existing Repository interface, with migrations
+- Audit-chain and replay coverage for every approval state transition
+
+### Approval routing and self-approval
+
+Routing uses the `RiskLevel` already carried on every `ActionPlan`, so approval
+requirements follow the action's blast radius rather than the requester's rank
+alone.
+
+| Requester role | `low` | `medium` | `high` |
+| --- | --- | --- | --- |
+| `analyst` | routes to approver/admin queue | routes to approver/admin queue | routes to approver/admin queue |
+| `approver` / `admin` | self-approval allowed, flagged | self-approval allowed, flagged | separate approver required |
+
+Self-approved decisions are recorded with `self_approved = true`, emitted as a
+distinct audit event type rather than an ordinary approval, and highlighted in
+the console so they can be filtered and reviewed after the fact.
+
+High-risk actions always require a second person, whatever the requester's role.
+This keeps routine work unblocked for small teams while preserving four-eyes
+control on the paths where a compromised privileged account would do the most
+damage.
+
+### Notification seam
+
+Routing a request into a role's queue is the only delivery mechanism in this
+milestone. A `Notifier` interface is defined so email, Slack, or webhook
+transports can be added later without touching approval logic; no transport is
+implemented here.
+
+### Scope boundary
+
+This is single-tenant local authentication, not production identity. SSO/OIDC,
+password reset, self-registration, and multi-tenancy are explicitly out of scope
+and deferred to a later milestone.
+
+## v0.2.5 Web Console
+
+Goal: Replace the API-docs-only interface with a browser console for the
+capabilities that already exist in the backend.
+
+Deliverables:
+- Vite + React + TypeScript scaffold with routing and server-state caching
+- OpenAPI-generated TypeScript client types, with a CI drift check
+- Local development proxy and a single-command `make dev` (backend + frontend)
+- Login and session handling
+- SOC Inbox (incident list) and incident detail with agent timeline
+- Approval queue and decision screens, including self-approval highlighting
+- Audit-chain viewer with integrity verification status
+- Frontend CI job (typecheck, lint, build)
+
+Pages for GRC controls, the risk register, and the knowledge base are owned by
+the milestones that build their backends (`v0.3`, `v0.5`) rather than bundled
+here, so no screen ships ahead of the capability behind it.
+
+Out of scope: realtime push (polling first), mobile layouts, internationalization.
+
 ## v0.3 GRC Bridge
 
 Goal: Convert confirmed findings and incidents into compliance evidence and risk register entries.
