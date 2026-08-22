@@ -200,7 +200,7 @@
   },
   {
     "title": "Implement agent activity timeline",
-    "milestone": "v0.1.5 Agent Workflow Runtime",
+    "milestone": "v0.2.5 Web Console",
     "labels": [
       "type:frontend",
       "type:agent",
