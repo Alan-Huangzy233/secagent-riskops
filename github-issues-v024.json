@@ -1,0 +1,109 @@
+[
+  {
+    "title": "Define ApprovalRequest and ApprovalDecision schemas bound to plan hash",
+    "milestone": "v0.2.4 Approval Service and Local Authentication",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Introduce the approval records that let the policy engine's APPROVAL_REQUIRED outcome be resolved by an accountable human decision.\n\nTasks:\n- [ ] Add ApprovalRequest schema: action_plan_id, plan canonical hash, requester identity, required role, risk level, policy reason code, created_at, expires_at, status\n- [ ] Add ApprovalDecision schema: approver identity, decision, mandatory reason text, decided_at, plan hash at decision time, self_approved flag\n- [ ] Reuse the canonical hashing already used for AssessmentScope rather than adding a second hashing scheme\n- [ ] Persist both through the existing Repository interface\n\nAcceptance Criteria:\n- [ ] A decision always records which plan hash it applied to\n- [ ] Reason text is required on both approve and reject\n- [ ] Schemas round-trip through persistence and replay unchanged\n- [ ] Unit tests cover hash binding and required-field validation"
+  },
+  {
+    "title": "Implement approval state machine, expiry, and plan-hash voiding",
+    "milestone": "v0.2.4 Approval Service and Local Authentication",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Make approval lifecycle transitions explicit, terminal, and fully audited.\n\nTasks:\n- [ ] Implement PENDING -> APPROVED / REJECTED / EXPIRED / VOIDED with no transitions out of terminal states\n- [ ] Void outstanding approvals when the ActionPlan canonical hash changes\n- [ ] Void outstanding approvals when the governing assessment scope is revoked or expires\n- [ ] Add configurable TTL (default 24h) and an expiry sweep\n- [ ] Append every transition to the hash-chained audit log with actor identity\n\nAcceptance Criteria:\n- [ ] An approved plan that is then modified cannot execute on the old approval\n- [ ] Terminal states cannot be reopened; a new request must be raised instead\n- [ ] Replay reproduces approval decisions from retained evidence\n- [ ] Tests cover expiry, hash change, scope revocation, and terminal-state re-entry attempts"
+  },
+  {
+    "title": "Wire the policy engine to create and consume approvals",
+    "milestone": "v0.2.4 Approval Service and Local Authentication",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Close the loop between the fail-closed policy engine and the approval service without introducing a second, weaker path to authorization.\n\nTasks:\n- [ ] Automatically create a PENDING ApprovalRequest when the engine returns APPROVAL_REQUIRED\n- [ ] Let a valid APPROVED decision change the engine's verdict for that plan from DENY to ALLOW\n- [ ] Ignore any caller-supplied approval assertions, consistent with existing handling of untrusted claimed fields\n- [ ] Keep approval strictly separate from execution: no executor is invoked in this milestone\n\nAcceptance Criteria:\n- [ ] There is no API path that grants approval other than an authenticated decision on a request the engine created\n- [ ] A forged or replayed approval claim in the request payload has no effect on the verdict\n- [ ] An APPROVED plan reaches ALLOW but still does not execute anything\n- [ ] Adversarial tests extend the existing policy suite"
+  },
+  {
+    "title": "Implement local session authentication",
+    "milestone": "v0.2.4 Approval Service and Local Authentication",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Give every action an authenticated identity. This is deliberately minimal single-tenant auth, not production identity.\n\nTasks:\n- [ ] Add User and Session models with admin-seeded users (no self-registration, no password reset, no email)\n- [ ] Hash passwords with argon2 via passlib; never implement password hashing by hand\n- [ ] Issue opaque, server-side, revocable session tokens in httpOnly + SameSite=Strict cookies\n- [ ] Add CSRF protection for state-changing endpoints\n- [ ] Move existing endpoints behind authentication, excepting /health\n- [ ] Document the scope boundary: SSO/OIDC and multi-tenancy are out of scope\n\nAcceptance Criteria:\n- [ ] Unauthenticated calls to protected endpoints are rejected\n- [ ] Sessions can be revoked server-side and stop working immediately\n- [ ] Password hashes are never logged, returned, or written to audit payloads\n- [ ] Tests cover login, logout, revocation, expiry, and CSRF rejection"
+  },
+  {
+    "title": "Implement role model and risk-tiered self-approval routing",
+    "milestone": "v0.2.4 Approval Service and Local Authentication",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Route approval requests by role and by the blast radius of the action, so small teams are not blocked while four-eyes control is preserved where it matters.\n\nRouting rules, keyed on the RiskLevel already carried by every ActionPlan:\n\n| Requester role | low | medium | high |\n| --- | --- | --- | --- |\n| analyst | approver/admin queue | approver/admin queue | approver/admin queue |\n| approver / admin | self-approval allowed, flagged | self-approval allowed, flagged | separate approver required |\n\nTasks:\n- [ ] Add roles: viewer, analyst, approver, admin\n- [ ] Derive required_role from requester role and plan risk level\n- [ ] Allow self-approval only where the table permits it; set self_approved = true\n- [ ] Emit self-approved decisions as a distinct audit event type, not an ordinary approval\n- [ ] Reject self-approval on high-risk plans regardless of role\n\nAcceptance Criteria:\n- [ ] A high-risk plan cannot be approved by its requester, including an admin\n- [ ] Self-approved decisions are queryable as a distinct set for after-the-fact review\n- [ ] Role escalation attempts via request payload are ignored\n- [ ] Tests cover every cell of the routing table"
+  },
+  {
+    "title": "Add approval and authentication API endpoints",
+    "milestone": "v0.2.4 Approval Service and Local Authentication",
+    "labels": [
+      "type:backend",
+      "priority:p0"
+    ],
+    "body": "Expose the approval service over HTTP for the console to consume.\n\nTasks:\n- [ ] POST /auth/login, POST /auth/logout, GET /auth/me\n- [ ] GET /approvals with status and role filtering\n- [ ] GET /approvals/{id}\n- [ ] POST /approvals/{id}/approve and POST /approvals/{id}/reject, both requiring reason text\n- [ ] Return the policy reason code and plan summary with each request so a decision can be made without a second call\n- [ ] Update backend/tests/test_api.py with an authenticated test client fixture\n\nAcceptance Criteria:\n- [ ] OpenAPI schema documents every new endpoint and its auth requirement\n- [ ] Decision endpoints are idempotent against double submission\n- [ ] Existing API tests pass with authentication enabled\n- [ ] Error responses do not leak whether a user exists"
+  },
+  {
+    "title": "Reserve a notification dispatch interface",
+    "milestone": "v0.2.4 Approval Service and Local Authentication",
+    "labels": [
+      "type:backend",
+      "priority:p2"
+    ],
+    "body": "Define the seam for notifying approvers without implementing any transport in this milestone.\n\nTasks:\n- [ ] Define a Notifier interface (approval requested, decided, expired)\n- [ ] Wire approval state transitions to dispatch through the interface\n- [ ] Ship a no-op implementation as the default\n- [ ] Document intended transports (email, Slack, webhook) as future work\n\nAcceptance Criteria:\n- [ ] Queue routing remains the only delivery mechanism that this milestone depends on\n- [ ] Approval logic has no transport-specific code\n- [ ] A future transport can be added without touching approval state handling"
+  },
+  {
+    "title": "Scaffold the Vite + React + TypeScript console",
+    "milestone": "v0.2.5 Web Console",
+    "labels": [
+      "type:frontend",
+      "priority:p0"
+    ],
+    "body": "Stand up the frontend project so subsequent screens have somewhere to land.\n\nTasks:\n- [ ] Initialize Vite + React + TypeScript in frontend/\n- [ ] Add React Router, TanStack Query, and Tailwind\n- [ ] Configure the dev server to proxy /api to the backend on :8000 so cookies stay same-origin\n- [ ] Add make dev to start backend and frontend together\n- [ ] Establish app shell, layout, and error boundary\n\nAcceptance Criteria:\n- [ ] make dev brings up both processes with one command\n- [ ] An authenticated request from the console reaches the backend without CORS exceptions\n- [ ] Production build succeeds and emits static assets"
+  },
+  {
+    "title": "Generate API types from OpenAPI and enforce contract drift in CI",
+    "milestone": "v0.2.5 Web Console",
+    "labels": [
+      "type:frontend",
+      "type:testing",
+      "priority:p0"
+    ],
+    "body": "Make backend contract changes fail at build time rather than at runtime.\n\nTasks:\n- [ ] Generate TypeScript types from the backend OpenAPI schema with openapi-typescript\n- [ ] Commit generated types and add a regeneration script\n- [ ] Add a CI step that regenerates and fails on git diff\n- [ ] Add a frontend CI job: typecheck, lint, build\n\nAcceptance Criteria:\n- [ ] A backend endpoint change without frontend regeneration turns CI red\n- [ ] No hand-written request or response types exist in the console\n- [ ] CI runs the frontend job on every pull request"
+  },
+  {
+    "title": "Build login and session handling in the console",
+    "milestone": "v0.2.5 Web Console",
+    "labels": [
+      "type:frontend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Give the console an authenticated entry point that matches the backend's cookie-based sessions.\n\nTasks:\n- [ ] Login screen and submit flow against /auth/login\n- [ ] Session-aware routing: redirect unauthenticated users, restore session on reload via /auth/me\n- [ ] Logout and expired-session handling with a clear message\n- [ ] Send the CSRF header on state-changing requests\n- [ ] Surface the current user and role in the app shell\n\nAcceptance Criteria:\n- [ ] Protected routes are unreachable without a session\n- [ ] Session expiry during use returns the user to login without a blank screen\n- [ ] No token or credential is written to localStorage or sessionStorage"
+  },
+  {
+    "title": "Build the audit chain viewer",
+    "milestone": "v0.2.5 Web Console",
+    "labels": [
+      "type:frontend",
+      "type:security",
+      "priority:p1"
+    ],
+    "body": "Expose the hash-chained audit log so its integrity guarantee is visible to operators, not just to tests.\n\nTasks:\n- [ ] Chronological audit event list with actor, event type, and subject reference\n- [ ] Filter by subject (incident, plan, approval) and by event type\n- [ ] Surface chain verification status from /audit/verify\n- [ ] Distinguish self-approval events from ordinary approvals in the event list\n\nAcceptance Criteria:\n- [ ] Verification failure is unmistakable in the UI, not a subtle indicator\n- [ ] An approval decision can be traced from incident through plan to audit entry\n- [ ] Sensitive payload contents are not rendered wholesale"
+  }
+]

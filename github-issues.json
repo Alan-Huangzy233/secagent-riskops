@@ -28,7 +28,7 @@
   },
   {
     "title": "Set up PostgreSQL schema and persistence layer",
-    "milestone": "v0.1 Foundation",
+    "milestone": "v0.2.4 Approval Service and Local Authentication",
     "labels": [
       "type:backend",
       "priority:p0"
@@ -91,7 +91,7 @@
   },
   {
     "title": "Build SOC Inbox frontend",
-    "milestone": "v0.2 AI SOC Inbox",
+    "milestone": "v0.2.5 Web Console",
     "labels": [
       "type:frontend",
       "priority:p0"
@@ -173,7 +173,7 @@
   },
   {
     "title": "Build remediation approval queue UI",
-    "milestone": "v0.4 Controlled Remediation",
+    "milestone": "v0.2.5 Web Console",
     "labels": [
       "type:frontend",
       "priority:p1"
@@ -200,7 +200,7 @@
   },
   {
     "title": "Implement agent activity timeline",
-    "milestone": "v0.1.5 Agent Workflow Runtime",
+    "milestone": "v0.2.5 Web Console",
     "labels": [
       "type:frontend",
       "type:agent",
@@ -620,5 +620,221 @@
       "priority:p0"
     ],
     "body": "Create evaluation fixtures and end-to-end tests for the authorization, compilation, approval, and runtime enforcement contract.\n\nTasks:\n- [ ] Cover blank, ambiguous, contradictory, expired, revoked, and cross-tenant scope\n- [ ] Cover wildcard confusion, IDN look-alikes, IPv4/IPv6 normalization, and CIDR boundaries\n- [ ] Cover DNS rebinding, private/link-local resolution, redirects, and discovered targets\n- [ ] Cover stale approval, hash mismatch, policy timeout, rate limits, and emergency stop\n- [ ] Add replayable expected decision reason codes\n\nAcceptance Criteria:\n- [ ] All fail-closed cases prove that no target-facing dispatch occurred\n- [ ] Tests verify both policy result and audit evidence\n- [ ] CI runs deterministic policy tests without external target access\n- [ ] Regression fixtures are added for every discovered scope-escape defect"
+  },
+  {
+    "title": "Define ApprovalRequest and ApprovalDecision schemas bound to plan hash",
+    "milestone": "v0.2.4 Approval Service and Local Authentication",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Introduce the approval records that let the policy engine's APPROVAL_REQUIRED outcome be resolved by an accountable human decision.\n\nTasks:\n- [ ] Add ApprovalRequest schema: action_plan_id, plan canonical hash, requester identity, required role, risk level, policy reason code, created_at, expires_at, status\n- [ ] Add ApprovalDecision schema: approver identity, decision, mandatory reason text, decided_at, plan hash at decision time, self_approved flag\n- [ ] Reuse the canonical hashing already used for AssessmentScope rather than adding a second hashing scheme\n- [ ] Persist both through the existing Repository interface\n\nAcceptance Criteria:\n- [ ] A decision always records which plan hash it applied to\n- [ ] Reason text is required on both approve and reject\n- [ ] Schemas round-trip through persistence and replay unchanged\n- [ ] Unit tests cover hash binding and required-field validation"
+  },
+  {
+    "title": "Implement approval state machine, expiry, and plan-hash voiding",
+    "milestone": "v0.2.4 Approval Service and Local Authentication",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Make approval lifecycle transitions explicit, terminal, and fully audited.\n\nTasks:\n- [ ] Implement PENDING -> APPROVED / REJECTED / EXPIRED / VOIDED with no transitions out of terminal states\n- [ ] Void outstanding approvals when the ActionPlan canonical hash changes\n- [ ] Void outstanding approvals when the governing assessment scope is revoked or expires\n- [ ] Add configurable TTL (default 24h) and an expiry sweep\n- [ ] Append every transition to the hash-chained audit log with actor identity\n\nAcceptance Criteria:\n- [ ] An approved plan that is then modified cannot execute on the old approval\n- [ ] Terminal states cannot be reopened; a new request must be raised instead\n- [ ] Replay reproduces approval decisions from retained evidence\n- [ ] Tests cover expiry, hash change, scope revocation, and terminal-state re-entry attempts"
+  },
+  {
+    "title": "Wire the policy engine to create and consume approvals",
+    "milestone": "v0.2.4 Approval Service and Local Authentication",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Close the loop between the fail-closed policy engine and the approval service without introducing a second, weaker path to authorization.\n\nTasks:\n- [ ] Automatically create a PENDING ApprovalRequest when the engine returns APPROVAL_REQUIRED\n- [ ] Let a valid APPROVED decision change the engine's verdict for that plan from DENY to ALLOW\n- [ ] Ignore any caller-supplied approval assertions, consistent with existing handling of untrusted claimed fields\n- [ ] Keep approval strictly separate from execution: no executor is invoked in this milestone\n\nAcceptance Criteria:\n- [ ] There is no API path that grants approval other than an authenticated decision on a request the engine created\n- [ ] A forged or replayed approval claim in the request payload has no effect on the verdict\n- [ ] An APPROVED plan reaches ALLOW but still does not execute anything\n- [ ] Adversarial tests extend the existing policy suite"
+  },
+  {
+    "title": "Implement local session authentication",
+    "milestone": "v0.2.4 Approval Service and Local Authentication",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Give every action an authenticated identity. This is deliberately minimal single-tenant auth, not production identity.\n\nTasks:\n- [ ] Add User and Session models with admin-seeded users (no self-registration, no password reset, no email)\n- [ ] Hash passwords with argon2 via passlib; never implement password hashing by hand\n- [ ] Issue opaque, server-side, revocable session tokens in httpOnly + SameSite=Strict cookies\n- [ ] Add CSRF protection for state-changing endpoints\n- [ ] Move existing endpoints behind authentication, excepting /health\n- [ ] Document the scope boundary: SSO/OIDC and multi-tenancy are out of scope\n\nAcceptance Criteria:\n- [ ] Unauthenticated calls to protected endpoints are rejected\n- [ ] Sessions can be revoked server-side and stop working immediately\n- [ ] Password hashes are never logged, returned, or written to audit payloads\n- [ ] Tests cover login, logout, revocation, expiry, and CSRF rejection"
+  },
+  {
+    "title": "Implement role model and risk-tiered self-approval routing",
+    "milestone": "v0.2.4 Approval Service and Local Authentication",
+    "labels": [
+      "type:backend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Route approval requests by role and by the blast radius of the action, so small teams are not blocked while four-eyes control is preserved where it matters.\n\nRouting rules, keyed on the RiskLevel already carried by every ActionPlan:\n\n| Requester role | low | medium | high |\n| --- | --- | --- | --- |\n| analyst | approver/admin queue | approver/admin queue | approver/admin queue |\n| approver / admin | self-approval allowed, flagged | self-approval allowed, flagged | separate approver required |\n\nTasks:\n- [ ] Add roles: viewer, analyst, approver, admin\n- [ ] Derive required_role from requester role and plan risk level\n- [ ] Allow self-approval only where the table permits it; set self_approved = true\n- [ ] Emit self-approved decisions as a distinct audit event type, not an ordinary approval\n- [ ] Reject self-approval on high-risk plans regardless of role\n\nAcceptance Criteria:\n- [ ] A high-risk plan cannot be approved by its requester, including an admin\n- [ ] Self-approved decisions are queryable as a distinct set for after-the-fact review\n- [ ] Role escalation attempts via request payload are ignored\n- [ ] Tests cover every cell of the routing table"
+  },
+  {
+    "title": "Add approval and authentication API endpoints",
+    "milestone": "v0.2.4 Approval Service and Local Authentication",
+    "labels": [
+      "type:backend",
+      "priority:p0"
+    ],
+    "body": "Expose the approval service over HTTP for the console to consume.\n\nTasks:\n- [ ] POST /auth/login, POST /auth/logout, GET /auth/me\n- [ ] GET /approvals with status and role filtering\n- [ ] GET /approvals/{id}\n- [ ] POST /approvals/{id}/approve and POST /approvals/{id}/reject, both requiring reason text\n- [ ] Return the policy reason code and plan summary with each request so a decision can be made without a second call\n- [ ] Update backend/tests/test_api.py with an authenticated test client fixture\n\nAcceptance Criteria:\n- [ ] OpenAPI schema documents every new endpoint and its auth requirement\n- [ ] Decision endpoints are idempotent against double submission\n- [ ] Existing API tests pass with authentication enabled\n- [ ] Error responses do not leak whether a user exists"
+  },
+  {
+    "title": "Reserve a notification dispatch interface",
+    "milestone": "v0.2.4 Approval Service and Local Authentication",
+    "labels": [
+      "type:backend",
+      "priority:p2"
+    ],
+    "body": "Define the seam for notifying approvers without implementing any transport in this milestone.\n\nTasks:\n- [ ] Define a Notifier interface (approval requested, decided, expired)\n- [ ] Wire approval state transitions to dispatch through the interface\n- [ ] Ship a no-op implementation as the default\n- [ ] Document intended transports (email, Slack, webhook) as future work\n\nAcceptance Criteria:\n- [ ] Queue routing remains the only delivery mechanism that this milestone depends on\n- [ ] Approval logic has no transport-specific code\n- [ ] A future transport can be added without touching approval state handling"
+  },
+  {
+    "title": "Scaffold the Vite + React + TypeScript console",
+    "milestone": "v0.2.5 Web Console",
+    "labels": [
+      "type:frontend",
+      "priority:p0"
+    ],
+    "body": "Stand up the frontend project so subsequent screens have somewhere to land.\n\nTasks:\n- [ ] Initialize Vite + React + TypeScript in frontend/\n- [ ] Add React Router, TanStack Query, and Tailwind\n- [ ] Configure the dev server to proxy /api to the backend on :8000 so cookies stay same-origin\n- [ ] Add make dev to start backend and frontend together\n- [ ] Establish app shell, layout, and error boundary\n\nAcceptance Criteria:\n- [ ] make dev brings up both processes with one command\n- [ ] An authenticated request from the console reaches the backend without CORS exceptions\n- [ ] Production build succeeds and emits static assets"
+  },
+  {
+    "title": "Generate API types from OpenAPI and enforce contract drift in CI",
+    "milestone": "v0.2.5 Web Console",
+    "labels": [
+      "type:frontend",
+      "type:testing",
+      "priority:p0"
+    ],
+    "body": "Make backend contract changes fail at build time rather than at runtime.\n\nTasks:\n- [ ] Generate TypeScript types from the backend OpenAPI schema with openapi-typescript\n- [ ] Commit generated types and add a regeneration script\n- [ ] Add a CI step that regenerates and fails on git diff\n- [ ] Add a frontend CI job: typecheck, lint, build\n\nAcceptance Criteria:\n- [ ] A backend endpoint change without frontend regeneration turns CI red\n- [ ] No hand-written request or response types exist in the console\n- [ ] CI runs the frontend job on every pull request"
+  },
+  {
+    "title": "Build login and session handling in the console",
+    "milestone": "v0.2.5 Web Console",
+    "labels": [
+      "type:frontend",
+      "type:security",
+      "priority:p0"
+    ],
+    "body": "Give the console an authenticated entry point that matches the backend's cookie-based sessions.\n\nTasks:\n- [ ] Login screen and submit flow against /auth/login\n- [ ] Session-aware routing: redirect unauthenticated users, restore session on reload via /auth/me\n- [ ] Logout and expired-session handling with a clear message\n- [ ] Send the CSRF header on state-changing requests\n- [ ] Surface the current user and role in the app shell\n\nAcceptance Criteria:\n- [ ] Protected routes are unreachable without a session\n- [ ] Session expiry during use returns the user to login without a blank screen\n- [ ] No token or credential is written to localStorage or sessionStorage"
+  },
+  {
+    "title": "Build the audit chain viewer",
+    "milestone": "v0.2.5 Web Console",
+    "labels": [
+      "type:frontend",
+      "type:security",
+      "priority:p1"
+    ],
+    "body": "Expose the hash-chained audit log so its integrity guarantee is visible to operators, not just to tests.\n\nTasks:\n- [ ] Chronological audit event list with actor, event type, and subject reference\n- [ ] Filter by subject (incident, plan, approval) and by event type\n- [ ] Surface chain verification status from /audit/verify\n- [ ] Distinguish self-approval events from ordinary approvals in the event list\n\nAcceptance Criteria:\n- [ ] Verification failure is unmistakable in the UI, not a subtle indicator\n- [ ] An approval decision can be traced from incident through plan to audit entry\n- [ ] Sensitive payload contents are not rendered wholesale"
+  },
+  {
+    "title": "Implement KnowledgeItem schema and provenance model",
+    "body": "Define the schema that carries reviewed operational learning: detection, suppression, remediation, control-mapping, and intelligence knowledge. This is the one core schema from #3 that the walking skeleton did not deliver.\n\nEvery item must carry where it came from, so an active rule can always be traced back to the alert, incident, document, or analyst that produced it.\n\nTasks:\n- [ ] KnowledgeItem schema with kind, content, and scope of applicability\n- [ ] Provenance references (source alert, incident, uploaded document, or analyst)\n- [ ] Confidence score and its basis\n- [ ] Lifecycle state field (candidate, reviewed, active, rejected, expired, superseded)\n- [ ] Version and supersession references\n- [ ] Evidence references consistent with the existing evidence vault\n- [ ] Repository persistence and audit events for creation\n\nAcceptance Criteria:\n- [ ] Every KnowledgeItem resolves to at least one provenance reference\n- [ ] A knowledge item with no evidence and no analyst attribution cannot be created\n- [ ] The schema covers all six lifecycle states named in the Project Charter",
+    "labels": [
+      "type:knowledge",
+      "type:backend",
+      "priority:p0"
+    ],
+    "milestone": "v0.5 Knowledge Loop"
+  },
+  {
+    "title": "Implement the knowledge lifecycle state machine",
+    "body": "Implement the candidate to reviewed to active workflow, plus the rejected, expired, and superseded terminal states.\n\nThis owns the lifecycle *after* review. The intake-side review queues are already tracked in #35 (external intelligence) and #51 (manual upload); this issue is what those queues hand off to.\n\nTasks:\n- [ ] Define the allowed state transitions and reject everything else\n- [ ] Implement promotion from candidate to reviewed to active\n- [ ] Implement rejection with a required reason\n- [ ] Implement supersession, linking the replacement item\n- [ ] Emit a distinct audit event for every transition, with the actor\n- [ ] Reuse the workflow runtime rather than a parallel state machine\n- [ ] Tests for invalid transitions\n\nAcceptance Criteria:\n- [ ] An item cannot reach active without passing through reviewed\n- [ ] Invalid transitions are blocked, not merely discouraged\n- [ ] Every transition is attributable to an actor and visible in the audit chain\n- [ ] Superseded items remain readable; nothing is destroyed on replacement",
+    "labels": [
+      "type:knowledge",
+      "type:backend",
+      "priority:p0"
+    ],
+    "milestone": "v0.5 Knowledge Loop"
+  },
+  {
+    "title": "Enforce the knowledge promotion policy",
+    "body": "Charter invariant: AI and external content may create candidates only. Promotion to active knowledge requires validation or explicit human approval. Enforce that in the policy engine rather than by convention.\n\nThis matters most for suppression knowledge — an AI-authored suppression rule that activates itself is the failure mode this rule exists to prevent.\n\nTasks:\n- [ ] Deny AI-authored and externally sourced items any state above candidate\n- [ ] Route promotion through the approval service built in v0.2.4\n- [ ] Add stable reason codes for promotion denials, matching the existing reason-code convention\n- [ ] Require validation evidence or an approver decision for activation\n- [ ] Apply stricter rules to suppression knowledge than to informational knowledge\n- [ ] Adversarial tests attempting self-promotion\n\nAcceptance Criteria:\n- [ ] No code path activates AI-generated knowledge without a human decision or a passing validation\n- [ ] Suppression knowledge cannot be activated by the agent that proposed it\n- [ ] Denials carry a stable reason code and are auditable",
+    "labels": [
+      "type:knowledge",
+      "type:security",
+      "priority:p0"
+    ],
+    "milestone": "v0.5 Knowledge Loop"
+  },
+  {
+    "title": "Implement knowledge TTL, freshness, and versioning",
+    "body": "Knowledge decays. A suppression rule that was correct six months ago may now be hiding a real intrusion, so active knowledge must expire rather than persist by default.\n\nTasks:\n- [ ] TTL field with a per-kind default, shortest for suppression\n- [ ] Expiry sweep that moves lapsed items out of active\n- [ ] Version history with immutable prior versions\n- [ ] Freshness signal surfaced with every knowledge lookup\n- [ ] Re-review workflow for items approaching expiry\n- [ ] Conflict detection when a new item contradicts an active one\n\nAcceptance Criteria:\n- [ ] Active knowledge with no TTL cannot be created\n- [ ] Expired items stop influencing triage immediately, without being deleted\n- [ ] Editing an active item creates a new version rather than mutating it\n- [ ] A conflicting candidate is flagged for review instead of silently overwriting",
+    "labels": [
+      "type:knowledge",
+      "type:backend",
+      "priority:p0"
+    ],
+    "milestone": "v0.5 Knowledge Loop"
+  },
+  {
+    "title": "Implement the human feedback loop on triage decisions",
+    "body": "Let analysts correct the system, and turn those corrections into knowledge candidates rather than losing them in a comment field.\n\nTasks:\n- [ ] Capture agree, disagree, and correction feedback on a triage recommendation\n- [ ] Require a reason on disagreement\n- [ ] Convert repeated corrections into knowledge candidates with provenance\n- [ ] Link feedback to the originating agent run and evidence\n- [ ] Expose feedback in the incident detail view planned for v0.2.5\n- [ ] Report feedback volume and disagreement rate\n\nAcceptance Criteria:\n- [ ] Analyst disagreement is recorded against the specific agent run, not just the incident\n- [ ] A correction produces a candidate, never directly active knowledge\n- [ ] Feedback is visible in the agent activity timeline",
+    "labels": [
+      "type:knowledge",
+      "type:agent",
+      "priority:p1"
+    ],
+    "milestone": "v0.5 Knowledge Loop"
+  },
+  {
+    "title": "Generate detection tuning and suppression suggestions",
+    "body": "Use accumulated knowledge and feedback to propose detection tuning: rules that fire too often, groupings that are too broad, and alerts that are consistently dispositioned as benign.\n\nSuggestions are proposals. Nothing here changes detection behavior on its own.\n\nTasks:\n- [ ] Identify high-volume, consistently benign signatures\n- [ ] Propose scoped suppression candidates with an explicit expiry\n- [ ] Propose grouping-key adjustments where groups are too broad or too narrow\n- [ ] Attach the supporting evidence and disposition history to every suggestion\n- [ ] Estimate the blast radius of a suggestion before it is reviewed\n- [ ] Run suggestions through the replay framework before they can be approved\n\nAcceptance Criteria:\n- [ ] Every suggestion carries the evidence that motivated it\n- [ ] No suggestion is applied without review, per the promotion policy\n- [ ] A suppression suggestion that would have hidden a past confirmed incident is rejected by replay",
+    "labels": [
+      "type:knowledge",
+      "type:soc",
+      "priority:p1"
+    ],
+    "milestone": "v0.5 Knowledge Loop"
+  },
+  {
+    "title": "Define the v1.0 end-to-end demo scenario and dataset",
+    "body": "The walking skeleton already satisfies the eight Initial Success Criteria in the Project Charter. v1.0 is the full loop: raw alerts through incident, GRC evidence, approved remediation, verification, and a knowledge update.\n\nDefine the scenario before building the demo around it, so the demo proves something specific rather than showing whatever happens to work.\n\nTasks:\n- [ ] Choose a scenario that exercises all four modules\n- [ ] Build a sanitized multi-source alert dataset (Suricata, Linux auth, and at least one more)\n- [ ] Include a deliberate negative case that must not escalate\n- [ ] Include a high-risk action that must require a second approver\n- [ ] Define the expected outcome at each stage as assertable checks\n- [ ] Confirm the dataset passes the public-repository sanitization audit\n\nAcceptance Criteria:\n- [ ] The scenario exercises SOC, GRC, remediation, and knowledge\n- [ ] Expected outcomes are written down before implementation\n- [ ] No real hostnames, IPs, or credentials appear in the dataset",
+    "labels": [
+      "type:docs",
+      "type:testing",
+      "priority:p0"
+    ],
+    "milestone": "v1.0 End-to-End Demo"
+  },
+  {
+    "title": "Extend the demo flow through approval and execution",
+    "body": "Carry the demo past the point where the walking skeleton stops. Today the flow ends at a policy DENY with APPROVAL_REQUIRED and no executor invoked; v1.0 continues through an approval decision into a real typed executor.\n\nDepends on the approval service (v0.2.4) and the adapters (v0.4).\n\nTasks:\n- [ ] Drive the demo through an approval decision rather than stopping at the deny\n- [ ] Demonstrate the risk-tiered routing, including a high-risk plan needing a second approver\n- [ ] Execute an approved plan through a typed executor against the lab target\n- [ ] Show that the plan hash bound the approval to exactly what executed\n- [ ] Show a rejected plan producing no execution\n\nAcceptance Criteria:\n- [ ] Nothing executes without a recorded approval bound to the plan hash\n- [ ] A plan modified after approval does not execute\n- [ ] The demo runs unattended and is reproducible",
+    "labels": [
+      "type:backend",
+      "type:executor",
+      "priority:p0"
+    ],
+    "milestone": "v1.0 End-to-End Demo"
+  },
+  {
+    "title": "Add verification and rollback to the demo flow",
+    "body": "An execution that is not verified is an assumption. The demo must show the outcome being checked and a failed change being reversed.\n\nDepends on the verifier and rollback manager in v0.4.\n\nTasks:\n- [ ] Verify the intended effect after execution, from independent evidence\n- [ ] Record the verification result as evidence, not just a log line\n- [ ] Demonstrate a deliberate failure that triggers rollback\n- [ ] Show the asset returning to its pre-change state\n- [ ] Show the audit chain covering execution, verification, and rollback\n\nAcceptance Criteria:\n- [ ] A failed verification triggers rollback without human intervention\n- [ ] Rollback is itself verified\n- [ ] The full sequence is reconstructable from the audit chain alone",
+    "labels": [
+      "type:executor",
+      "type:testing",
+      "priority:p0"
+    ],
+    "milestone": "v1.0 End-to-End Demo"
+  },
+  {
+    "title": "Close the loop by feeding demo outcomes back as knowledge",
+    "body": "The last step of the demo is the one that makes it a loop rather than a pipeline: the outcome becomes reviewed knowledge that changes how the next alert is handled.\n\nTasks:\n- [ ] Produce a knowledge candidate from the resolved incident\n- [ ] Route it through review and promotion, per the v0.5 policy\n- [ ] Re-run the same alert and show the changed handling\n- [ ] Show the provenance chain from active knowledge back to the original alert\n- [ ] Show that the promotion required a human decision\n\nAcceptance Criteria:\n- [ ] The second run differs from the first only because of promoted knowledge\n- [ ] The knowledge item traces back to the incident that produced it\n- [ ] No knowledge is activated by the system on its own",
+    "labels": [
+      "type:knowledge",
+      "priority:p1"
+    ],
+    "milestone": "v1.0 End-to-End Demo"
+  },
+  {
+    "title": "Add the end-to-end demo acceptance checks to CI",
+    "body": "The existing CI runs the tests and a demo smoke check. v1.0 needs the full scenario asserted in CI, so a regression in any module fails the build rather than surfacing during a walkthrough.\n\nTasks:\n- [ ] Assert every stage outcome defined in the demo scenario issue\n- [ ] Assert the negative case does not escalate\n- [ ] Assert nothing executes without approval\n- [ ] Assert the audit chain verifies and replay reproduces the run\n- [ ] Keep the runtime short enough for every pull request\n- [ ] Publish the demo report as a build artifact\n\nAcceptance Criteria:\n- [ ] The full demo runs in CI on every pull request\n- [ ] A broken stage fails the build with a message naming the stage\n- [ ] The report is readable without running the demo locally",
+    "labels": [
+      "type:testing",
+      "type:devops",
+      "priority:p0"
+    ],
+    "milestone": "v1.0 End-to-End Demo"
   }
 ]

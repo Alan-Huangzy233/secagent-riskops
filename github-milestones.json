@@ -5,7 +5,7 @@
   },
   {
     "title": "v0.2 AI SOC Inbox",
-    "description": "Alert ingestion, grouping, scoring, AI triage, skeptic agent, and SOC Inbox UI."
+    "description": "Alert ingestion, grouping, scoring, AI triage, and skeptic agent. The SOC Inbox UI moved to v0.2.5 Web Console."
   },
   {
     "title": "v0.3 GRC Bridge",
@@ -13,7 +13,7 @@
   },
   {
     "title": "v0.4 Controlled Remediation",
-    "description": "ActionPlan schema, policy engine, approval queue, adapters, verifier, and rollback."
+    "description": "Execution layer for already-approved remediation: preconditions, backups, adapters, verification, and rollback. Policy engine and ActionPlan schema were delivered in the walking skeleton; approval moved to v0.2.4."
   },
   {
     "title": "v0.5 Knowledge Loop",
@@ -42,5 +42,13 @@
   {
     "title": "v0.1.9 Assessment Authorization and Rules of Engagement",
     "description": "Turn user-provided assessment scope and pentest constraints into an explicit, reviewable, versioned, and deterministically enforced authorization policy."
+  },
+  {
+    "title": "v0.2.4 Approval Service and Local Authentication",
+    "description": "Give the fail-closed policy engine a counterpart that can grant approval, with an authenticated identity behind every decision, and move persistence to PostgreSQL before the new tables land. Approval lifts the policy DENY for one plan; it never executes anything. Self-approval is risk-tiered on the ActionPlan RiskLevel. Single-tenant local auth, not production identity."
+  },
+  {
+    "title": "v0.2.5 Web Console",
+    "description": "Replace the OpenAPI docs page with a browser console for capabilities that already exist in the backend: login, SOC Inbox, incident detail, approval queue, and audit chain viewer. Vite + React + TypeScript with OpenAPI-generated types."
   }
 ]
