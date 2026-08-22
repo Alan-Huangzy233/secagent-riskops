@@ -169,6 +169,13 @@ Deliverables:
 
 Goal: Demonstrate the full workflow from raw alerts to incident, GRC evidence, remediation, verification, and knowledge update.
 
+Deliverables:
+- Demo scenario and sanitized multi-source alert dataset
+- Approval and execution carried through the demo flow
+- Verification and rollback demonstrated, including a deliberate failure
+- Knowledge loop closed: outcome promoted back into active knowledge
+- End-to-end acceptance checks in CI
+
 ## v0.1.6 External Intelligence Ingestion
 
 Goal: Build the source registry, connector, crawler-safety, raw document, extracted entity, and knowledge candidate foundation for external security intelligence enrichment.
