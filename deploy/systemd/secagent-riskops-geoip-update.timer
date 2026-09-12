@@ -1,0 +1,11 @@
+[Unit]
+Description=Check monthly DB-IP Lite updates daily and retry download failures
+
+[Timer]
+OnCalendar=*-*-* 04:10:00 UTC
+RandomizedDelaySec=5m
+Persistent=true
+Unit=secagent-riskops-geoip-update.service
+
+[Install]
+WantedBy=timers.target

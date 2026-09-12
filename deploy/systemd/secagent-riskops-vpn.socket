@@ -1,0 +1,12 @@
+[Unit]
+Description=Optional private-network socket for the RiskOps console
+After=network.target
+
+[Socket]
+# Bind this template to an administrator-selected private management address
+# and interface before enabling it. The loopback API remains the safe default.
+ListenStream=127.0.0.1:18089
+NoDelay=true
+
+[Install]
+WantedBy=sockets.target

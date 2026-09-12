@@ -1,0 +1,12 @@
+[Unit]
+Description=Collect SSH journals every 30 seconds after the previous collection
+
+[Timer]
+OnBootSec=30
+OnUnitInactiveSec=30
+AccuracySec=1
+RandomizedDelaySec=2
+Unit=secagent-riskops-collector.service
+
+[Install]
+WantedBy=timers.target

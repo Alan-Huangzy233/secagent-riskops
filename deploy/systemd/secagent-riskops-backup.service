@@ -1,0 +1,18 @@
+[Unit]
+Description=Consistent local recovery copy of the RiskOps telemetry database
+After=secagent-riskops.service
+
+[Service]
+Type=oneshot
+User=riskops
+Group=riskops
+ExecStart=/usr/bin/python3 /opt/secagent-riskops/current/scripts/backup_telemetry.py --database /var/lib/secagent-riskops/live.sqlite --directory /var/backups/secagent-riskops
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# SQLite WAL readers may need to create/remove the -shm sidecar in the
+# database directory.  The helper opens the database mode=ro and performs no
+# SQL writes; this namespace exception is only for SQLite's local sidecars.
+ReadWritePaths=/var/lib/secagent-riskops /var/backups/secagent-riskops

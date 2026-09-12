@@ -1,0 +1,30 @@
+[Unit]
+Description=Poll restricted SSH authentication journals into SecAgent RiskOps
+After=network-online.target secagent-riskops.service
+Wants=network-online.target
+Requires=secagent-riskops.service
+
+[Service]
+Type=oneshot
+User=riskops-collector
+Group=riskops-collector
+ExecStart=/usr/bin/python3 /opt/secagent-riskops/current/scripts/telemetry_collector.py --once --config /etc/secagent-riskops/collector.json
+TimeoutStartSec=180
+StateDirectory=secagent-riskops-collector
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/var/lib/secagent-riskops-collector
+MemoryMax=256M
+CPUQuota=50%
+CPUWeight=10
+TasksMax=32
