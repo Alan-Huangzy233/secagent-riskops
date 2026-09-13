@@ -33,6 +33,8 @@ def database(tmp_path):
     # Model the old parser's retained records, without modifying their raw hashes.
     with closing(sqlite3.connect(database)) as db:
         db.execute("DELETE FROM incident_evidence")
+        for table in ("incident_sources", "incident_rules", "incident_details"):
+            db.execute(f"DELETE FROM {table}")
         db.execute("UPDATE events SET incident_id=NULL")
         db.execute("DELETE FROM incidents")
         for event_id, encoded in db.execute("SELECT event_id,record_json FROM events").fetchall():

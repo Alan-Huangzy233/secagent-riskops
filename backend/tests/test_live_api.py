@@ -65,6 +65,23 @@ def test_live_entrypoint_requires_configuration(monkeypatch):
             pass
 
 
+def test_summary_counts_cross_source_incident_once(client):
+    start = datetime.now(timezone.utc) - timedelta(minutes=25)
+    for source, host, token, offset in (("server-a", "host-a", TOKEN_A, 0),
+                                        ("server-b", "host-b", TOKEN_B, 300)):
+        rows = [{"event_id": str(i), "timestamp": (start + timedelta(seconds=offset + i * 600)).isoformat(),
+                 "message": "Connection closed by authenticating user root 192.0.2.10 port 42000 [preauth]",
+                 "identifier": "sshd"} for i in range(3)]
+        response = send(client, batch(source_id=source, hostname=host, records=rows), token)
+        assert response.status_code == 200
+    summary = client.get("/api/summary", auth=("operator", PASSWORD)).json()
+    assert summary["totals"]["incidents"] == 1
+    assert [source["incident_count"] for source in summary["sources"]] == [1, 1]
+    for source in ("server-a", "server-b"):
+        page = client.get(f"/api/incidents?source_id={source}&page=1", auth=("operator", PASSWORD)).json()
+        assert page["total"] == 1 and page["items"][0]["source_ids"] == ["server-a", "server-b"]
+
+
 def test_invalid_config_never_echoes_secret(tmp_path):
     path = tmp_path / "config.json"
     path.write_text('{"operator_password":"must-never-appear-in-error"}')

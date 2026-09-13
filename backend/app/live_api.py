@@ -199,6 +199,9 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None) -> Fa
             for total, counter in (("events", "event_count"), ("incidents", "incident_count"),
                                    ("ssh_failures", "ssh_failure_count"), ("ssh_successes", "ssh_success_count")):
                 totals[total] += int(row.get(counter, 0))
+        # A correlated incident appears under every participating source but is
+        # counted once in the global total.
+        totals["incidents"] = request.app.state.store.count_incidents()
         return {"generated_at": now.isoformat(), "retention_days": cfg.retention_days,
                 "heartbeat_timeout_seconds": cfg.heartbeat_timeout_seconds, "sources": sources, "totals": totals}
 

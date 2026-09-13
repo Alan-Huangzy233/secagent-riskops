@@ -13,6 +13,7 @@ button{cursor:pointer}button:disabled{opacity:.45;cursor:default}.toolbar{displa
 .table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;text-align:left;font-size:13px}th{color:#a9bacd;font-weight:500}td,th{border-bottom:1px solid #263a53;padding:11px 9px;vertical-align:top}td{max-width:480px;overflow-wrap:anywhere}tr.selectable{cursor:pointer}tr.selectable:hover{background:#1a2d46}
 .online{color:#68dfa8}.offline,.error{color:#ffba85}.never_seen{color:#a9bacd}#error{color:#ffc49c;min-height:24px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.7 ui-monospace,monospace;max-height:480px;overflow:auto}.pager{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:14px}.page-jump{display:flex;gap:8px;align-items:center}.page-jump input{width:86px}.list-status{min-height:20px;font-size:13px;margin-bottom:0}.muted{color:#a9bacd}
 .ip-form{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.ip-form input{flex:1;min-width:220px;font:inherit}.ip-link{padding:0;border:0;background:none;color:#8ac7ff;text-align:left;font:inherit;overflow-wrap:anywhere}.ip-link:hover{text-decoration:underline}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #8ac7ff;outline-offset:3px}a{color:#8ac7ff}.ip-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin:18px 0}.ip-fields dt{color:#a9bacd;font-size:13px;margin-bottom:6px}.ip-fields dd{margin:0;overflow-wrap:anywhere}#ip-status{min-height:24px;margin-bottom:0}
+.incident-value{white-space:pre-line}
 @media(max-width:800px){body{padding:16px}.cards,.ip-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.ip-form input{min-width:0;flex-basis:100%}}
 """
 
@@ -108,10 +109,30 @@ function renderEvents(data){
  for(const event of data){const tr=document.createElement('tr');tr.className='selectable';tr.tabIndex=0;cell(tr,when(event.timestamp));cell(tr,event.source_id);cell(tr,event.event_kind||event.event_type);ipCell(tr,event.src_ip||event.peer_ip);cell(tr,event.message);tr.addEventListener('click',()=>details(event,'日志详情'));tr.addEventListener('keydown',e=>{if(e.target===tr&&e.key==='Enter')details(event,'日志详情');});rows.append(tr);}
  if(!data.length)empty(rows,5,'此页没有已接收的日志。');
 }
+const detectionRuleLabels={burst:'短时密集失败',slow_scan:'慢速扫描',multi_account:'多账号尝试',cross_source:'跨服务器尝试',success_after_failures:'多次失败后成功'};
+function incidentSources(incident){
+ const sourceIds=Array.isArray(incident.source_ids)&&incident.source_ids.length?incident.source_ids:[incident.source_id].filter(Boolean);
+ const hostnames=Array.isArray(incident.hostnames)&&incident.hostnames.length?incident.hostnames:[incident.hostname].filter(Boolean);
+ return [hostnames.join('、'),sourceIds.length?`来源 ID：${sourceIds.join('、')}`:''].filter(Boolean).join('\\n')||'—';
+}
+function incidentRules(incident){
+ return Array.isArray(incident.rules)?incident.rules.filter(rule=>rule&&typeof rule==='object'):[];
+}
 function renderIncidents(data){
  const rows=$('incidents');rows.replaceChildren();
- for(const incident of data){const tr=document.createElement('tr');tr.className='selectable';tr.tabIndex=0;cell(tr,when(incident.last_seen));cell(tr,incident.hostname||incident.source_id);ipCell(tr,incident.src_ip||incident.peer_ip);cell(tr,incident.failure_count);cell(tr,incident.status==='open'?'待人工核查':incident.status);tr.addEventListener('click',()=>details(incident,'SSH 失败事件与原始证据'));tr.addEventListener('keydown',e=>{if(e.target===tr&&e.key==='Enter')details(incident,'SSH 失败事件与原始证据');});rows.append(tr);}
- if(!data.length)empty(rows,5,'尚未发现达到阈值的 SSH 登录失败事件。');
+ for(const incident of data){
+  const tr=document.createElement('tr');tr.className='selectable';tr.tabIndex=0;cell(tr,when(incident.last_seen));
+  const sources=cell(tr,incidentSources(incident));sources.className='incident-value';ipCell(tr,incident.src_ip||incident.peer_ip);
+  const counts=[`失败日志：${incident.failure_count??0} 条`];
+  if(incident.success_count!==undefined&&incident.success_count!==null)counts.push(`成功日志：${incident.success_count} 条`);
+  if(incident.username_count!==undefined&&incident.username_count!==null)counts.push(`非空账号：${incident.username_count} 个`);
+  const countCell=cell(tr,counts.join('\\n'));countCell.className='incident-value';
+  if(Array.isArray(incident.usernames)&&incident.usernames.length)countCell.title=`涉及账号：${incident.usernames.join('、')}`;
+  const rules=incidentRules(incident),ruleCell=cell(tr,rules.length?rules.map(rule=>detectionRuleLabels[rule.rule_id]||rule.rule_id||'未知规则').join('、'):'登录失败（旧版记录）');
+  ruleCell.title=rules.map(rule=>[rule.reason,rule.window_seconds?`窗口 ${rule.window_seconds} 秒`:null,rule.rule_version?`版本 ${rule.rule_version}`:null].filter(Boolean).join(' · ')).join('\\n');
+  cell(tr,incident.status==='open'?'待人工核查':incident.status);tr.addEventListener('click',()=>details(incident,'SSH 认证告警与原始证据'));tr.addEventListener('keydown',e=>{if(e.target===tr&&e.key==='Enter')details(incident,'SSH 认证告警与原始证据');});rows.append(tr);
+ }
+ if(!data.length)empty(rows,6,'尚未发现达到阈值的 SSH 认证告警。');
 }
 function updatePager(kind){
  const state=pages[kind];$(kind+'-prev').disabled=state.page<=1;$(kind+'-next').disabled=state.totalPages===null||state.page>=state.totalPages;
@@ -124,7 +145,7 @@ function beginList(kind,page){
  const previous=state.displayed,sameView=state.visible&&state.visible.source===source&&state.visible.page===page;
  state.page=page;state.pending=true;updatePager(kind);updateRefreshButton();
  const rows=$(kind==='event'?'events':'incidents');
- if(!sameView){state.visible=null;rows.replaceChildren();empty(rows,5,`正在读取第 ${page} 页…`);text(kind+'-updated','');clearDetails();}
+ if(!sameView){state.visible=null;rows.replaceChildren();empty(rows,kind==='incident'?6:5,`正在读取第 ${page} 页…`);text(kind+'-updated','');clearDetails();}
  $(kind+'-section').setAttribute('aria-busy','true');$(kind+'-status').className='list-status muted';
  text(kind+'-status',sameView?`正在更新第 ${page} 页，保留当前显示…`:`正在读取第 ${page} 页…`);$(kind+'-jump').removeAttribute('aria-invalid');
  return {kind,state,source,page,started,requestId,previous,sameView,rows};
@@ -147,7 +168,7 @@ function failList(view,error){
    state.page=previous.page;state.total=previous.total;state.totalPages=previous.totalPages;state.displayed=previous;state.visible=previous;retained=true;
    if(!sameView){if(kind==='event')renderEvents(previous.items);else renderIncidents(previous.items);}
    text(kind+'-updated',`更新于 ${when(previous.updatedAt)} · 用时 ${previous.elapsed}`);
-  }else{state.displayed=null;state.visible=null;rows.replaceChildren();empty(rows,5,'此来源暂时无法读取，请刷新重试。');}
+  }else{state.displayed=null;state.visible=null;rows.replaceChildren();empty(rows,kind==='incident'?6:5,'此来源暂时无法读取，请刷新重试。');}
   updatePager(kind);const message=error instanceof TypeError?'网络连接失败，请刷新重试。':error.message;
   text(kind+'-status',message+(retained?` 已保留第 ${state.page} 页上次成功读取的数据。`:''));$(kind+'-status').className='list-status error';
 }
@@ -197,9 +218,9 @@ refresh();
 
 DASHBOARD_HTML = """<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SecAgent RiskOps · 实时日志</title><style>__STYLE__</style></head>
-<body><h1>SecAgent RiskOps · 实时日志</h1><p>查看已接入服务器的心跳、系统日志和 SSH 登录失败事件。所有内容来自采集器实际上传的数据；本页只读。</p>
+<body><h1>SecAgent RiskOps · 实时日志</h1><p>查看已接入服务器的心跳、系统日志和 SSH 认证告警。所有内容来自采集器实际上传的数据；本页只读。</p>
 <div class="toolbar"><label for="source-filter">日志来源</label><select id="source-filter"><option value="">全部来源</option></select><button id="refresh" type="button">刷新数据</button><label for="refresh-interval">自动刷新</label><select id="refresh-interval" aria-describedby="refresh-help"><option value="0">关闭（手动刷新）</option><option value="1">每 1 分钟</option><option value="5">每 5 分钟</option><option value="15">每 15 分钟</option></select><small id="updated">正在读取</small></div><p id="refresh-help">默认保留当前列表，点击“刷新数据”获取最新内容；刷新保留当前来源、页码与已打开的详情。自动刷新仅在页面可见且没有读取任务时运行。</p><div id="error" role="status"></div>
-<div class="cards"><div class="card">保留期内日志<div class="number" id="event-total">—</div></div><div class="card">SSH 失败事件<div class="number" id="incident-total">—</div></div><div class="card">SSH 认证异常日志<div class="number" id="failure-total">—</div></div><div class="card">SSH 成功日志<div class="number" id="success-total">—</div></div></div>
+<div class="cards"><div class="card">保留期内日志<div class="number" id="event-total">—</div></div><div class="card">SSH 认证告警<div class="number" id="incident-total">—</div></div><div class="card">SSH 认证异常日志<div class="number" id="failure-total">—</div></div><div class="card">SSH 成功日志<div class="number" id="success-total">—</div></div></div>
 <section><h2>来源状态</h2><p>来源 ID（source_id）是跨日志关联使用的稳定资产 ID，服务器一栏显示配置名称。在线表示近期收到采集器心跳；心跳超时不代表已确认入侵。</p><div class="table-wrap"><table><thead><tr><th>服务器</th><th>来源 ID</th><th>状态</th><th>最后心跳</th><th>最新日志时间</th><th>采集异常</th></tr></thead><tbody id="sources"></tbody></table></div></section>
 <section id="ip-query-section" aria-busy="false"><h2>IP 属地查询</h2><p id="ip-help">输入 IPv4 / IPv6 地址，或点击下方日志中的来源 IP。属地查询使用离线库，不会自动发送 IP 给第三方；属地仅供参考，不能确定实际使用者位置。</p>
 <form id="ip-form" class="ip-form"><label for="ip-input">IP 地址</label><input id="ip-input" name="ip" type="text" required maxlength="128" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="ip-help" placeholder="例如 8.8.8.8 或 2001:4860:4860::8888"><button id="ip-query-button" type="submit">查询属地</button></form>
@@ -209,7 +230,7 @@ DASHBOARD_HTML = """<!doctype html>
 <p><a id="abuseipdb-link" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" hidden>在 AbuseIPDB 查看完整报告 ↗</a></p><p><small>外部风险查询：仅在点击按钮或报告入口时向 AbuseIPDB 发送所选公网 IP，不发送 SSH 原始日志或账号。评分仅供核查，0 分不代表确认安全。</small></p>
 <div id="ip-result" hidden><dl class="ip-fields"><div><dt>IP 地址</dt><dd id="ip-address">—</dd></div><div><dt>地址类型</dt><dd id="ip-type">—</dd></div><div><dt>国家 / 地区</dt><dd id="ip-country">—</dd></div><div><dt>省份 / 城市</dt><dd id="ip-region">—</dd></div><div><dt>网络组织</dt><dd id="ip-network">—</dd></div><div><dt>ASN</dt><dd id="ip-asn">—</dd></div><div><dt>属地库版本</dt><dd id="ip-database-release">—</dd></div><div><dt>数据库更新时间</dt><dd id="ip-database-updated">—</dd></div></dl><p>数据库状态：<span id="ip-database-status" class="muted">—</span></p></div>
 <p><small>属地数据：<a href="https://db-ip.com" target="_blank" rel="noopener noreferrer">DB-IP Lite</a>（CC BY 4.0）。部分地址可能缺少城市或网络组织信息。</small></p></section>
-<section id="incident-section" aria-busy="false"><h2>SSH 登录失败事件</h2><p>统计认证失败、无效账号和认证前断开的日志条数，不等于独立连接或攻击次数。事件保存在中控，刷新不会删除；点击查看证据或查询来源 IP。</p><p><small id="incident-updated"></small></p><div class="table-wrap"><table><thead><tr><th>最近发生</th><th>服务器</th><th>来源 IP</th><th>异常日志条数</th><th>状态</th></tr></thead><tbody id="incidents"></tbody></table></div><div class="pager"><button id="incident-prev" type="button">上一页</button><span id="incident-page"></span><button id="incident-next" type="button">下一页</button><form id="incident-jump-form" class="page-jump" novalidate><label for="incident-jump">跳至</label><input id="incident-jump" type="number" min="1" step="1" value="1" aria-label="SSH 失败事件页码" aria-describedby="incident-status"><span>页</span><button id="incident-jump-button" type="submit">跳转</button></form></div><p id="incident-status" class="list-status muted" role="status" aria-live="polite"></p></section>
+<section id="incident-section" aria-busy="false"><h2>SSH 认证告警</h2><p>检测短时密集失败、慢速扫描、多账号尝试、跨服务器尝试及多次失败后成功。失败日志包括认证失败、无效账号和认证前断开，不等于独立连接或攻击次数。相同来源 IP 可能由不同使用者共享，命中规则需要人工核查，不会自动封禁。</p><p>告警保存在中控，刷新不会删除；来源一栏列出全部关联服务器与来源 ID。点击查看命中原因、账号和原始证据，或点击来源 IP 查询属地。</p><p><small id="incident-updated"></small></p><div class="table-wrap"><table><thead><tr><th>最近发生</th><th>关联服务器 / 来源</th><th>来源 IP</th><th>日志 / 账号统计</th><th>命中规则</th><th>状态</th></tr></thead><tbody id="incidents"></tbody></table></div><div class="pager"><button id="incident-prev" type="button">上一页</button><span id="incident-page"></span><button id="incident-next" type="button">下一页</button><form id="incident-jump-form" class="page-jump" novalidate><label for="incident-jump">跳至</label><input id="incident-jump" type="number" min="1" step="1" value="1" aria-label="SSH 认证告警页码" aria-describedby="incident-status"><span>页</span><button id="incident-jump-button" type="submit">跳转</button></form></div><p id="incident-status" class="list-status muted" role="status" aria-live="polite"></p></section>
 <section id="event-section" aria-busy="false"><h2>已接收日志</h2><p>点击一行查看完整记录，点击来源 IP 查询属地。系统当前采集 SSH 相关日志；这里不代表服务器的全部网络流量。</p><p><small id="event-updated"></small></p><div class="table-wrap"><table><thead><tr><th>日志时间</th><th>来源</th><th>类型</th><th>来源 IP</th><th>原始消息</th></tr></thead><tbody id="events"></tbody></table></div><div class="pager"><button id="event-prev" type="button">上一页</button><span id="event-page"></span><button id="event-next" type="button">下一页</button><form id="event-jump-form" class="page-jump" novalidate><label for="event-jump">跳至</label><input id="event-jump" type="number" min="1" step="1" value="1" aria-label="日志页码" aria-describedby="event-status"><span>页</span><button id="event-jump-button" type="submit">跳转</button></form></div><p id="event-status" class="list-status muted" role="status" aria-live="polite"></p></section>
 <section id="detail-section"><h2 id="detail-title">记录详情</h2><pre id="detail">选择上方记录查看详情。</pre></section><script>__SCRIPT__</script></body></html>""".replace("__STYLE__", _STYLE).replace("__SCRIPT__", _SCRIPT)
 

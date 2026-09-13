@@ -63,7 +63,7 @@ def test_incident_page_counts_exclude_merged_and_keep_evidence(store):
     for source, count in (("source-a", 5), ("source-b", 3)):
         for peer in range(count):
             store.ingest(source, source, f"batch-{peer}", [
-                record(f"{peer}-{i}", i, f"Failed password for root from 198.51.100.{peer + 1} port 2222 ssh2")
+                record(f"{peer}-{i}", i, f"Failed password for root from 198.51.100.{peer + 1 + (100 if source == 'source-b' else 0)} port 2222 ssh2")
                 for i in range(3)
             ])
     with store._connection(write=True) as db:

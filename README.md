@@ -43,6 +43,12 @@ See the implementation and test files for the request/response contract. Keep
 deployment credentials, host addresses, logs, databases, and operational notes
 outside this repository.
 
+SSH detection also correlates slow scans, multiple usernames, activity across
+sources and successful authentication after failures. Correlated incidents retain
+their original evidence and show all participating sources. See
+[SSH detection rules](./docs/ssh-detection.md) for thresholds and safe historical
+re-evaluation.
+
 ## Quickstart (walking skeleton)
 
 ```bash

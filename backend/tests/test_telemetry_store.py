@@ -61,12 +61,16 @@ def test_cross_batch_window_ipv6_and_incident_count_update(store):
     assert store.list_events()[0]["username"] == "admin"
 
 
-def test_other_sources_peers_and_slow_failures_do_not_combine(store):
+def test_sources_correlate_but_different_peers_do_not_combine(store):
     for index in range(3):
         store.ingest("source-a", "source-a", str(index), [record(str(index), index * 240)])
         store.ingest(f"source-{index}", "trusted", "one", [record("one")])
         store.ingest("separate-peers", "trusted", str(index), [record(str(index), ip=f"198.51.100.{index + 1}")])
-    assert store.list_incidents() == []
+    incidents = store.list_incidents()
+    assert len(incidents) == 1
+    assert incidents[0]["failure_count"] == 6
+    assert incidents[0]["src_ip"] == "198.51.100.23"
+    assert {rule["rule_id"] for rule in incidents[0]["rules"]} == {"cross_source"}
 
 
 def test_rolling_window_across_minute_boundary_and_out_of_order(store):
@@ -229,7 +233,7 @@ def test_late_bridge_merges_incidents_and_old_batch_ack_resolves_current_id(stor
 
 def test_query_pagination_and_scope_filter(store):
     store.ingest("source-a", "source-a", "one", [record(str(i), i) for i in range(5)])
-    store.ingest("source-b", "source-b", "one", [record("source-event")])
+    store.ingest("source-b", "source-b", "one", [record("source-event", ip="198.51.100.99")])
     assert [item["event_id"] for item in store.list_events("source-a", limit=2, offset=1)] == ["3", "2"]
     assert store.list_incidents("source-b") == []
     assert len(store.list_sources(limit=1, offset=1)) == 1

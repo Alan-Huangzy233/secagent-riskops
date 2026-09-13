@@ -19,10 +19,10 @@ from pathlib import Path
 from typing import Any, Iterator
 
 from .sshd_parse import FAILURE_KINDS, parse_sshd
+from .detection import MAX_WINDOW_SECONDS, RuleMatch, detect_matches
 
 
 _WINDOW_SECONDS = 300
-_FAILURE_THRESHOLD = 3
 _EVIDENCE_RESPONSE_LIMIT = 20
 _SSH_PREFIX = re.compile(
     r"^(?:\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\S+\s+)?"
@@ -35,6 +35,12 @@ _SSH_UNITS = {"ssh.service", "sshd.service"}
 _FAILURE_TYPES = tuple(sorted(FAILURE_KINDS | {"ssh_failure"}))
 _SUCCESS_TYPES = ("auth_success", "ssh_success")
 _FAILURE_SQL = ",".join("?" * len(_FAILURE_TYPES))
+
+
+def _compatible_evidence_kind(old: str, new: str) -> bool:
+    """Parser upgrades must preserve the authentication outcome in evidence."""
+    return ((old in _FAILURE_TYPES and new in _FAILURE_TYPES)
+            or (old in _SUCCESS_TYPES and new in _SUCCESS_TYPES))
 
 
 def _now() -> datetime:
@@ -185,7 +191,34 @@ class TelemetryStore:
                 CREATE INDEX IF NOT EXISTS incident_evidence_incident
                     ON incident_evidence(incident_id, event_ts);
                 CREATE TABLE IF NOT EXISTS maintenance (name TEXT PRIMARY KEY, value TEXT NOT NULL);
+                CREATE INDEX IF NOT EXISTS events_peer_detection
+                    ON events(src_ip, event_ts, source_id, event_id);
+                CREATE TABLE IF NOT EXISTS incident_sources (
+                    incident_id TEXT NOT NULL REFERENCES incidents(incident_id),
+                    source_id TEXT NOT NULL, hostname TEXT NOT NULL,
+                    PRIMARY KEY (incident_id, source_id)
+                );
+                CREATE INDEX IF NOT EXISTS incident_sources_source ON incident_sources(source_id, incident_id);
+                CREATE TABLE IF NOT EXISTS incident_rules (
+                    incident_id TEXT NOT NULL REFERENCES incidents(incident_id),
+                    rule_id TEXT NOT NULL, rule_version INTEGER NOT NULL,
+                    window_seconds INTEGER NOT NULL, reason TEXT NOT NULL,
+                    PRIMARY KEY (incident_id, rule_id)
+                );
+                CREATE TABLE IF NOT EXISTS incident_details (
+                    incident_id TEXT PRIMARY KEY REFERENCES incidents(incident_id),
+                    success_count INTEGER NOT NULL, evidence_count INTEGER NOT NULL,
+                    username_count INTEGER NOT NULL, usernames_json TEXT NOT NULL
+                );
             """)
+        # Additive migration: old IDs, receipts and raw evidence remain intact.
+        with self._connection(write=True) as db:
+            if not db.execute("SELECT 1 FROM maintenance WHERE name='detection_metadata_v1'").fetchone():
+                for row in db.execute("SELECT incident_id FROM incidents WHERE status!='merged'").fetchall():
+                    self._record_rule(db, row[0], RuleMatch("burst", 1, _WINDOW_SECONDS, [],
+                        "同一来源、同一 IP，滚动 5 分钟内至少 3 条 SSH 认证失败日志。"))
+                    self._refresh_incident(db, row[0])
+                db.execute("INSERT INTO maintenance VALUES('detection_metadata_v1',?)", (_iso(_now()),))
 
     @contextmanager
     def _connection(self, *, write: bool = False, transaction: bool = True) -> Iterator[sqlite3.Connection]:
@@ -249,7 +282,7 @@ class TelemetryStore:
                         "replayed_batch": True, "last_seen": received_at}
 
             accepted = duplicates = 0
-            failure_ids: list[str] = []
+            detection_rows: list[dict[str, Any]] = []
             for record in normalized:
                 prior = db.execute("SELECT record_hash FROM event_receipts WHERE source_id=? AND event_id=?",
                                    (source_id, record["event_id"])).fetchone()
@@ -267,15 +300,13 @@ class TelemetryStore:
                     (source_id, record["event_id"], hostname, record["timestamp"], record["event_ts"],
                      received_at, record["event_type"], record["src_ip"], record["ssh_user"], _json(snapshot)))
                 accepted += 1
-                if record["event_type"] in FAILURE_KINDS and record["src_ip"] is not None:
-                    failure_ids.append(record["event_id"])
-            incident_ids: set[str] = set()
-            for event_id in failure_ids:
-                incident_id = self._detect(db, source_id, event_id, received_at)
-                if incident_id:
-                    incident_ids.add(incident_id)
+                if record["event_type"] in (*_FAILURE_TYPES, *_SUCCESS_TYPES) and record["src_ip"] is not None:
+                    detection_rows.append(snapshot)
+            incident_ids = self._detect_advanced(db, detection_rows, received_at)
             # Out-of-order input can join two prior windows. Return canonical IDs.
             incident_ids = {self._canonical_incident(db, item) for item in incident_ids}
+            for incident_id in incident_ids:
+                self._refresh_incident(db, incident_id)
             latest = max((record["timestamp"] for record in normalized), default=None)
             db.execute("""UPDATE sources SET accepted_total=accepted_total+?,
                 duplicate_total=duplicate_total+?, last_event_at=CASE
@@ -301,60 +332,135 @@ class TelemetryStore:
                 return incident_id
             incident_id = row[0]
 
-    def _detect(self, db: sqlite3.Connection, source_id: str, event_id: str, now: str) -> str | None:
-        event = db.execute("SELECT * FROM events WHERE source_id=? AND event_id=?",
-                           (source_id, event_id)).fetchone()
-        if event["incident_id"]:
-            return self._canonical_incident(db, event["incident_id"])
-        at = event["event_ts"]
-        neighbors = db.execute(f"""SELECT * FROM events WHERE source_id=? AND src_ip=?
-            AND event_type IN ({_FAILURE_SQL}) AND event_ts BETWEEN ? AND ? ORDER BY event_ts,event_id""",
-            (source_id, event["src_ip"], *_FAILURE_TYPES,
-             at - _WINDOW_SECONDS, at + _WINDOW_SECONDS)).fetchall()
-        # Find a true rolling five-minute window containing this event, including
-        # late arrivals. Three failures spread over a longer interval do not pass.
-        best_left = best_right = 0
-        left = 0
-        for right, row in enumerate(neighbors):
-            while row["event_ts"] - neighbors[left]["event_ts"] > _WINDOW_SECONDS:
-                left += 1
-            if neighbors[left]["event_ts"] <= at <= row["event_ts"] and right - left + 1 > best_right - best_left:
-                best_left, best_right = left, right + 1
-        best = neighbors[best_left:best_right]
-        active = db.execute("""SELECT * FROM incidents WHERE source_id=? AND src_ip=? AND status='open'
-            AND first_ts<=? AND last_ts>=? ORDER BY first_ts,incident_id""",
-            (source_id, event["src_ip"], at + _WINDOW_SECONDS, at - _WINDOW_SECONDS)).fetchall()
-        if not active and len(best) < _FAILURE_THRESHOLD:
-            return None
-        evidence = best if len(best) >= _FAILURE_THRESHOLD else [event]
-        linked = {row["incident_id"] for row in evidence if row["incident_id"]}
-        linked.update(row["incident_id"] for row in active)
-        linked = {self._canonical_incident(db, item) for item in linked}
+    @staticmethod
+    def _record_rule(db: sqlite3.Connection, incident_id: str, match: RuleMatch) -> None:
+        db.execute("""INSERT INTO incident_rules VALUES(?,?,?,?,?)
+            ON CONFLICT(incident_id,rule_id) DO UPDATE SET rule_version=excluded.rule_version,
+            window_seconds=excluded.window_seconds,reason=excluded.reason""",
+            (incident_id, match.rule_id, match.rule_version, match.window_seconds, match.reason))
+
+    @staticmethod
+    def _merge_incident(db: sqlite3.Connection, target: str, other: str, now: str) -> None:
+        if target == other:
+            return
+        db.execute("UPDATE incident_evidence SET incident_id=? WHERE incident_id=?", (target, other))
+        db.execute("UPDATE events SET incident_id=? WHERE incident_id=?", (target, other))
+        db.execute("""INSERT OR IGNORE INTO incident_rules
+            SELECT ?,rule_id,rule_version,window_seconds,reason FROM incident_rules WHERE incident_id=?""", (target, other))
+        db.execute("UPDATE incidents SET status='merged',merged_into=?,updated_at=? WHERE incident_id=?",
+                   (target, now, other))
+
+    def _refresh_incident(self, db: sqlite3.Connection, incident_id: str) -> None:
+        # Counts cover retained evidence, including after raw-event expiry. Read
+        # JSON inside SQLite rather than materialising an unbounded preview.
+        stats = db.execute(f"""SELECT count(*), min(event_ts), max(event_ts),
+            coalesce(sum(json_extract(snapshot_json,'$.event_type') IN ({_FAILURE_SQL})),0),
+            coalesce(sum(json_extract(snapshot_json,'$.event_type') IN (?,?)),0),
+            count(DISTINCT nullif(json_extract(snapshot_json,'$.ssh_user'),''))
+            FROM incident_evidence WHERE incident_id=?""", (*_FAILURE_TYPES, *_SUCCESS_TYPES, incident_id)).fetchone()
+        if not stats[0]:
+            row = db.execute("SELECT source_id,hostname FROM incidents WHERE incident_id=?", (incident_id,)).fetchone()
+            db.execute("INSERT OR IGNORE INTO incident_sources VALUES(?,?,?)", (incident_id, row[0], row[1]))
+            return
+        usernames = [row[0] for row in db.execute("""SELECT DISTINCT json_extract(snapshot_json,'$.ssh_user') AS username
+            FROM incident_evidence WHERE incident_id=? AND username IS NOT NULL AND username!=''
+            ORDER BY username LIMIT 100""", (incident_id,))]
+        db.execute("INSERT OR REPLACE INTO incident_details VALUES(?,?,?,?,?)",
+                   (incident_id, stats[4], stats[0], stats[5], _json(usernames)))
+        db.execute("DELETE FROM incident_sources WHERE incident_id=?", (incident_id,))
+        db.execute("""INSERT INTO incident_sources SELECT ?,source_id,
+            coalesce(max(json_extract(snapshot_json,'$.hostname')),source_id)
+            FROM incident_evidence WHERE incident_id=? GROUP BY source_id""", (incident_id, incident_id))
+        db.execute("""UPDATE incidents SET failure_count=?,first_ts=?,last_ts=?,first_seen=?,last_seen=?
+            WHERE incident_id=?""", (stats[3], stats[1], stats[2],
+            _iso(datetime.fromtimestamp(stats[1], timezone.utc)), _iso(datetime.fromtimestamp(stats[2], timezone.utc)), incident_id))
+
+    def _apply_match(self, db: sqlite3.Connection, match: RuleMatch, now: str) -> str:
+        evidence = match.evidence
+        first = min(evidence, key=lambda row: (row["event_ts"], row["source_id"], row["event_id"]))
+        linked = set()
+        for row in evidence:
+            prior = db.execute("SELECT incident_id FROM incident_evidence WHERE source_id=? AND event_id=?",
+                               (row["source_id"], row["event_id"])).fetchone()
+            if prior:
+                linked.add(self._canonical_incident(db, prior[0]))
         if linked:
-            incident_id = sorted(linked)[0]
+            # Preserve the oldest existing identity. Old batch acknowledgments
+            # continue resolving through merged_into, even after restart.
+            incident_id = min(linked, key=lambda item: tuple(db.execute(
+                "SELECT created_at,incident_id FROM incidents WHERE incident_id=?", (item,)).fetchone()))
             for other in linked - {incident_id}:
-                db.execute("UPDATE incident_evidence SET incident_id=? WHERE incident_id=?", (incident_id, other))
-                db.execute("UPDATE events SET incident_id=? WHERE incident_id=?", (incident_id, other))
-                db.execute("UPDATE incidents SET status='merged',merged_into=?,updated_at=? WHERE incident_id=?",
-                           (incident_id, now, other))
+                self._merge_incident(db, incident_id, other, now)
         else:
             incident_id = "SSH-" + uuid.uuid4().hex
-            db.execute("""INSERT INTO incidents VALUES(?,?,?,?,?,'open',?,?,?,?,0,?,?,NULL)""",
-                       (incident_id, source_id, event["hostname"], event["src_ip"],
-                        f"Repeated SSH authentication failures on {event['hostname']} from {event['src_ip']}",
-                        event["timestamp"], event["timestamp"], at, at, now, now))
+            timestamp = _iso(datetime.fromtimestamp(first["event_ts"], timezone.utc))
+            db.execute("INSERT INTO incidents VALUES(?,?,?,?,?,'open',?,?,?,?,0,?,?,NULL)",
+                       (incident_id, first["source_id"], first["hostname"], first["src_ip"],
+                        f"SSH authentication activity from {first['src_ip']}", timestamp, timestamp,
+                        first["event_ts"], first["event_ts"], now, now))
         for row in evidence:
             db.execute("INSERT OR IGNORE INTO incident_evidence VALUES(?,?,?,?,?)",
-                       (source_id, row["event_id"], incident_id, row["event_ts"], row["record_json"]))
+                       (row["source_id"], row["event_id"], incident_id, row["event_ts"], row["record_json"]))
             db.execute("UPDATE events SET incident_id=? WHERE source_id=? AND event_id=?",
-                       (incident_id, source_id, row["event_id"]))
-        stats = db.execute("SELECT count(*),min(event_ts),max(event_ts) FROM incident_evidence WHERE incident_id=?",
-                           (incident_id,)).fetchone()
-        db.execute("""UPDATE incidents SET failure_count=?,first_ts=?,last_ts=?,first_seen=?,last_seen=?,
-            updated_at=? WHERE incident_id=?""",
-            (stats[0], stats[1], stats[2], _iso(datetime.fromtimestamp(stats[1], timezone.utc)),
-             _iso(datetime.fromtimestamp(stats[2], timezone.utc)), now, incident_id))
+                       (incident_id, row["source_id"], row["event_id"]))
+        self._record_rule(db, incident_id, match)
+        db.execute("UPDATE incidents SET updated_at=? WHERE incident_id=?", (now, incident_id))
         return incident_id
+
+    def _detect_advanced(self, db: sqlite3.Connection, triggers: list[dict[str, Any]], now: str) -> set[str]:
+        by_peer: dict[str, list[dict[str, Any]]] = {}
+        for row in triggers:
+            by_peer.setdefault(row["src_ip"], []).append(row)
+        changed: set[str] = set()
+        for peer, rows in by_peer.items():
+            # Only fetch the affected peer's temporal neighbourhoods. Separate
+            # distant late arrivals instead of querying all intervening history.
+            intervals: list[list[float]] = []
+            for at in sorted(row["event_ts"] for row in rows):
+                left, right = at - MAX_WINDOW_SECONDS, at + MAX_WINDOW_SECONDS
+                if intervals and left <= intervals[-1][1]:
+                    intervals[-1][1] = max(intervals[-1][1], right)
+                else:
+                    intervals.append([left, right])
+            keys = {(row["source_id"], row["event_id"]) for row in rows}
+            for left, right in intervals:
+                candidates = [dict(row) for row in db.execute(f"""SELECT * FROM events
+                    WHERE src_ip=? AND event_ts BETWEEN ? AND ? AND event_type IN ({_FAILURE_SQL},?,?)
+                    ORDER BY event_ts,source_id,event_id""", (peer, left, right, *_FAILURE_TYPES, *_SUCCESS_TYPES))]
+                for match in detect_matches(candidates, keys, include_burst=True):
+                    changed.add(self._apply_match(db, match, now))
+        return {self._canonical_incident(db, item) for item in changed}
+
+    def rebuild_detections(self) -> dict[str, int]:
+        """Re-evaluate retained raw rows transactionally; never replay ingestion.
+
+        This explicit maintenance operation keeps all raw data and receipts,
+        retains old incident identities (including merged aliases), and adds
+        evidence only. Expired raw rows cannot be reconstructed from this call.
+        """
+        with self._connection(write=True) as db:
+            before = [db.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
+                      for table in ("incidents", "incident_evidence")]
+            merged_before = db.execute("SELECT count(*) FROM incidents WHERE status='merged'").fetchone()[0]
+            evaluated = 0
+            now = _iso(_now())
+            peers = db.execute(f"""SELECT DISTINCT src_ip FROM events WHERE src_ip IS NOT NULL
+                AND event_type IN ({_FAILURE_SQL},?,?)""", (*_FAILURE_TYPES, *_SUCCESS_TYPES)).fetchall()
+            for peer in peers:
+                rows = [dict(row) for row in db.execute(f"""SELECT * FROM events WHERE src_ip=?
+                    AND event_type IN ({_FAILURE_SQL},?,?) ORDER BY event_ts,source_id,event_id""",
+                    (peer[0], *_FAILURE_TYPES, *_SUCCESS_TYPES))]
+                evaluated += len(rows)
+                changed = set()
+                keys = {(row["source_id"], row["event_id"]) for row in rows}
+                for match in detect_matches(rows, keys, include_burst=True):
+                    changed.add(self._apply_match(db, match, now))
+                for incident_id in {self._canonical_incident(db, item) for item in changed}:
+                    self._refresh_incident(db, incident_id)
+            return {"events_evaluated": evaluated,
+                    "incidents_created": db.execute("SELECT count(*) FROM incidents").fetchone()[0] - before[0],
+                    "incidents_merged": db.execute("SELECT count(*) FROM incidents WHERE status='merged'").fetchone()[0] - merged_before,
+                    "evidence_added": db.execute("SELECT count(*) FROM incident_evidence").fetchone()[0] - before[1]}
 
     @staticmethod
     def _page(limit: int, offset: int) -> None:
@@ -409,19 +515,42 @@ class TelemetryStore:
 
     def _incidents(self, db: sqlite3.Connection, source_id: str | None,
                    limit: int, offset: int) -> list[dict[str, Any]]:
-        where, params = ("AND source_id=?", [source_id]) if source_id else ("", [])
+        where, params = self._incident_filter(source_id)
         rows = db.execute(f"SELECT * FROM incidents WHERE status!='merged' {where} ORDER BY last_ts DESC,incident_id LIMIT ? OFFSET ?",
                           (*params, limit, offset)).fetchall()
         result = []
         for row in rows:
-            evidence = db.execute("SELECT event_id,snapshot_json FROM incident_evidence WHERE incident_id=? ORDER BY event_ts,event_id LIMIT ?",
+            evidence = db.execute("SELECT source_id,event_id,snapshot_json FROM incident_evidence WHERE incident_id=? ORDER BY event_ts,source_id,event_id LIMIT ?",
                                   (row["incident_id"], _EVIDENCE_RESPONSE_LIMIT)).fetchall()
-            result.append({**dict(row), "peer_ip": row["src_ip"], "severity": "medium",
-                           "evidence_count": row["failure_count"],
-                           "evidence_truncated": row["failure_count"] > len(evidence),
+            sources = db.execute("SELECT source_id,hostname FROM incident_sources WHERE incident_id=? ORDER BY source_id", (row["incident_id"],)).fetchall()
+            rules = [dict(rule) for rule in db.execute("SELECT rule_id,rule_version,window_seconds,reason FROM incident_rules WHERE incident_id=? ORDER BY rule_id", (row["incident_id"],))]
+            detail = db.execute("SELECT * FROM incident_details WHERE incident_id=?", (row["incident_id"],)).fetchone()
+            count = detail["evidence_count"] if detail else row["failure_count"]
+            usernames = json.loads(detail["usernames_json"]) if detail else []
+            result.append({**dict(row), "peer_ip": row["src_ip"],
+                           "severity": "high" if any(rule["rule_id"] == "success_after_failures" for rule in rules) else "medium",
+                           "source_ids": [source["source_id"] for source in sources] or [row["source_id"]],
+                           "hostnames": [source["hostname"] for source in sources] or [row["hostname"]],
+                           "rules": rules, "success_count": detail["success_count"] if detail else 0,
+                           "username_count": detail["username_count"] if detail else 0,
+                           "usernames": usernames, "usernames_truncated": bool(detail and detail["username_count"] > len(usernames)),
+                           "evidence_count": count,
+                           "evidence_truncated": count > len(evidence),
+                           "evidence_refs": [{"source_id": item["source_id"], "event_id": item["event_id"]} for item in evidence],
                            "event_ids": [item["event_id"] for item in evidence],
                            "evidence_snapshots": [self._event(json.loads(item["snapshot_json"])) for item in evidence]})
         return result
+
+    @staticmethod
+    def _incident_filter(source_id: str | None) -> tuple[str, tuple]:
+        if source_id is None:
+            return "", ()
+        return ("AND (source_id=? OR incident_id IN (SELECT incident_id FROM incident_sources WHERE source_id=?))",
+                (source_id, source_id))
+
+    def count_incidents(self) -> int:
+        with self._connection() as db:
+            return db.execute("SELECT count(*) FROM incidents WHERE status!='merged'").fetchone()[0]
 
     def list_incidents(self, source_id: str | None = None, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
         self._page(limit, offset)
@@ -431,7 +560,7 @@ class TelemetryStore:
     def paginate_incidents(self, source_id: str | None = None, limit: int = 100,
                            page: int = 1) -> dict[str, Any]:
         self._page_number(limit, page)
-        where, params = ("AND source_id=?", (source_id,)) if source_id else ("", ())
+        where, params = self._incident_filter(source_id)
         with self._connection() as db:
             total = db.execute(f"SELECT count(*) FROM incidents WHERE status!='merged' {where}", params).fetchone()[0]
             pagination = self._pagination(total, limit, page)
@@ -449,7 +578,8 @@ class TelemetryStore:
             coalesce(sum(event_type IN ({_FAILURE_SQL})),0),
             coalesce(sum(event_type IN (?,?)),0) FROM events WHERE source_id=?""",
             (*_FAILURE_TYPES, *_SUCCESS_TYPES, row["source_id"])).fetchone()
-        incidents = db.execute("SELECT count(*) FROM incidents WHERE source_id=? AND status!='merged'", (row["source_id"],)).fetchone()[0]
+        where, params = TelemetryStore._incident_filter(row["source_id"])
+        incidents = db.execute(f"SELECT count(*) FROM incidents WHERE status!='merged' {where}", params).fetchone()[0]
         return {**dict(row), "event_count": counts[0], "ssh_failure_count": counts[1],
                 "ssh_success_count": counts[2], "incident_count": incidents}
 
@@ -497,7 +627,8 @@ class TelemetryStore:
                     updated = enrich(old)
                     if old == updated and (row["event_type"], row["src_ip"], row["ssh_user"]) == (updated["event_type"], updated["src_ip"], updated["ssh_user"]):
                         continue
-                    if row["incident_id"] and (row["src_ip"] != updated["src_ip"] or updated["event_type"] not in _FAILURE_TYPES):
+                    if row["incident_id"] and (row["src_ip"] != updated["src_ip"]
+                            or not _compatible_evidence_kind(row["event_type"], updated["event_type"])):
                         raise ValueError("Parser changes an existing incident's peer or evidence classification; review before applying")
                     db.execute("UPDATE events SET event_type=?,src_ip=?,ssh_user=?,record_json=? WHERE source_id=? AND event_id=?",
                                (updated["event_type"], updated["src_ip"], updated["ssh_user"], _json(updated), row["source_id"], row["event_id"]))
@@ -511,12 +642,19 @@ class TelemetryStore:
                     old = json.loads(row["snapshot_json"])
                     updated = enrich(old)
                     if old != updated:
-                        if old.get("src_ip") != updated["src_ip"] or updated["event_type"] not in _FAILURE_TYPES:
+                        if old.get("src_ip") != updated["src_ip"] or not _compatible_evidence_kind(old["event_type"], updated["event_type"]):
                             raise ValueError("Parser changes retained incident evidence; review before applying")
                         db.execute("UPDATE incident_evidence SET snapshot_json=? WHERE source_id=? AND event_id=?",
                                    (_json(updated), row["source_id"], row["event_id"]))
                         changed_evidence += 1
+            dirty = set()
+            triggers = []
             for _, source, event_id in sorted(newly_detectable):
-                self._detect(db, source, event_id, _iso(_now()))
+                triggers.append(dict(db.execute("SELECT * FROM events WHERE source_id=? AND event_id=?", (source, event_id)).fetchone()))
+            dirty.update(self._detect_advanced(db, triggers, _iso(_now())))
+            if changed_evidence:
+                dirty.update(row[0] for row in db.execute("SELECT incident_id FROM incidents WHERE status!='merged'"))
+            for incident_id in {self._canonical_incident(db, item) for item in dirty}:
+                self._refresh_incident(db, incident_id)
         return {"changed_events": changed_events, "changed_evidence": changed_evidence,
                 "newly_detectable": len(newly_detectable)}

@@ -18,7 +18,7 @@ import sqlite3
 import tempfile
 from typing import Any
 
-from app.telemetry.store import FAILURE_KINDS, TelemetryStore, _FAILURE_TYPES, _classify
+from app.telemetry.store import FAILURE_KINDS, TelemetryStore, _FAILURE_TYPES, _classify, _compatible_evidence_kind
 
 
 _DERIVED = frozenset({"event_type", "src_ip", "ssh_user", "event_kind", "peer_ip", "username"})
@@ -111,11 +111,11 @@ def preview(database: Path) -> dict[str, int]:
                     continue
                 counts["changed_events" if table == "events" else "changed_evidence"] += 1
                 if table == "events":
-                    if row["incident_id"] and (row["src_ip"] != peer or kind not in _FAILURE_TYPES):
+                    if row["incident_id"] and (row["src_ip"] != peer or not _compatible_evidence_kind(row["event_type"], kind)):
                         counts["conflicting_evidence"] += 1
                     if kind in FAILURE_KINDS and peer is not None and (row["event_type"] not in _FAILURE_TYPES or row["src_ip"] != peer):
                         counts["newly_detectable"] += 1
-                elif old.get("src_ip") != peer or kind not in _FAILURE_TYPES:
+                elif old.get("src_ip") != peer or not _compatible_evidence_kind(old["event_type"], kind):
                     counts["conflicting_evidence"] += 1
     return counts
 
