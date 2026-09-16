@@ -89,7 +89,7 @@ def test_only_explicit_incident_targets_are_selected_and_source_scoped():
 const incident={incident_id:'example',source_id:'source-a',source_ids:['source-a','source-b'],src_ip:'192.0.2.7',status:'open'};
 renderIncidents([incident,{...incident,src_ip:'192.0.2.8'}]);
 assert.equal(selectedTargets.size,0);
-const checkbox=$('incidents').children[0].children[5].children[0].children[0];
+const checkbox=$('incidents').children[0].children[5].children[1].children[0];
 checkbox.checked=true;checkbox.listeners.change();
 assert.equal(selectedTargets.size,2);
 assert.deepEqual([...selectedTargets.values()].map(t=>t.ip),['192.0.2.7','192.0.2.7']);

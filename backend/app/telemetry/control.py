@@ -66,9 +66,12 @@ class SSHTransport:
 
 
 class ControlService:
-    def __init__(self, config, live_sources, *, transport=None):
+    def __init__(self, config, live_sources, *, transport=None, block_listener=None):
         self.enabled = config is not None
         self.csrf_token = secrets.token_urlsafe(32)
+        # Called after a ban is verified on a source with the sources that now
+        # hold an SSH-covering block for that IP. It never influences the job.
+        self.block_listener = block_listener
         self._stop = threading.Event()
         self._thread = None
         self._last_reconcile = 0
@@ -123,15 +126,15 @@ class ControlService:
             """)
 
     @classmethod
-    def from_environment(cls, live_sources):
+    def from_environment(cls, live_sources, *, block_listener=None):
         path = os.environ.get("RISKOPS_CONTROL_CONFIG")
         if not path:
-            return cls(None, live_sources)
+            return cls(None, live_sources, block_listener=block_listener)
         try:
             raw = Path(path).read_bytes()
             if len(raw) > 65536:
                 raise ValueError
-            return cls(json.loads(raw), live_sources)
+            return cls(json.loads(raw), live_sources, block_listener=block_listener)
         except Exception:
             raise RuntimeError("Control configuration is missing or invalid") from None
 
@@ -329,7 +332,25 @@ class ControlService:
             db.execute("UPDATE jobs SET status=?,items=?,updated=?,lease_until=? WHERE id=?",
                        (status, encoded(items), now, now + 10 if item["status"] == "pending" else 0, job_id))
             self.audit(db, actor, "result", {"job_id": job_id, "item": item})
+        if item["status"] == "ok" and item["action"] == "ban" and item["channel"] in ("ssh", "tcp"):
+            self._notify_block(job_id, actor, row["reason"], item)
         return True
+
+    def _notify_block(self, job_id, actor, reason, item):
+        if self.block_listener is None:
+            return
+        with self.connection() as db:
+            covered = sorted({row[0] for row in db.execute(
+                "SELECT source_id FROM blocks WHERE ip=? AND channel IN ('ssh','tcp') AND (expires_at IS NULL OR expires_at>?)",
+                (item["ip"], time.time()))})
+        try:
+            self.block_listener({"ip": item["ip"], "source_ids": covered, "job_id": job_id,
+                                 "actor": actor, "reason": reason})
+        except Exception:
+            # The firewall change is already verified and recorded; only the
+            # incident bookkeeping failed, which the audit trail must show.
+            with self.connection(write=True) as db:
+                self.audit(db, actor, "incident_update_failed", {"job_id": job_id, "ip": item["ip"], "source_ids": covered})
 
     def reconcile(self):
         for source in self.sources.values():

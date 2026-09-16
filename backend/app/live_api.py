@@ -6,7 +6,7 @@ import hmac
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -116,6 +116,13 @@ class IPCheckRequest(BaseModel):
     ip: str = Field(min_length=1, max_length=128)
 
 
+class TriageRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+    incident_ids: list[Annotated[str, Field(min_length=1, max_length=256)]] = Field(min_length=1, max_length=100)
+    state: Literal["pending", "acknowledged", "resolved"]
+    note: str | None = Field(default=None, max_length=300)
+
+
 class TelemetryBatch(BaseModel):
     model_config = {"extra": "forbid"}
     source_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
@@ -151,7 +158,18 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
         if not await run_in_threadpool(application.state.store.healthcheck):
             raise RuntimeError("Live telemetry database is unavailable")
         from .telemetry.control import ControlService
-        application.state.control = control or ControlService.from_environment(application.state.config.sources)
+        live_store = application.state.store
+
+        def resolve_blocked(event: dict[str, Any]) -> None:
+            # A verified SSH-covering block on every participating source
+            # marks the peer's open incidents as handled, with the job as reference.
+            live_store.resolve_blocked_incidents(event["ip"], event["source_ids"], actor=event["actor"],
+                                                 reference=event["job_id"], note=event.get("reason"))
+
+        application.state.control = control or ControlService.from_environment(
+            application.state.config.sources, block_listener=resolve_blocked)
+        if application.state.control.block_listener is None:
+            application.state.control.block_listener = resolve_blocked
         if control is None:
             application.state.control.start()
         try:
@@ -208,9 +226,11 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
                 totals[total] += int(row.get(counter, 0))
         # A correlated incident appears under every participating source but is
         # counted once in the global total.
-        totals["incidents"] = request.app.state.store.count_incidents()
+        triage = request.app.state.store.triage_counts()
+        totals["incidents"] = triage["total"]
         return {"generated_at": now.isoformat(), "retention_days": cfg.retention_days,
-                "heartbeat_timeout_seconds": cfg.heartbeat_timeout_seconds, "sources": sources, "totals": totals}
+                "heartbeat_timeout_seconds": cfg.heartbeat_timeout_seconds, "sources": sources,
+                "totals": totals, "triage_counts": triage}
 
     def source_filter(request: Request, source_id: str | None) -> str | None:
         if source_id is not None and source_id not in {source.id for source in request.app.state.config.sources}:
@@ -242,28 +262,36 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
             return request.app.state.store.paginate_events(source_id=source_filter(request, source_id), limit=limit, page=page, **filters)
         return request.app.state.store.list_events(source_id=source_filter(request, source_id), limit=limit, offset=offset, **filters)
 
+    def triage_filter(triage: str | None = Query(None, max_length=16)) -> str | None:
+        if triage is not None and triage not in ("all", "pending", "acknowledged", "resolved"):
+            raise HTTPException(422, "处置状态筛选无效")
+        return triage
+
     @application.get("/api/incidents", dependencies=[Depends(operator)])
     def incidents(request: Request, source_id: str | None = Query(None, max_length=64),
                   limit: int = Query(100, ge=1, le=200), offset: int = Query(0, ge=0),
                   page: int | None = Query(None, ge=1, le=1_000_000_000),
-                  include_evidence: bool = Query(True)):
+                  include_evidence: bool = Query(True), triage: str | None = Depends(triage_filter)):
         if page is not None:
-            return request.app.state.store.paginate_incidents(source_id=source_filter(request, source_id), limit=limit, page=page, include_evidence=include_evidence)
-        return request.app.state.store.list_incidents(source_id=source_filter(request, source_id), limit=limit, offset=offset)
+            return request.app.state.store.paginate_incidents(source_id=source_filter(request, source_id), limit=limit, page=page,
+                                                              include_evidence=include_evidence, triage=triage)
+        return request.app.state.store.list_incidents(source_id=source_filter(request, source_id), limit=limit, offset=offset, triage=triage)
 
     @application.get("/api/dashboard", dependencies=[Depends(operator)])
     def dashboard_snapshot(request: Request, source_id: str | None = Query(None, max_length=64),
                            event_page: int = Query(1, ge=1, le=1_000_000_000),
                            incident_page: int = Query(1, ge=1, le=1_000_000_000),
                            limit: int = Query(50, ge=1, le=200),
-                           filters: dict = Depends(search_filters)):
+                           filters: dict = Depends(search_filters),
+                           incident_triage: str | None = Query(None, max_length=16)):
         # One authenticated HTTP request avoids three expensive password checks
         # when the operator returns after the short verification cache expires.
         selected = source_filter(request, source_id)
         store = request.app.state.store
         return {"summary": summary(request),
                 "events": store.paginate_events(source_id=selected, limit=limit, page=event_page, **filters),
-                "incidents": store.paginate_incidents(source_id=selected, limit=limit, page=incident_page, include_evidence=False)}
+                "incidents": store.paginate_incidents(source_id=selected, limit=limit, page=incident_page,
+                                                      include_evidence=False, triage=triage_filter(incident_triage))}
 
     @application.get("/api/incidents/{incident_id}", dependencies=[Depends(operator)])
     def incident_detail(request: Request, incident_id: str):
@@ -283,7 +311,7 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
             raise HTTPException(404, "事件不存在")
         return result
 
-    def control_write(request: Request, _: None = Depends(operator)):
+    def operator_write(request: Request, _: None = Depends(operator)):
         # Basic credentials alone are ambient browser credentials. Requiring a
         # secret custom header prevents CSRF; no cross-origin CORS is enabled.
         supplied = request.headers.get("x-riskops-csrf", "")
@@ -294,8 +322,24 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
             raise HTTPException(403, "不允许跨站操作")
         if request.headers.get("content-type", "").split(";", 1)[0].strip() != "application/json":
             raise HTTPException(415, "Expected application/json")
+
+    def control_write(request: Request, _: None = Depends(operator_write)):
         if not request.app.state.control.enabled:
             raise HTTPException(503, "手动控制尚未配置")
+
+    @application.post("/api/incidents/triage", dependencies=[Depends(operator_write)])
+    async def triage_incidents(request: Request):
+        # Triage is bookkeeping on the control centre only; it never contacts a
+        # source and does not depend on the block channel being configured.
+        try:
+            body = TriageRequest.model_validate_json(await request.body())
+        except ValidationError:
+            raise HTTPException(422, "处置请求无效：需要 1–100 个告警 ID、目标状态和不超过 300 字的备注") from None
+        try:
+            return await run_in_threadpool(request.app.state.store.set_triage, body.incident_ids, body.state,
+                                           actor=request.app.state.config.operator_username, note=body.note)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
 
     @application.get("/api/controls", dependencies=[Depends(operator)])
     def controls(request: Request):
