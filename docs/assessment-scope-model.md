@@ -151,7 +151,7 @@ Suggested fields:
   "policy_hash": "sha256:REDACTED_EXAMPLE",
   "flow_id": "FLOW-001",
   "status": "running",
-  "requested_by": "alan",
+  "requested_by": "operator",
   "started_at": "2026-07-09T01:00:00Z",
   "completed_at": null
 }

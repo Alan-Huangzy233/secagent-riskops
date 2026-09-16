@@ -1,0 +1,39 @@
+[Unit]
+Description=SecAgent RiskOps authenticated SSH telemetry console
+After=network.target
+
+[Service]
+Type=simple
+User=riskops
+Group=riskops
+WorkingDirectory=/opt/secagent-riskops/current
+Environment=RISKOPS_CONFIG=/etc/secagent-riskops/config.json
+Environment=RISKOPS_GEOIP_DIRECTORY=/var/lib/secagent-riskops-geoip
+Environment=RISKOPS_ABUSEIPDB_KEY_FILE=/etc/secagent-riskops/abuseipdb.key
+Environment=PYTHONPATH=/opt/secagent-riskops/current/backend
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/secagent-riskops/venv/bin/python -m uvicorn app.live_api:app --host 127.0.0.1 --port 8088 --workers 1 --limit-concurrency 32 --timeout-keep-alive 5 --no-server-header --no-access-log
+Restart=on-failure
+RestartSec=5
+StateDirectory=secagent-riskops
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/var/lib/secagent-riskops
+MemoryHigh=1G
+MemoryMax=2G
+CPUQuota=150%
+CPUWeight=20
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

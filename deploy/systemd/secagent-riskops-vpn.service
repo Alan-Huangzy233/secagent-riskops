@@ -1,0 +1,13 @@
+[Unit]
+Description=Forward optional management access to the loopback-only RiskOps API
+Requires=secagent-riskops.service
+After=secagent-riskops.service
+
+[Service]
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd 127.0.0.1:8088
+DynamicUser=yes
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true

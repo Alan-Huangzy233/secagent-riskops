@@ -22,11 +22,38 @@ SecAgent RiskOps reduces alert fatigue, converts security incidents into complia
 > [Implementation Status](./docs/implementation-status.md) for exactly what is
 > implemented in code versus still design-only.
 
+An independent, authenticated SSH/auth telemetry pilot is also available via
+`app.live_api:app`. It includes persistent ingestion, a read-only console, and
+restricted SSH journal polling. See the source files in `backend/app/telemetry/`,
+the collector in `scripts/telemetry_collector.py`, and the example systemd units
+in `deploy/systemd/` for integration points. The [configuration guide](./deploy/README.md)
+describes the generic schemas and runtime boundaries. This pilot does not execute
+remediation or observe all server network traffic.
+
+The console also supports offline IPv4/IPv6 city and ASN lookup with DB-IP Lite,
+plus total page counts and direct page navigation. Individual lookup IPs are
+never forwarded to a geolocation API. See `backend/app/telemetry/geoip.py` and
+the related tests for the lookup and pagination contract.
+
+Refresh is manual by default, with optional longer intervals; existing results
+stay visible during refresh or network errors. Operators can explicitly check a
+public IP against AbuseIPDB using a server-held API key. Only that IP is sent,
+and ordinary location lookups or dashboard refreshes do not trigger the check.
+See the implementation and test files for the request/response contract. Keep
+deployment credentials, host addresses, logs, databases, and operational notes
+outside this repository.
+
+SSH detection also correlates slow scans, multiple usernames, activity across
+sources and successful authentication after failures. Correlated incidents retain
+their original evidence and show all participating sources. See
+[SSH detection rules](./docs/ssh-detection.md) for thresholds and safe historical
+re-evaluation.
+
 ## Quickstart (walking skeleton)
 
 ```bash
 make install   # or: pip install -e .[dev]
-make test      # 22 tests, incl. adversarial policy-enforcement suite
+make test      # tests, incl. policy checks and live telemetry coverage
 make demo      # end-to-end run on the bundled sample alerts
 make run       # FastAPI dev server on :8000  (GET /docs)
 ```
