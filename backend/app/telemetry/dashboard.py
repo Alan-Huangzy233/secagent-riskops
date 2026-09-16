@@ -1,4 +1,4 @@
-"""Self-contained read-only dashboard; no external assets or untrusted HTML."""
+"""Self-contained telemetry dashboard; no external assets or untrusted HTML."""
 from __future__ import annotations
 
 import base64
@@ -14,7 +14,8 @@ button{cursor:pointer}button:disabled{opacity:.45;cursor:default}.toolbar{displa
 .online{color:#68dfa8}.offline,.error{color:#ffba85}.never_seen{color:#a9bacd}#error{color:#ffc49c;min-height:24px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.7 ui-monospace,monospace;max-height:480px;overflow:auto}.pager{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:14px}.page-jump{display:flex;gap:8px;align-items:center}.page-jump input{width:86px}.list-status{min-height:20px;font-size:13px;margin-bottom:0}.muted{color:#a9bacd}
 .ip-form{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.ip-form input{flex:1;min-width:220px;font:inherit}.ip-link{padding:0;border:0;background:none;color:#8ac7ff;text-align:left;font:inherit;overflow-wrap:anywhere}.ip-link:hover{text-decoration:underline}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #8ac7ff;outline-offset:3px}a{color:#8ac7ff}.ip-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin:18px 0}.ip-fields dt{color:#a9bacd;font-size:13px;margin-bottom:6px}.ip-fields dd{margin:0;overflow-wrap:anywhere}#ip-status{min-height:24px;margin-bottom:0}
 .incident-value{white-space:pre-line}
-@media(max-width:800px){body{padding:16px}.cards,.ip-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.ip-form input{min-width:0;flex-basis:100%}}
+.search-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.search-fields label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:#a9bacd}.search-fields input,.search-fields select{min-width:0;width:100%}.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}.selection{display:flex;gap:8px;align-items:center}.selection input{width:18px;height:18px}.danger{border-color:#d69673;color:#ffd2b6}.control-targets{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.control-targets label{display:flex;gap:6px;align-items:center}.control-targets input{width:18px;height:18px}fieldset{border:1px solid #37516d;border-radius:6px;margin:14px 0}textarea{background:#172941;color:#e7edf5;border:1px solid #37516d;border-radius:6px;width:100%;padding:10px;font:inherit}#control-plan{border-left:3px solid #d69673;padding-left:14px}#evidence-view table{font-size:12px}
+@media(max-width:800px){body{padding:16px}.cards,.ip-fields,.search-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.ip-form input{min-width:0;flex-basis:100%}}@media(max-width:480px){.search-fields{grid-template-columns:1fr}}
 """
 
 _SCRIPT = """
@@ -23,6 +24,9 @@ const $=id=>document.getElementById(id);
 let currentSource='', refreshRequestId=0, summaryController=null, summaryPending=false;
 let sourceRowsKey=null, autoRefreshTimer=null, refreshRunning=false;
 let ipRequestId=0, ipController=null, abuseRequestId=0, abuseController=null, abuseIP=null;
+let eventFilters={},eventSnapshot=null,detailRequestId=0,detailController=null,detailIncident=null,evidencePage=1,evidenceTotalPages=1;
+let controlsData=null,controlBusy=false,controlPlan=null,controlRevision=0,controlPollTimer=null,controlPollId=0,controlReadId=0;
+const selectedTargets=new Map(),channelLabels={ssh:'SSH 端口',tcp:'全部 TCP（包含 SSH）',udp:'全部 UDP'};
 const pageSize=50;
 const pages={event:{page:1,total:0,totalPages:null,requestId:0,controller:null,pending:false,displayed:null,visible:null},incident:{page:1,total:0,totalPages:null,requestId:0,controller:null,pending:false,displayed:null,visible:null}};
 function text(id,value){const node=$(id),next=String(value??'—');if(node.textContent!==next)node.textContent=next;}
@@ -30,11 +34,30 @@ function when(value){if(!value)return '尚未收到'; const d=new Date(value);re
 function duration(started){const elapsed=Math.round(performance.now()-started);return elapsed<1000?`${elapsed} 毫秒`:`${(elapsed/1000).toFixed(1)} 秒`;}
 function isBusy(){return refreshRunning||summaryPending||Object.values(pages).some(state=>state.pending);}
 function updateRefreshButton(){const busy=isBusy();$('refresh').disabled=busy;text('refresh',busy?'正在更新…':'刷新数据');}
-function clearDetails(){text('detail-title','记录详情');text('detail','选择上方记录查看详情。');}
+function clearDetails(){++detailRequestId;if(detailController)detailController.abort();detailIncident=null;$('evidence-view').hidden=true;text('detail-title','记录详情');text('detail','选择上方记录查看详情。');}
 function cell(row,value){const td=document.createElement('td');td.textContent=String(value??'—');row.append(td);return td;}
 function empty(tbody,span,message){const tr=document.createElement('tr');const td=cell(tr,message);td.colSpan=span;tbody.append(tr);}
 async function get(path,signal){const response=await fetch(path,{credentials:'same-origin',cache:'no-store',signal});if(!response.ok)throw new Error(response.status===401?'登录已失效，请刷新页面重新登录。':`读取失败（${response.status}）。请检查中控服务。`);return response.json();}
-function details(record,title){text('detail-title',title);text('detail',JSON.stringify(record,null,2));$('detail-section').scrollIntoView({behavior:'smooth',block:'nearest'});}
+function details(record,title){clearDetails();text('detail-title',title);text('detail',JSON.stringify(record,null,2));$('detail-section').scrollIntoView({behavior:'smooth',block:'nearest'});}
+function filterKey(){return JSON.stringify({filters:eventFilters,snapshot:eventSnapshot});}
+function saveView(){try{sessionStorage.setItem('riskops-view',JSON.stringify({source:currentSource,filters:eventFilters,snapshot:eventSnapshot,eventPage:pages.event.page,incidentPage:pages.incident.page}));}catch{}}
+function setFilterInputs(){for(const key of ['ip','username','event_type','q','start','end']){let value=eventFilters[key]||'';if(value&&(key==='start'||key==='end')){const d=new Date(value);if(!Number.isNaN(d.valueOf())){const local=new Date(d.valueOf()-d.getTimezoneOffset()*60000);value=local.toISOString().slice(0,16);}}$('search-'+key).value=value;}}
+function queryLogsForIP(ip){eventFilters={...eventFilters,ip:String(ip)};eventSnapshot=null;setFilterInputs();saveView();loadList('event',1);$('event-section').scrollIntoView({behavior:'smooth',block:'start'});}
+async function showIncident(incident){
+ clearDetails();const id=incident.incident_id;if(!id){details(incident,'SSH 认证告警与原始证据');return;}
+ detailIncident=String(id);const requestId=++detailRequestId;detailController=new AbortController();text('detail-title','SSH 认证告警与原始证据');text('detail','正在读取事件详情…');$('detail-section').scrollIntoView({behavior:'smooth',block:'nearest'});
+ try{const data=await get('/api/incidents/'+encodeURIComponent(id),detailController.signal);if(requestId!==detailRequestId)return;const summary={...data};delete summary.evidence_snapshots;text('detail',JSON.stringify(summary,null,2));await loadEvidence(1);}
+ catch(error){if(requestId===detailRequestId&&error.name!=='AbortError')text('detail',error.message);}
+}
+async function loadEvidence(page){
+ if(!detailIncident)return;const id=detailIncident,requestId=++detailRequestId;if(detailController)detailController.abort();detailController=new AbortController();$('evidence-view').hidden=false;text('evidence-status','正在读取原始证据…');
+ try{const data=await get('/api/incidents/'+encodeURIComponent(id)+'/evidence?'+new URLSearchParams({page:String(page),limit:String(pageSize)}),detailController.signal);if(requestId!==detailRequestId||id!==detailIncident)return;
+  if(!Array.isArray(data.items)||!Number.isInteger(data.page)||!Number.isInteger(data.total_pages))throw new Error('证据分页返回异常，请重试。');
+  evidencePage=data.page;evidenceTotalPages=Math.max(1,data.total_pages);const rows=$('evidence-rows');rows.replaceChildren();
+  for(const record of data.items){const tr=document.createElement('tr');cell(tr,when(record.timestamp));cell(tr,record.source_id);cell(tr,record.event_kind||record.event_type);ipCell(tr,record.peer_ip||record.src_ip);cell(tr,record.username||record.ssh_user);cell(tr,record.message);rows.append(tr);}if(!data.items.length)empty(rows,6,'没有可显示的证据。');
+  text('evidence-page',`第 ${evidencePage} 页 / 共 ${evidenceTotalPages} 页 · ${data.total} 条证据`);$('evidence-jump').value=String(evidencePage);$('evidence-jump').max=String(evidenceTotalPages);$('evidence-prev').disabled=evidencePage<=1;$('evidence-next').disabled=evidencePage>=evidenceTotalPages;text('evidence-status','证据按时间顺序展示，跨服务器记录在同一时间线中。');
+ }catch(error){if(requestId===detailRequestId&&error.name!=='AbortError')text('evidence-status',error.message+' 已保留上次成功读取的证据。');}
+}
 function ipCell(row,value){
  const td=cell(row,null);if(!value)return td;
  const ip=String(value);const button=document.createElement('button');button.type='button';button.className='ip-link';button.textContent=ip;button.setAttribute('aria-label',`查询 ${ip} 的属地`);
@@ -92,7 +115,61 @@ async function lookupIp(value){
  }catch(error){if(requestId!==ipRequestId||error.name==='AbortError')return;text('ip-status',error instanceof TypeError?'无法连接属地查询服务，请检查网络后重试。':error.message);$('ip-status').className='error';}
  finally{if(requestId===ipRequestId){$('ip-query-section').setAttribute('aria-busy','false');text('ip-query-button','查询属地');}}
 }
-function sourceQuery(page,source){const query=new URLSearchParams({limit:String(pageSize),page:String(page)});if(source)query.set('source_id',source);return query;}
+function sourceQuery(page,source,kind='incident'){const query=new URLSearchParams({limit:String(pageSize),page:String(page)});if(source)query.set('source_id',source);if(kind==='event')appendEventQuery(query);else query.set('include_evidence','false');return query;}
+function appendEventQuery(query){for(const [key,value] of Object.entries(eventFilters))if(value)query.set(key,value);if(eventSnapshot!==null)query.set('snapshot',String(eventSnapshot));}
+function targetKey(target){return JSON.stringify([target.source_id,target.ip]);}
+function incidentTargets(incident){const ip=incident.src_ip||incident.peer_ip;if(!ip)return [];const sources=currentSource?[currentSource]:(Array.isArray(incident.source_ids)&&incident.source_ids.length?incident.source_ids:[incident.source_id]);return [...new Set(sources.filter(Boolean))].map(source_id=>({source_id,ip:String(ip)}));}
+function appendIncidentSelection(td,incident){
+ const targets=incidentTargets(incident);if(!targets.length)return;const label=document.createElement('label');label.className='selection';const input=document.createElement('input');input.type='checkbox';input.checked=targets.every(target=>selectedTargets.has(targetKey(target)));input.setAttribute('aria-label',`选择 ${targets[0].ip}，涉及 ${targets.length} 个来源`);
+ input.addEventListener('change',()=>{for(const target of targets){if(input.checked)selectedTargets.set(targetKey(target),target);else selectedTargets.delete(targetKey(target));}invalidatePlan();renderSelectedTargets();});label.addEventListener('click',event=>event.stopPropagation());label.addEventListener('keydown',event=>event.stopPropagation());const caption=document.createElement('span');caption.textContent=`选择 IP（${targets.length} 个来源）`;label.append(input,caption);td.append(label);
+}
+function invalidatePlan(){++controlRevision;controlPlan=null;$('control-plan').hidden=true;$('control-confirm').checked=false;$('control-execute').disabled=true;}
+function controlState(){const enabled=controlsData?.enabled===true&&!controlBusy;$('control-preview').disabled=!enabled||!selectedTargets.size;$('control-execute').disabled=!enabled||!controlPlan||!$('control-confirm').checked;}
+function durationLabel(value){return value===null?'永久（需要手动解封）':value===86400?'24 小时':value===3600?'1 小时':`${value/60} 分钟`;}
+function renderSelectedTargets(){
+ const rows=$('control-selected');rows.replaceChildren();for(const [key,target] of selectedTargets){const row=document.createElement('tr');cell(row,target.source_id);cell(row,target.ip);const td=cell(row,'');const remove=document.createElement('button');remove.type='button';remove.textContent='移除';remove.addEventListener('click',()=>{selectedTargets.delete(key);invalidatePlan();renderSelectedTargets();if(pages.incident.displayed)renderIncidents(pages.incident.displayed.items);});td.append(remove);rows.append(row);}if(!selectedTargets.size)empty(rows,3,'尚未选择目标。请勾选告警，或输入单个 IP 并勾选目标来源。');text('control-selection-count',`已选 ${selectedTargets.size} 个 IP / 来源组合；仅这些目标会进入预览。`);text('incident-control-open',`查看已选目标与封禁预览（${selectedTargets.size}）`);controlState();
+}
+function renderControlSources(sources){
+ const wrap=$('control-sources'),key=JSON.stringify(sources);if(wrap.dataset.key===key)return;wrap.dataset.key=key;wrap.replaceChildren();
+ for(const source of sources){const label=document.createElement('label'),input=document.createElement('input'),caption=document.createElement('span');input.type='checkbox';input.value=source.source_id;input.checked=!!currentSource&&source.source_id===currentSource;caption.textContent=`${source.hostname||source.source_id} (${source.source_id}) · SSH ${(source.ssh_ports||[]).join('、')}`;label.append(input,caption);wrap.append(label);}
+}
+function renderBlocks(blocks){
+ const checks=controlsData?.source_checks||[],rows=$('control-blocks');rows.replaceChildren();for(const block of blocks){const check=checks.find(item=>item.source_id===block.source_id),tr=document.createElement('tr');cell(tr,block.source_id);cell(tr,block.ip);cell(tr,channelLabels[block.channel]||block.channel);cell(tr,block.expires_at?when(typeof block.expires_at==='number'?block.expires_at*1000:block.expires_at):'永久');cell(tr,`${block.verified_at?when(block.verified_at*1000):'尚未确认'}${!check||check.error?' · 当前待核实':''}`);const td=cell(tr,'');const button=document.createElement('button');button.type='button';button.textContent='预览解封';button.disabled=!controlsData?.enabled;button.addEventListener('click',()=>previewUnban(block));td.append(button);rows.append(tr);}if(!blocks.length)empty(rows,6,'暂无封禁记录；请结合下方各来源核实状态判断。');
+ text('control-source-checks',checks.length?checks.map(check=>`${check.source_id} · ${when(check.checked_at*1000)} · ${check.error?'无法核实：'+check.error:'已核实'}`).join('\\n'):'尚未收到来源核实结果。');
+}
+async function loadControls(){
+ const readId=++controlReadId;try{const data=await get('/api/controls');if(readId!==controlReadId)return;controlsData=data;renderControlSources(Array.isArray(data.sources)?data.sources:[]);renderBlocks(Array.isArray(data.blocks)?data.blocks:[]);text('control-availability',data.enabled?'手动控制已启用。先选择目标、范围和时长，再预览确认。':'此中控尚未配置受限执行通道，仍可查看告警；封禁暂不可用。');controlState();renderJobHistory(Array.isArray(data.jobs)?data.jobs:[]);}
+ catch(error){if(readId!==controlReadId)return;text('control-availability',error.message+' 下方仅保留上次读取的状态，当前情况待核实。');controlsData=null;controlState();}
+}
+async function controlPost(path,payload){
+ if(!controlsData?.enabled||!controlsData.csrf_token)throw new Error('执行通道尚未准备好，请刷新封禁状态。');
+ const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-RiskOps-CSRF':controlsData.csrf_token},credentials:'same-origin',cache:'no-store',body:JSON.stringify(payload)});const data=await response.json().catch(()=>null);
+ if(!response.ok){const errors={401:'登录已失效，请重新登录。',403:'操作校验失效，请刷新封禁状态后重新预览。',409:'计划已过期或状态冲突，请重新预览。',422:'目标、范围或时长不符合控制策略。',503:'受限执行通道尚不可用。'};const detail=typeof data?.detail==='string'?data.detail:null;throw new Error(detail||errors[response.status]||`操作失败（${response.status}）。`);}if(!data||typeof data!=='object')throw new Error('操作接口返回异常。');return data;
+}
+function controlPayload(){const channels=['ssh','tcp','udp'].filter(channel=>$('control-channel-'+channel).checked),durationValue=$('control-duration').value;return {action:'ban',targets:[...selectedTargets.values()],channels,duration_seconds:durationValue==='permanent'?null:Number(durationValue),reason:$('control-reason').value.trim()};}
+async function previewControl(payload=controlPayload()){
+ if(controlBusy)return;invalidatePlan();const revision=controlRevision;controlBusy=true;controlState();text('control-status','正在核对目标与保护规则，尚未执行…');
+ try{if(!payload.targets.length)throw new Error('请先选择至少一个 IP / 来源组合。');if(!payload.channels.length)throw new Error('请至少选择一个封禁范围。');if(!payload.reason)throw new Error('请填写操作原因，便于审计。');const plan=await controlPost('/api/controls/preview',payload);if(revision!==controlRevision)return;
+  if(!plan.plan_id||!Array.isArray(plan.items)||!plan.items.length)throw new Error('操作计划返回异常，请重试。');controlPlan={...plan,action:payload.action};const rows=$('control-plan-items');rows.replaceChildren();for(const item of plan.items){const tr=document.createElement('tr');cell(tr,item.source_id);cell(tr,item.ip);cell(tr,channelLabels[item.channel]||item.channel);cell(tr,item.action==='unban'?'解封':durationLabel(item.duration_seconds));rows.append(tr);}text('control-plan-title',payload.action==='unban'?'请核对解封计划':'请核对封禁计划');text('control-plan-expiry',`共 ${plan.items.length} 项；计划有效至 ${when(typeof plan.expires_at==='number'?plan.expires_at*1000:plan.expires_at)}。修改选择后需要重新预览。`);$('control-plan').hidden=false;text('control-status','预览已生成，尚未执行。请核对所有目标和范围。');$('control-plan').scrollIntoView({behavior:'smooth',block:'nearest'});
+ }catch(error){text('control-status',error.message);}finally{controlBusy=false;controlState();}
+}
+async function previewUnban(block){
+ $('control-section').scrollIntoView({behavior:'smooth',block:'start'});await previewControl({action:'unban',targets:[{source_id:block.source_id,ip:block.ip}],channels:[block.channel],duration_seconds:3600,reason:$('control-reason').value.trim()||'操作员手动解封'});
+}
+const jobStatusLabels={queued:'等待执行',running:'正在执行',done:'已完成',partial:'部分完成',failed:'失败',succeeded:'成功',success:'成功',ok:'成功',pending:'等待执行',blocked:'拒绝执行',unknown:'结果待核实'};
+function renderJob(job){
+ text('control-job-title',`操作 ${job.id||job.job_id||''} · ${jobStatusLabels[job.status]||job.status}`);const rows=$('control-job-items');rows.replaceChildren();for(const item of job.items||[]){const tr=document.createElement('tr');cell(tr,item.source_id);cell(tr,item.ip);cell(tr,channelLabels[item.channel]||item.channel);cell(tr,jobStatusLabels[item.status]||item.status);cell(tr,item.error||item.message||'—');rows.append(tr);}if(!(job.items||[]).length)empty(rows,5,'任务已建立，等待执行结果。');$('control-job').hidden=false;
+}
+function renderJobHistory(jobs){const list=$('control-history');list.replaceChildren();for(const job of jobs){const button=document.createElement('button');button.type='button';button.textContent=`${when(typeof job.created_at==='number'?job.created_at*1000:job.created_at)} · ${jobStatusLabels[job.status]||job.status}`;button.addEventListener('click',()=>watchJob(job.id||job.job_id));list.append(button);}if(!jobs.length)list.textContent='暂无操作记录。';}
+async function watchJob(id,attempt=0,pollId=null){
+ if(!id)return;if(pollId===null){pollId=++controlPollId;if(controlPollTimer!==null)clearTimeout(controlPollTimer);}try{const job=await get('/api/controls/jobs/'+encodeURIComponent(id));if(pollId!==controlPollId)return;renderJob(job);if(['done','partial','failed','succeeded'].includes(job.status)){text('control-status',job.status==='done'||job.status==='succeeded'?'操作完成，请查看逐项结果。':'操作已结束，请检查失败项目。');await loadControls();return;}const delay=Math.min(15000,3000*(1+Math.floor(attempt/5)));controlPollTimer=setTimeout(()=>watchJob(id,attempt+1,pollId),delay);}
+ catch(error){if(pollId!==controlPollId)return;text('control-status',error.message+' 执行任务可能仍在运行，请从操作记录重新查看；不要重复提交。');}
+}
+async function executeControl(){
+ if(controlBusy||!controlPlan||!$('control-confirm').checked)return;const plan=controlPlan;if(plan.expires_at&&Date.now()/1000>=Number(plan.expires_at)){invalidatePlan();text('control-status','计划已过期，请重新预览。');return;}controlBusy=true;controlState();text('control-status','正在提交已确认的计划…');
+ try{const job=await controlPost('/api/controls/execute',{plan_id:plan.plan_id});invalidatePlan();renderJob(job);text('control-status','任务已提交，正在读取执行结果…');await watchJob(job.id||job.job_id);}
+ catch(error){invalidatePlan();text('control-status',error.message+' 请先刷新操作记录核实是否已建立任务，再决定是否重新预览。');await loadControls();}finally{controlBusy=false;controlState();}
+}
 function renderSummary(data){
  text('event-total',data.totals.events);text('incident-total',data.totals.incidents);text('failure-total',data.totals.ssh_failures);text('success-total',data.totals.ssh_successes);
  text('updated',`概览更新于 ${when(data.generated_at)} · 原始日志保留 ${data.retention_days} 天`);
@@ -130,7 +207,7 @@ function renderIncidents(data){
   if(Array.isArray(incident.usernames)&&incident.usernames.length)countCell.title=`涉及账号：${incident.usernames.join('、')}`;
   const rules=incidentRules(incident),ruleCell=cell(tr,rules.length?rules.map(rule=>detectionRuleLabels[rule.rule_id]||rule.rule_id||'未知规则').join('、'):'登录失败（旧版记录）');
   ruleCell.title=rules.map(rule=>[rule.reason,rule.window_seconds?`窗口 ${rule.window_seconds} 秒`:null,rule.rule_version?`版本 ${rule.rule_version}`:null].filter(Boolean).join(' · ')).join('\\n');
-  cell(tr,incident.status==='open'?'待人工核查':incident.status);tr.addEventListener('click',()=>details(incident,'SSH 认证告警与原始证据'));tr.addEventListener('keydown',e=>{if(e.target===tr&&e.key==='Enter')details(incident,'SSH 认证告警与原始证据');});rows.append(tr);
+  const statusCell=cell(tr,incident.status==='open'?'待人工核查':incident.status);appendIncidentSelection(statusCell,incident);tr.addEventListener('click',()=>showIncident(incident));tr.addEventListener('keydown',e=>{if(e.target===tr&&e.key==='Enter')showIncident(incident);});rows.append(tr);
  }
  if(!data.length)empty(rows,6,'尚未发现达到阈值的 SSH 认证告警。');
 }
@@ -142,13 +219,13 @@ function updatePager(kind){
 }
 function beginList(kind,page){
  const state=pages[kind],source=currentSource,started=performance.now();const requestId=++state.requestId;if(state.controller)state.controller.abort();state.controller=new AbortController();
- const previous=state.displayed,sameView=state.visible&&state.visible.source===source&&state.visible.page===page;
+ const queryKey=kind==='event'?filterKey():'',previous=state.displayed,sameView=state.visible&&state.visible.source===source&&state.visible.page===page&&state.visible.queryKey===queryKey;
  state.page=page;state.pending=true;updatePager(kind);updateRefreshButton();
  const rows=$(kind==='event'?'events':'incidents');
  if(!sameView){state.visible=null;rows.replaceChildren();empty(rows,kind==='incident'?6:5,`正在读取第 ${page} 页…`);text(kind+'-updated','');clearDetails();}
  $(kind+'-section').setAttribute('aria-busy','true');$(kind+'-status').className='list-status muted';
  text(kind+'-status',sameView?`正在更新第 ${page} 页，保留当前显示…`:`正在读取第 ${page} 页…`);$(kind+'-jump').removeAttribute('aria-invalid');
- return {kind,state,source,page,started,requestId,previous,sameView,rows};
+ return {kind,state,source,page,started,requestId,previous,sameView,rows,queryKey};
 }
 function isCurrent(view){return view.requestId===view.state.requestId&&view.source===currentSource;}
 async function acceptList(view,data){
@@ -158,13 +235,14 @@ async function acceptList(view,data){
   if(data.page>lastPage){await loadList(kind,lastPage);return;}
   const itemsKey=JSON.stringify(data.items),unchanged=sameView&&previous.page===data.page&&previous.itemsKey===itemsKey;
   state.page=data.page;if(!unchanged){if(kind==='event')renderEvents(data.items);else renderIncidents(data.items);}
-  state.displayed={source,page:state.page,total:state.total,totalPages:state.totalPages,items:data.items,itemsKey,updatedAt:new Date().toISOString(),elapsed:duration(started)};state.visible=state.displayed;
+  if(kind==='event'&&data.snapshot!==undefined)eventSnapshot=data.snapshot;
+  state.displayed={source,page:state.page,queryKey:kind==='event'?filterKey():'',total:state.total,totalPages:state.totalPages,items:data.items,itemsKey,updatedAt:new Date().toISOString(),elapsed:duration(started)};state.visible=state.displayed;saveView();
   updatePager(kind);text(kind+'-updated',`更新于 ${when(state.displayed.updatedAt)} · 用时 ${state.displayed.elapsed}`);text(kind+'-status',unchanged?'已是最新，内容无变化。':'');
 }
 function failList(view,error){
   if(!isCurrent(view)||error.name==='AbortError')return;const {kind,state,source,previous,sameView,rows}=view;
   let retained=false;
-  if(previous&&previous.source===source){
+  if(previous&&previous.source===source&&previous.queryKey===(kind==='event'?filterKey():'')){
    state.page=previous.page;state.total=previous.total;state.totalPages=previous.totalPages;state.displayed=previous;state.visible=previous;retained=true;
    if(!sameView){if(kind==='event')renderEvents(previous.items);else renderIncidents(previous.items);}
    text(kind+'-updated',`更新于 ${when(previous.updatedAt)} · 用时 ${previous.elapsed}`);
@@ -175,7 +253,7 @@ function failList(view,error){
 function finishList(view){if(view.requestId===view.state.requestId){view.state.pending=false;$(view.kind+'-section').setAttribute('aria-busy','false');updateRefreshButton();}}
 async function loadList(kind,page=pages[kind].page){
  const view=beginList(kind,page);
- try{const data=await get((kind==='event'?'/api/events?':'/api/incidents?')+sourceQuery(page,view.source),view.state.controller.signal);await acceptList(view,data);}
+ try{const data=await get((kind==='event'?'/api/events?':'/api/incidents?')+sourceQuery(page,view.source,kind),view.state.controller.signal);await acceptList(view,data);}
  catch(error){failList(view,error);}
  finally{finishList(view);}
 }
@@ -190,10 +268,11 @@ function scheduleAutoRefresh(){
  autoRefreshTimer=setTimeout(()=>{autoRefreshTimer=null;if(document.hidden||isBusy()){scheduleAutoRefresh();return;}refresh();},minutes*60000);
 }
 async function refresh(){
+ loadControls();
  const requestId=++refreshRequestId;if(summaryController)summaryController.abort();summaryController=new AbortController();
  const controller=summaryController,source=currentSource;refreshRunning=true;summaryPending=true;updateRefreshButton();text('error','');
  const views=[beginList('event',pages.event.page),beginList('incident',pages.incident.page)];
- const query=new URLSearchParams({limit:String(pageSize),event_page:String(views[0].page),incident_page:String(views[1].page)});if(source)query.set('source_id',source);
+ const query=new URLSearchParams({limit:String(pageSize),event_page:String(views[0].page),incident_page:String(views[1].page)});if(source)query.set('source_id',source);appendEventQuery(query);
  try{
   const data=await get('/api/dashboard?'+query,controller.signal);if(requestId!==refreshRequestId||source!==currentSource)return;
   if(!data||!data.summary||!data.events||!data.incidents)throw new Error('概览数据返回异常，请刷新重试。');
@@ -206,33 +285,56 @@ $('refresh').addEventListener('click',refresh);
 $('refresh-interval').addEventListener('change',()=>{try{localStorage.setItem('riskops-refresh-minutes',$('refresh-interval').value);}catch{}scheduleAutoRefresh();});
 $('ip-form').addEventListener('submit',event=>{event.preventDefault();lookupIp($('ip-input').value);});
 $('abuseipdb-check').addEventListener('click',lookupAbuse);
-$('source-filter').addEventListener('change',()=>{currentSource=$('source-filter').value;if(summaryController)summaryController.abort();++refreshRequestId;refreshRunning=false;summaryPending=false;clearDetails();for(const kind of ['event','incident']){pages[kind].totalPages=null;pages[kind].total=0;text(kind+'-updated','');loadList(kind,1);}scheduleAutoRefresh();});
+$('incident-control-open').addEventListener('click',()=>$('control-section').scrollIntoView({behavior:'smooth',block:'start'}));
+$('ip-show-events').addEventListener('click',()=>{const ip=$('ip-input').value.trim();if(ip)queryLogsForIP(ip);else text('ip-status','请先输入要查日志的 IP。');});
+$('ip-add-control').addEventListener('click',()=>{$('control-ip').value=$('ip-input').value.trim();$('control-section').scrollIntoView({behavior:'smooth',block:'start'});});
+$('source-filter').addEventListener('change',()=>{currentSource=$('source-filter').value;eventSnapshot=null;if(summaryController)summaryController.abort();++refreshRequestId;refreshRunning=false;summaryPending=false;clearDetails();for(const kind of ['event','incident']){pages[kind].totalPages=null;pages[kind].total=0;text(kind+'-updated','');loadList(kind,1);}if(controlsData){$('control-sources').dataset.key='';renderControlSources(controlsData.sources||[]);}saveView();scheduleAutoRefresh();});
+$('search-form').addEventListener('submit',event=>{event.preventDefault();const next={};for(const key of ['ip','username','event_type','q','start','end']){const value=$('search-'+key).value.trim();if(!value)continue;if(key==='start'||key==='end'){const date=new Date(value);if(Number.isNaN(date.valueOf())){text('event-status','请输入有效的起止时间。');return;}next[key]=date.toISOString();}else next[key]=value;}if(next.start&&next.end&&next.start>next.end){text('event-status','开始时间不能晚于结束时间。');return;}eventFilters=next;eventSnapshot=null;saveView();loadList('event',1);});
+$('search-clear').addEventListener('click',()=>{eventFilters={};eventSnapshot=null;setFilterInputs();saveView();loadList('event',1);});
+$('event-latest').addEventListener('click',()=>{eventSnapshot=null;saveView();loadList('event',1);});
+$('evidence-prev').addEventListener('click',()=>loadEvidence(Math.max(1,evidencePage-1)));
+$('evidence-next').addEventListener('click',()=>loadEvidence(Math.min(evidenceTotalPages,evidencePage+1)));
+$('evidence-jump-form').addEventListener('submit',event=>{event.preventDefault();const value=Number($('evidence-jump').value);if(!Number.isInteger(value)||value<1||value>evidenceTotalPages){text('evidence-status',`请输入 1 至 ${evidenceTotalPages} 之间的整数页码。`);return;}loadEvidence(value);});
+$('control-add-form').addEventListener('submit',event=>{event.preventDefault();const ip=$('control-ip').value.trim(),sources=Array.from($('control-sources').querySelectorAll('input:checked')).map(input=>input.value);if(!ip||!sources.length){text('control-status','请输入一个 IP，并勾选至少一个目标来源。');return;}for(const source_id of sources)selectedTargets.set(targetKey({source_id,ip}),{source_id,ip});invalidatePlan();renderSelectedTargets();if(pages.incident.displayed)renderIncidents(pages.incident.displayed.items);text('control-status','目标已加入待预览列表，尚未执行。');});
+$('control-clear').addEventListener('click',()=>{selectedTargets.clear();invalidatePlan();renderSelectedTargets();if(pages.incident.displayed)renderIncidents(pages.incident.displayed.items);});
+for(const id of ['control-channel-ssh','control-channel-tcp','control-channel-udp','control-duration','control-reason'])$(id).addEventListener('input',()=>{invalidatePlan();controlState();});
+$('control-preview').addEventListener('click',()=>previewControl());$('control-cancel').addEventListener('click',()=>{invalidatePlan();controlState();text('control-status','已取消预览，没有执行。');});$('control-confirm').addEventListener('change',controlState);$('control-execute').addEventListener('click',executeControl);$('control-refresh').addEventListener('click',loadControls);
 for(const kind of ['event','incident']){
  $(kind+'-prev').addEventListener('click',()=>navigate(kind,pages[kind].page-1));
  $(kind+'-next').addEventListener('click',()=>navigate(kind,pages[kind].page+1));
  $(kind+'-jump-form').addEventListener('submit',event=>{event.preventDefault();navigate(kind,$(kind+'-jump').value);});
 }
 try{const saved=localStorage.getItem('riskops-refresh-minutes');if(['0','1','5','15'].includes(saved))$('refresh-interval').value=saved;}catch{}
+try{const saved=JSON.parse(sessionStorage.getItem('riskops-view')||'null');if(saved&&typeof saved==='object'){currentSource=typeof saved.source==='string'?saved.source:'';if(saved.filters&&typeof saved.filters==='object')for(const key of ['ip','username','event_type','q','start','end'])if(typeof saved.filters[key]==='string')eventFilters[key]=saved.filters[key];eventSnapshot=typeof saved.snapshot==='string'?saved.snapshot:null;for(const kind of ['event','incident'])if(Number.isSafeInteger(saved[kind+'Page'])&&saved[kind+'Page']>0)pages[kind].page=saved[kind+'Page'];setFilterInputs();}}catch{}
 refresh();
 """
 
 DASHBOARD_HTML = """<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SecAgent RiskOps · 实时日志</title><style>__STYLE__</style></head>
-<body><h1>SecAgent RiskOps · 实时日志</h1><p>查看已接入服务器的心跳、系统日志和 SSH 认证告警。所有内容来自采集器实际上传的数据；本页只读。</p>
-<div class="toolbar"><label for="source-filter">日志来源</label><select id="source-filter"><option value="">全部来源</option></select><button id="refresh" type="button">刷新数据</button><label for="refresh-interval">自动刷新</label><select id="refresh-interval" aria-describedby="refresh-help"><option value="0">关闭（手动刷新）</option><option value="1">每 1 分钟</option><option value="5">每 5 分钟</option><option value="15">每 15 分钟</option></select><small id="updated">正在读取</small></div><p id="refresh-help">默认保留当前列表，点击“刷新数据”获取最新内容；刷新保留当前来源、页码与已打开的详情。自动刷新仅在页面可见且没有读取任务时运行。</p><div id="error" role="status"></div>
+<body><h1>SecAgent RiskOps · 实时日志</h1><p>查看已接入服务器的心跳、系统日志和 SSH 认证告警，核对证据后手动执行封禁或解封。</p>
+<div class="toolbar"><label for="source-filter">日志来源</label><select id="source-filter"><option value="">全部来源</option></select><button id="refresh" type="button">刷新数据</button><label for="refresh-interval">自动刷新</label><select id="refresh-interval" aria-describedby="refresh-help"><option value="0">关闭（手动刷新）</option><option value="1">每 1 分钟</option><option value="5">每 5 分钟</option><option value="15">每 15 分钟</option></select><small id="updated">正在读取</small></div><p id="refresh-help">默认手动刷新，保留当前来源、筛选、页码与已打开的详情。日志查询固定在本次快照；点击“获取最新日志”重新查询并回到第一页。自动刷新仅在页面可见且没有读取任务时运行。</p><div id="error" role="status"></div>
 <div class="cards"><div class="card">保留期内日志<div class="number" id="event-total">—</div></div><div class="card">SSH 认证告警<div class="number" id="incident-total">—</div></div><div class="card">SSH 认证异常日志<div class="number" id="failure-total">—</div></div><div class="card">SSH 成功日志<div class="number" id="success-total">—</div></div></div>
 <section><h2>来源状态</h2><p>来源 ID（source_id）是跨日志关联使用的稳定资产 ID，服务器一栏显示配置名称。在线表示近期收到采集器心跳；心跳超时不代表已确认入侵。</p><div class="table-wrap"><table><thead><tr><th>服务器</th><th>来源 ID</th><th>状态</th><th>最后心跳</th><th>最新日志时间</th><th>采集异常</th></tr></thead><tbody id="sources"></tbody></table></div></section>
 <section id="ip-query-section" aria-busy="false"><h2>IP 属地查询</h2><p id="ip-help">输入 IPv4 / IPv6 地址，或点击下方日志中的来源 IP。属地查询使用离线库，不会自动发送 IP 给第三方；属地仅供参考，不能确定实际使用者位置。</p>
 <form id="ip-form" class="ip-form"><label for="ip-input">IP 地址</label><input id="ip-input" name="ip" type="text" required maxlength="128" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="ip-help" placeholder="例如 8.8.8.8 或 2001:4860:4860::8888"><button id="ip-query-button" type="submit">查询属地</button></form>
+<div class="actions"><button id="ip-show-events" type="button">查看此 IP 的日志</button><button id="ip-add-control" type="button">为此 IP 选择封禁来源</button></div>
 <p id="ip-status" class="muted" role="status" aria-live="polite">等待输入 IP 地址。</p>
 <p><button id="abuseipdb-check" type="button" disabled>查询 AbuseIPDB 风险分</button></p><p id="abuseipdb-status" role="status" aria-live="polite">先查询一个公网 IP，再点击风险查询。</p>
 <div id="abuseipdb-result" hidden><dl class="ip-fields"><div><dt>风险评分（举报置信度）</dt><dd id="abuseipdb-score">—</dd></div><div><dt>近 90 天举报条数</dt><dd id="abuseipdb-reports">—</dd></div><div><dt>独立举报者</dt><dd id="abuseipdb-reporters">—</dd></div><div><dt>最近举报时间</dt><dd id="abuseipdb-last">—</dd></div></dl><p><small id="abuseipdb-checked"></small></p></div>
 <p><a id="abuseipdb-link" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" hidden>在 AbuseIPDB 查看完整报告 ↗</a></p><p><small>外部风险查询：仅在点击按钮或报告入口时向 AbuseIPDB 发送所选公网 IP，不发送 SSH 原始日志或账号。评分仅供核查，0 分不代表确认安全。</small></p>
 <div id="ip-result" hidden><dl class="ip-fields"><div><dt>IP 地址</dt><dd id="ip-address">—</dd></div><div><dt>地址类型</dt><dd id="ip-type">—</dd></div><div><dt>国家 / 地区</dt><dd id="ip-country">—</dd></div><div><dt>省份 / 城市</dt><dd id="ip-region">—</dd></div><div><dt>网络组织</dt><dd id="ip-network">—</dd></div><div><dt>ASN</dt><dd id="ip-asn">—</dd></div><div><dt>属地库版本</dt><dd id="ip-database-release">—</dd></div><div><dt>数据库更新时间</dt><dd id="ip-database-updated">—</dd></div></dl><p>数据库状态：<span id="ip-database-status" class="muted">—</span></p></div>
 <p><small>属地数据：<a href="https://db-ip.com" target="_blank" rel="noopener noreferrer">DB-IP Lite</a>（CC BY 4.0）。部分地址可能缺少城市或网络组织信息。</small></p></section>
-<section id="incident-section" aria-busy="false"><h2>SSH 认证告警</h2><p>检测短时密集失败、慢速扫描、多账号尝试、跨服务器尝试及多次失败后成功。失败日志包括认证失败、无效账号和认证前断开，不等于独立连接或攻击次数。相同来源 IP 可能由不同使用者共享，命中规则需要人工核查，不会自动封禁。</p><p>告警保存在中控，刷新不会删除；来源一栏列出全部关联服务器与来源 ID。点击查看命中原因、账号和原始证据，或点击来源 IP 查询属地。</p><p><small id="incident-updated"></small></p><div class="table-wrap"><table><thead><tr><th>最近发生</th><th>关联服务器 / 来源</th><th>来源 IP</th><th>日志 / 账号统计</th><th>命中规则</th><th>状态</th></tr></thead><tbody id="incidents"></tbody></table></div><div class="pager"><button id="incident-prev" type="button">上一页</button><span id="incident-page"></span><button id="incident-next" type="button">下一页</button><form id="incident-jump-form" class="page-jump" novalidate><label for="incident-jump">跳至</label><input id="incident-jump" type="number" min="1" step="1" value="1" aria-label="SSH 认证告警页码" aria-describedby="incident-status"><span>页</span><button id="incident-jump-button" type="submit">跳转</button></form></div><p id="incident-status" class="list-status muted" role="status" aria-live="polite"></p></section>
-<section id="event-section" aria-busy="false"><h2>已接收日志</h2><p>点击一行查看完整记录，点击来源 IP 查询属地。系统当前采集 SSH 相关日志；这里不代表服务器的全部网络流量。</p><p><small id="event-updated"></small></p><div class="table-wrap"><table><thead><tr><th>日志时间</th><th>来源</th><th>类型</th><th>来源 IP</th><th>原始消息</th></tr></thead><tbody id="events"></tbody></table></div><div class="pager"><button id="event-prev" type="button">上一页</button><span id="event-page"></span><button id="event-next" type="button">下一页</button><form id="event-jump-form" class="page-jump" novalidate><label for="event-jump">跳至</label><input id="event-jump" type="number" min="1" step="1" value="1" aria-label="日志页码" aria-describedby="event-status"><span>页</span><button id="event-jump-button" type="submit">跳转</button></form></div><p id="event-status" class="list-status muted" role="status" aria-live="polite"></p></section>
-<section id="detail-section"><h2 id="detail-title">记录详情</h2><pre id="detail">选择上方记录查看详情。</pre></section><script>__SCRIPT__</script></body></html>""".replace("__STYLE__", _STYLE).replace("__SCRIPT__", _SCRIPT)
+<section id="incident-section" aria-busy="false"><h2>SSH 认证告警</h2><p>检测短时密集失败、慢速扫描、多账号尝试、跨服务器尝试及多次失败后成功。失败日志包括认证失败、无效账号和认证前断开，不等于独立连接或攻击次数。相同来源 IP 可能由不同使用者共享，命中规则需要人工核查，不会自动封禁。</p><p>告警保存在中控，刷新不会删除；来源一栏列出全部关联服务器与来源 ID。点击查看命中原因、账号和原始证据，或点击来源 IP 查询属地。</p><div class="actions"><button id="incident-control-open" type="button">查看已选目标与封禁预览（0）</button></div><p><small id="incident-updated"></small></p><div class="table-wrap"><table><thead><tr><th>最近发生</th><th>关联服务器 / 来源</th><th>来源 IP</th><th>日志 / 账号统计</th><th>命中规则</th><th>状态</th></tr></thead><tbody id="incidents"></tbody></table></div><div class="pager"><button id="incident-prev" type="button">上一页</button><span id="incident-page"></span><button id="incident-next" type="button">下一页</button><form id="incident-jump-form" class="page-jump" novalidate><label for="incident-jump">跳至</label><input id="incident-jump" type="number" min="1" step="1" value="1" aria-label="SSH 认证告警页码" aria-describedby="incident-status"><span>页</span><button id="incident-jump-button" type="submit">跳转</button></form></div><p id="incident-status" class="list-status muted" role="status" aria-live="polite"></p></section>
+<section id="event-section" aria-busy="false"><h2>已接收日志</h2><p>点击一行查看完整记录，点击来源 IP 查询属地。系统当前采集 SSH 相关日志；这里不代表服务器的全部网络流量。以下条件组合生效，仅筛选日志，不影响上方告警和概览。</p>
+<form id="search-form"><div class="search-fields"><label>来源 IP<input id="search-ip" type="text" maxlength="128" placeholder="完整 IPv4 / IPv6" autocomplete="off"></label><label>账号<input id="search-username" type="text" maxlength="256" placeholder="完整账号名" autocomplete="off"></label><label>事件类型<select id="search-event_type"><option value="">全部类型</option><option value="auth_failure">认证失败</option><option value="invalid_user">无效账号</option><option value="preauth_abort">认证前断开</option><option value="auth_success">认证成功</option><option value="probe">协议探测</option><option value="disconnect">断开连接</option><option value="session_open">会话打开</option><option value="session_close">会话关闭</option><option value="daemon">服务状态</option><option value="other">其他</option></select></label><label>开始时间（本地）<input id="search-start" type="datetime-local"></label><label>结束时间（本地）<input id="search-end" type="datetime-local"></label><label>消息关键字<input id="search-q" type="text" maxlength="256" placeholder="原始消息包含" autocomplete="off"></label></div><div class="actions"><button type="submit">查询日志</button><button id="search-clear" type="button">清空条件</button><button id="event-latest" type="button">获取最新日志</button></div></form><p><small id="event-updated"></small></p><div class="table-wrap"><table><thead><tr><th>日志时间</th><th>来源</th><th>类型</th><th>来源 IP</th><th>原始消息</th></tr></thead><tbody id="events"></tbody></table></div><div class="pager"><button id="event-prev" type="button">上一页</button><span id="event-page"></span><button id="event-next" type="button">下一页</button><form id="event-jump-form" class="page-jump" novalidate><label for="event-jump">跳至</label><input id="event-jump" type="number" min="1" step="1" value="1" aria-label="日志页码" aria-describedby="event-status"><span>页</span><button id="event-jump-button" type="submit">跳转</button></form></div><p id="event-status" class="list-status muted" role="status" aria-live="polite"></p></section>
+<section id="detail-section"><h2 id="detail-title">记录详情</h2><pre id="detail">选择上方记录查看详情。</pre><div id="evidence-view" hidden><h3>原始证据时间线</h3><div class="table-wrap"><table><thead><tr><th>时间</th><th>来源</th><th>类型</th><th>IP</th><th>账号</th><th>原始消息</th></tr></thead><tbody id="evidence-rows"></tbody></table></div><div class="pager"><button id="evidence-prev" type="button">上一页证据</button><span id="evidence-page"></span><button id="evidence-next" type="button">下一页证据</button><form id="evidence-jump-form" class="page-jump" novalidate><label for="evidence-jump">跳至</label><input id="evidence-jump" type="number" min="1" step="1" value="1"><span>页</span><button type="submit">跳转</button></form></div><p id="evidence-status" role="status" aria-live="polite"></p></div></section>
+<section id="control-section"><h2>手动封禁与解封</h2><p id="control-availability" role="status">正在读取执行通道状态…</p><p>勾选告警可选择该 IP 在关联来源上的目标；指定日志来源时，仅选择该来源。翻页保留已选目标，不会自动选择全部历史告警。也可以在下面输入单个 IP 并明确选择来源。</p>
+<form id="control-add-form"><div class="ip-form"><label for="control-ip">目标 IP</label><input id="control-ip" type="text" maxlength="128" required autocomplete="off" placeholder="输入要封禁的完整公网 IP"></div><fieldset><legend>选择目标服务器</legend><div id="control-sources" class="control-targets"></div></fieldset><button type="submit">加入待预览目标</button></form>
+<p id="control-selection-count">已选 0 个 IP / 来源组合。</p><div class="table-wrap"><table><thead><tr><th>目标来源</th><th>目标 IP</th><th>选择</th></tr></thead><tbody id="control-selected"><tr><td colspan="3">尚未选择目标。请勾选告警，或输入单个 IP 并勾选目标来源。</td></tr></tbody></table></div><div class="actions"><button id="control-clear" type="button">清空已选目标</button></div>
+<fieldset><legend>封禁范围（可多选）</legend><div class="control-targets"><label><input id="control-channel-ssh" type="checkbox" checked>SSH 端口</label><label><input id="control-channel-tcp" type="checkbox">全部 TCP（包含 SSH）</label><label><input id="control-channel-udp" type="checkbox">全部 UDP</label></div><p>限制所选 IP 进入目标服务器本机的对应流量。全部 TCP／UDP 会影响现有连接，也会拦截服务器主动访问该 IP 时的回包；不会过滤经服务器转发的流量。</p></fieldset>
+<div class="actions"><label for="control-duration">有效时长</label><select id="control-duration"><option value="300">5 分钟</option><option value="900">15 分钟</option><option value="1800">30 分钟</option><option value="3600" selected>1 小时</option><option value="86400">24 小时</option><option value="permanent">永久（需要手动解封）</option></select></div><p><label for="control-reason">操作原因（写入审计记录）</label></p><textarea id="control-reason" rows="2" maxlength="300" placeholder="例如：已核对跨服务器扫描证据，临时限制来源"></textarea><div class="actions"><button id="control-preview" type="button" class="danger" disabled>预览封禁计划</button><button id="control-refresh" type="button">刷新封禁状态与操作记录</button></div><p id="control-status" role="status" aria-live="polite">尚未提交操作。</p>
+<div id="control-plan" hidden><h3 id="control-plan-title">请核对封禁计划</h3><div class="table-wrap"><table><thead><tr><th>目标来源</th><th>目标 IP</th><th>影响范围</th><th>动作 / 有效时长</th></tr></thead><tbody id="control-plan-items"></tbody></table></div><p id="control-plan-expiry"></p><label class="selection"><input id="control-confirm" type="checkbox">我已核对上方全部目标、范围和有效时长</label><div class="actions"><button id="control-execute" type="button" class="danger" disabled>确认执行此计划</button><button id="control-cancel" type="button">取消</button></div></div>
+<div id="control-job" hidden><h3 id="control-job-title">操作结果</h3><div class="table-wrap"><table><thead><tr><th>来源</th><th>IP</th><th>范围</th><th>状态</th><th>说明</th></tr></thead><tbody id="control-job-items"></tbody></table></div></div><h3>封禁状态与最近核实记录</h3><p>到期封禁由目标服务器自动解除；永久封禁需要手动解封。表格是最近一次核实的快照，核实失败时不代表当前仍然生效；解封同样需要核对预览。</p><div class="table-wrap"><table><thead><tr><th>来源</th><th>IP</th><th>范围</th><th>到期时间</th><th>最近确认时间</th><th>操作</th></tr></thead><tbody id="control-blocks"></tbody></table></div><p id="control-source-checks" class="incident-value" role="status"></p><h3>最近操作记录</h3><div id="control-history" class="actions"></div></section><script>__SCRIPT__</script></body></html>""".replace("__STYLE__", _STYLE).replace("__SCRIPT__", _SCRIPT)
 
 
 def _csp_hash(value: str) -> str:

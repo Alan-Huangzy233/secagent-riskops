@@ -165,6 +165,10 @@ class TelemetryStore:
                     ON events(event_ts DESC, source_id, event_id);
                 CREATE INDEX IF NOT EXISTS events_source_paging
                     ON events(source_id, event_ts DESC, event_id);
+                CREATE INDEX IF NOT EXISTS events_username_paging
+                    ON events(ssh_user, event_ts DESC, source_id, event_id);
+                CREATE INDEX IF NOT EXISTS events_type_paging
+                    ON events(event_type, event_ts DESC, source_id, event_id);
                 -- The complete ordering above also covers timestamp retention.
                 DROP INDEX IF EXISTS events_recent;
                 CREATE TABLE IF NOT EXISTS incidents (
@@ -475,16 +479,57 @@ class TelemetryStore:
                 "username": record["ssh_user"]}
 
     def _events(self, db: sqlite3.Connection, source_id: str | None,
-                limit: int, offset: int) -> list[dict[str, Any]]:
-        where, params = ("WHERE source_id=?", [source_id]) if source_id else ("", [])
+                limit: int, offset: int, **filters) -> list[dict[str, Any]]:
+        where, params = self._event_filter(source_id, **filters)
         rows = db.execute(f"SELECT record_json,incident_id FROM events {where} ORDER BY event_ts DESC,source_id,event_id LIMIT ? OFFSET ?",
                           (*params, limit, offset)).fetchall()
         return [self._event({**json.loads(row["record_json"]), "incident_id": row["incident_id"]}) for row in rows]
 
-    def list_events(self, source_id: str | None = None, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
+    def list_events(self, source_id: str | None = None, limit: int = 100, offset: int = 0, **filters) -> list[dict[str, Any]]:
         self._page(limit, offset)
         with self._connection() as db:
-            return self._events(db, source_id, limit, offset)
+            return self._events(db, source_id, limit, offset, **filters)
+
+    @staticmethod
+    def _event_filter(source_id=None, *, ip=None, username=None, event_type=None,
+                      q=None, start=None, end=None, snapshot=None):
+        clauses, params = [], []
+        for column, value in (("source_id", source_id), ("src_ip", ip),
+                              ("ssh_user", username), ("event_type", event_type)):
+            if value is not None:
+                if not isinstance(value, str) or not value or len(value) > 256:
+                    raise ValueError("Invalid search value")
+                if column == "src_ip":
+                    address = ipaddress.ip_address(value)
+                    value = str(address)
+                clauses.append(column + "=?")
+                params.append(value)
+        times = []
+        for column, value, operator in (("event_ts", start, ">="), ("event_ts", end, "<=")):
+            if value is not None:
+                moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                if moment.tzinfo is None:
+                    raise ValueError("Search time requires timezone")
+                stamp = moment.timestamp()
+                clauses.append(column + operator + "?")
+                params.append(stamp)
+                times.append(stamp)
+        if len(times) == 2 and times[0] > times[1]:
+            raise ValueError("Search start must precede end")
+        if q is not None:
+            if not isinstance(q, str) or not 1 <= len(q) <= 256:
+                raise ValueError("Invalid keyword")
+            clauses.append("instr(json_extract(record_json,'$.message'),?)>0")
+            params.append(q)
+        if snapshot is not None:
+            if not isinstance(snapshot, str) or not re.fullmatch(r"r1:[0-9]{1,19}", snapshot):
+                raise ValueError("Invalid snapshot")
+            bound = int(snapshot[3:])
+            if bound > 9223372036854775807:
+                raise ValueError("Invalid snapshot")
+            clauses.append("EXISTS (SELECT 1 FROM event_receipts r WHERE r.source_id=events.source_id AND r.event_id=events.event_id AND r.rowid<=?)")
+            params.append(bound)
+        return ("WHERE " + " AND ".join(clauses) if clauses else ""), params
 
     @staticmethod
     def _pagination(total: int, limit: int, page: int) -> dict[str, int]:
@@ -499,7 +544,7 @@ class TelemetryStore:
             raise ValueError("page must be a positive integer")
 
     def paginate_events(self, source_id: str | None = None, limit: int = 100,
-                        page: int = 1) -> dict[str, Any]:
+                        page: int = 1, **filters) -> dict[str, Any]:
         """Count and read one page from the same SQLite snapshot.
 
         The ordering indexes let SQLite skip old rows without sorting or loading
@@ -507,21 +552,30 @@ class TelemetryStore:
         page, including when retention removed rows since the previous request.
         """
         self._page_number(limit, page)
-        where, params = ("WHERE source_id=?", (source_id,)) if source_id else ("", ())
         with self._connection() as db:
+            # Receipts outlive raw-event retention. Their monotonically appended
+            # rowids exclude late arrivals even if they have old event times.
+            if filters.get("snapshot") is None:
+                filters["snapshot"] = "r1:" + str(db.execute("SELECT coalesce(max(rowid),0) FROM event_receipts").fetchone()[0])
+            where, params = self._event_filter(source_id, **filters)
             total = db.execute(f"SELECT count(*) FROM events {where}", params).fetchone()[0]
             pagination = self._pagination(total, limit, page)
-            return {"items": self._events(db, source_id, limit, pagination["offset"]), **pagination}
+            return {"items": self._events(db, source_id, limit, pagination["offset"], **filters),
+                    **pagination, "snapshot": filters["snapshot"]}
 
     def _incidents(self, db: sqlite3.Connection, source_id: str | None,
-                   limit: int, offset: int) -> list[dict[str, Any]]:
+                   limit: int, offset: int, *, include_evidence: bool = True,
+                   incident_id: str | None = None) -> list[dict[str, Any]]:
         where, params = self._incident_filter(source_id)
+        if incident_id is not None:
+            where += " AND incident_id=?"
+            params += (incident_id,)
         rows = db.execute(f"SELECT * FROM incidents WHERE status!='merged' {where} ORDER BY last_ts DESC,incident_id LIMIT ? OFFSET ?",
                           (*params, limit, offset)).fetchall()
         result = []
         for row in rows:
             evidence = db.execute("SELECT source_id,event_id,snapshot_json FROM incident_evidence WHERE incident_id=? ORDER BY event_ts,source_id,event_id LIMIT ?",
-                                  (row["incident_id"], _EVIDENCE_RESPONSE_LIMIT)).fetchall()
+                                  (row["incident_id"], _EVIDENCE_RESPONSE_LIMIT)).fetchall() if include_evidence else []
             sources = db.execute("SELECT source_id,hostname FROM incident_sources WHERE incident_id=? ORDER BY source_id", (row["incident_id"],)).fetchall()
             rules = [dict(rule) for rule in db.execute("SELECT rule_id,rule_version,window_seconds,reason FROM incident_rules WHERE incident_id=? ORDER BY rule_id", (row["incident_id"],))]
             detail = db.execute("SELECT * FROM incident_details WHERE incident_id=?", (row["incident_id"],)).fetchone()
@@ -552,19 +606,44 @@ class TelemetryStore:
         with self._connection() as db:
             return db.execute("SELECT count(*) FROM incidents WHERE status!='merged'").fetchone()[0]
 
+    def get_incident(self, incident_id: str) -> dict[str, Any] | None:
+        with self._connection() as db:
+            canonical = self._canonical_incident(db, incident_id)
+            rows = self._incidents(db, None, 1, 0, include_evidence=False, incident_id=canonical)
+            return {**rows[0], "requested_incident_id": incident_id} if rows else None
+
+    def paginate_incident_evidence(self, incident_id: str, limit: int = 100,
+                                   page: int = 1, source_id: str | None = None):
+        self._page_number(limit, page)
+        with self._connection() as db:
+            canonical = self._canonical_incident(db, incident_id)
+            if not db.execute("SELECT 1 FROM incidents WHERE incident_id=?", (canonical,)).fetchone():
+                return None
+            where, params = "incident_id=?", [canonical]
+            if source_id:
+                where += " AND source_id=?"
+                params.append(source_id)
+            total = db.execute("SELECT count(*) FROM incident_evidence WHERE " + where, params).fetchone()[0]
+            pagination = self._pagination(total, limit, page)
+            rows = db.execute("SELECT snapshot_json FROM incident_evidence WHERE " + where +
+                              " ORDER BY event_ts,source_id,event_id LIMIT ? OFFSET ?",
+                              (*params, limit, pagination["offset"])).fetchall()
+            return {"items": [self._event(json.loads(row[0])) for row in rows], **pagination,
+                    "incident_id": canonical, "requested_incident_id": incident_id}
+
     def list_incidents(self, source_id: str | None = None, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
         self._page(limit, offset)
         with self._connection() as db:
             return self._incidents(db, source_id, limit, offset)
 
     def paginate_incidents(self, source_id: str | None = None, limit: int = 100,
-                           page: int = 1) -> dict[str, Any]:
+                           page: int = 1, *, include_evidence: bool = True) -> dict[str, Any]:
         self._page_number(limit, page)
         where, params = self._incident_filter(source_id)
         with self._connection() as db:
             total = db.execute(f"SELECT count(*) FROM incidents WHERE status!='merged' {where}", params).fetchone()[0]
             pagination = self._pagination(total, limit, page)
-            return {"items": self._incidents(db, source_id, limit, pagination["offset"]), **pagination}
+            return {"items": self._incidents(db, source_id, limit, pagination["offset"], include_evidence=include_evidence), **pagination}
 
     def list_sources(self, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
         self._page(limit, offset)

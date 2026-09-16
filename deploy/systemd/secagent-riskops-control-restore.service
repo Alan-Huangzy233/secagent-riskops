@@ -1,0 +1,22 @@
+[Unit]
+Description=Restore SecAgent RiskOps operator-managed firewall entries
+After=network-online.target nftables.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -I /usr/local/sbin/riskops-ssh-control --restore
+User=root
+Group=root
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+CapabilityBoundingSet=CAP_NET_ADMIN
+RestrictAddressFamilies=AF_NETLINK AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/riskops-control
+TimeoutStartSec=30
+
+[Install]
+WantedBy=multi-user.target

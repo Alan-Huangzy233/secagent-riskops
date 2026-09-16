@@ -132,7 +132,8 @@ class TelemetryBatch(BaseModel):
         return _valid_time(value) if value is not None else None
 
 
-def create_app(config: LiveConfig | None = None, store: Any | None = None) -> FastAPI:
+def create_app(config: LiveConfig | None = None, store: Any | None = None,
+               control: Any | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI):
         from .telemetry.store import TelemetryStore
@@ -149,9 +150,15 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None) -> Fa
         )
         if not await run_in_threadpool(application.state.store.healthcheck):
             raise RuntimeError("Live telemetry database is unavailable")
+        from .telemetry.control import ControlService
+        application.state.control = control or ControlService.from_environment(application.state.config.sources)
+        if control is None:
+            application.state.control.start()
         try:
             yield
         finally:
+            if control is None:
+                await run_in_threadpool(application.state.control.close)
             if store is None and hasattr(application.state.store, "close"):
                 await run_in_threadpool(application.state.store.close)
 
@@ -210,34 +217,120 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None) -> Fa
             raise HTTPException(404, "Source not found")
         return source_id
 
+    def search_filters(ip: str | None = Query(None, max_length=64),
+                       username: str | None = Query(None, min_length=1, max_length=256),
+                       event_type: str | None = Query(None, min_length=1, max_length=64),
+                       q: str | None = Query(None, min_length=1, max_length=256),
+                       start: str | None = Query(None, max_length=64),
+                       end: str | None = Query(None, max_length=64),
+                       snapshot: str | None = Query(None, max_length=128)):
+        filters = {"ip": ip, "username": username, "event_type": event_type, "q": q,
+                   "start": start, "end": end, "snapshot": snapshot}
+        from .telemetry.store import TelemetryStore
+        try:
+            TelemetryStore._event_filter(**filters)
+        except (ValueError, OverflowError, TypeError):
+            raise HTTPException(422, "查询参数无效，请检查 IP、时间范围和查询快照") from None
+        return filters
+
     @application.get("/api/events", dependencies=[Depends(operator)])
     def events(request: Request, source_id: str | None = Query(None, max_length=64),
                limit: int = Query(100, ge=1, le=200), offset: int = Query(0, ge=0),
-               page: int | None = Query(None, ge=1, le=1_000_000_000)):
+               page: int | None = Query(None, ge=1, le=1_000_000_000),
+               filters: dict = Depends(search_filters)):
         if page is not None:
-            return request.app.state.store.paginate_events(source_id=source_filter(request, source_id), limit=limit, page=page)
-        return request.app.state.store.list_events(source_id=source_filter(request, source_id), limit=limit, offset=offset)
+            return request.app.state.store.paginate_events(source_id=source_filter(request, source_id), limit=limit, page=page, **filters)
+        return request.app.state.store.list_events(source_id=source_filter(request, source_id), limit=limit, offset=offset, **filters)
 
     @application.get("/api/incidents", dependencies=[Depends(operator)])
     def incidents(request: Request, source_id: str | None = Query(None, max_length=64),
                   limit: int = Query(100, ge=1, le=200), offset: int = Query(0, ge=0),
-                  page: int | None = Query(None, ge=1, le=1_000_000_000)):
+                  page: int | None = Query(None, ge=1, le=1_000_000_000),
+                  include_evidence: bool = Query(True)):
         if page is not None:
-            return request.app.state.store.paginate_incidents(source_id=source_filter(request, source_id), limit=limit, page=page)
+            return request.app.state.store.paginate_incidents(source_id=source_filter(request, source_id), limit=limit, page=page, include_evidence=include_evidence)
         return request.app.state.store.list_incidents(source_id=source_filter(request, source_id), limit=limit, offset=offset)
 
     @application.get("/api/dashboard", dependencies=[Depends(operator)])
     def dashboard_snapshot(request: Request, source_id: str | None = Query(None, max_length=64),
                            event_page: int = Query(1, ge=1, le=1_000_000_000),
                            incident_page: int = Query(1, ge=1, le=1_000_000_000),
-                           limit: int = Query(50, ge=1, le=200)):
+                           limit: int = Query(50, ge=1, le=200),
+                           filters: dict = Depends(search_filters)):
         # One authenticated HTTP request avoids three expensive password checks
         # when the operator returns after the short verification cache expires.
         selected = source_filter(request, source_id)
         store = request.app.state.store
         return {"summary": summary(request),
-                "events": store.paginate_events(source_id=selected, limit=limit, page=event_page),
-                "incidents": store.paginate_incidents(source_id=selected, limit=limit, page=incident_page)}
+                "events": store.paginate_events(source_id=selected, limit=limit, page=event_page, **filters),
+                "incidents": store.paginate_incidents(source_id=selected, limit=limit, page=incident_page, include_evidence=False)}
+
+    @application.get("/api/incidents/{incident_id}", dependencies=[Depends(operator)])
+    def incident_detail(request: Request, incident_id: str):
+        result = request.app.state.store.get_incident(incident_id)
+        if result is None:
+            raise HTTPException(404, "事件不存在")
+        return result
+
+    @application.get("/api/incidents/{incident_id}/evidence", dependencies=[Depends(operator)])
+    def incident_evidence(request: Request, incident_id: str,
+                          page: int = Query(1, ge=1, le=1_000_000_000),
+                          limit: int = Query(50, ge=1, le=200),
+                          source_id: str | None = Query(None, max_length=64)):
+        result = request.app.state.store.paginate_incident_evidence(
+            incident_id, limit=limit, page=page, source_id=source_filter(request, source_id))
+        if result is None:
+            raise HTTPException(404, "事件不存在")
+        return result
+
+    def control_write(request: Request, _: None = Depends(operator)):
+        # Basic credentials alone are ambient browser credentials. Requiring a
+        # secret custom header prevents CSRF; no cross-origin CORS is enabled.
+        supplied = request.headers.get("x-riskops-csrf", "")
+        if not hmac.compare_digest(supplied.encode("utf-8"), request.app.state.control.csrf_token.encode("ascii")):
+            raise HTTPException(403, "操作校验已过期，请刷新控制区域")
+        origin = request.headers.get("origin")
+        if request.headers.get("sec-fetch-site") == "cross-site" or (origin and origin != str(request.base_url).rstrip("/")):
+            raise HTTPException(403, "不允许跨站操作")
+        if request.headers.get("content-type", "").split(";", 1)[0].strip() != "application/json":
+            raise HTTPException(415, "Expected application/json")
+        if not request.app.state.control.enabled:
+            raise HTTPException(503, "手动控制尚未配置")
+
+    @application.get("/api/controls", dependencies=[Depends(operator)])
+    def controls(request: Request):
+        return request.app.state.control.capabilities()
+
+    @application.post("/api/controls/preview", dependencies=[Depends(control_write)])
+    async def preview_control(request: Request):
+        try:
+            body = await request.json()
+            return await run_in_threadpool(request.app.state.control.preview,
+                request.app.state.config.operator_username, body,
+                operator_ip=request.client.host if request.client else None)
+        except (ValueError, TypeError, KeyError) as exc:
+            raise HTTPException(422, str(exc) if isinstance(exc, ValueError) else "操作请求无效") from None
+
+    @application.post("/api/controls/execute", dependencies=[Depends(control_write)])
+    async def execute_control(request: Request):
+        try:
+            body = await request.json()
+            if not isinstance(body, dict) or set(body) != {"plan_id"} or not isinstance(body["plan_id"], str) or len(body["plan_id"]) > 64:
+                raise ValueError("操作请求无效")
+            result = await run_in_threadpool(request.app.state.control.execute,
+                                            request.app.state.config.operator_username, body["plan_id"])
+            return JSONResponse(result, status_code=202)
+        except (ValueError, TypeError):
+            raise HTTPException(422, "预览无效或已过期，请重新预览") from None
+
+    @application.get("/api/controls/jobs/{job_id}", dependencies=[Depends(operator)])
+    def control_job(request: Request, job_id: str):
+        if not request.app.state.control.enabled:
+            raise HTTPException(503, "手动控制尚未配置")
+        result = request.app.state.control.job(job_id)
+        if result is None:
+            raise HTTPException(404, "操作记录不存在")
+        return result
 
     @application.get("/api/ip-info", dependencies=[Depends(operator)])
     def ip_info(request: Request, ip: str = Query(min_length=1, max_length=128)):

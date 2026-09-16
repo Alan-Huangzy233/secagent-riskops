@@ -48,9 +48,12 @@ def test_event_page_counts_scope_order_and_last_page(store):
 @pytest.mark.parametrize("method", ["paginate_events", "paginate_incidents"])
 def test_empty_pages_and_invalid_page_numbers(store, method):
     query = getattr(store, method)
-    assert query("unknown", limit=50, page=99) == {
+    expected = {
         "items": [], "total": 0, "total_pages": 1, "page": 1, "limit": 50, "offset": 0,
     }
+    if method == "paginate_events":
+        expected["snapshot"] = "r1:0"
+    assert query("unknown", limit=50, page=99) == expected
     for page in (0, -1, True, 1.5, "2"):
         with pytest.raises(ValueError, match="page"):
             query(page=page)
@@ -84,9 +87,9 @@ def test_counts_and_page_share_snapshot_while_collector_writes(store, monkeypatc
     seed_events(store)
     original = store._events
 
-    def insert_between_count_and_items(db, source_id, limit, offset):
+    def insert_between_count_and_items(db, source_id, limit, offset, **filters):
         store.ingest("source-a", "source-a", "concurrent", [record("newest", 20)])
-        return original(db, source_id, limit, offset)
+        return original(db, source_id, limit, offset, **filters)
 
     monkeypatch.setattr(store, "_events", insert_between_count_and_items)
     page = store.paginate_events(limit=2)
@@ -143,6 +146,9 @@ def test_deep_pages_use_ordered_indexes_on_large_database(store):
             event_type,record_json) VALUES(?,?,?,?,?,?,?,?)""",
             (("source-a" if i % 2 else "source-b", f"event-{i:05}", "host", "time", i // 3, "time", "other", payload)
              for i in range(12000)))
+        db.executemany("INSERT INTO event_receipts VALUES(?,?,?,?)",
+                       (("source-a" if i % 2 else "source-b", f"event-{i:05}", "synthetic-hash", "time")
+                        for i in range(12000)))
         db.executemany("""INSERT INTO incidents VALUES(?,?,?,'198.51.100.1','title','open',
             'time','time',0,?,3,'time','time',NULL)""",
             ((f"incident-{i:05}", "source-a" if i % 2 else "source-b", "host", i // 3) for i in range(3000)))
