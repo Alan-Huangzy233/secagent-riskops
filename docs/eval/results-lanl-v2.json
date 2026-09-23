@@ -1,0 +1,511 @@
+{
+  "alerts": {
+    "attack_alerts": 5,
+    "benign_share": 0.9978,
+    "by_rule": {
+      "burst": 374,
+      "cross_source": 814,
+      "multi_account": 204,
+      "slow_scan": 325,
+      "success_after_failures": 545
+    },
+    "count": 2262,
+    "sha256": "37c613fd8ece25532385c837e475674417eb0847e7ebb41fac5d77058576755d"
+  },
+  "configuration": {
+    "baseline_window_seconds": 600,
+    "correlation_gap_seconds": 3600,
+    "schedule_version": 1,
+    "score_weights": {
+      "EXISTING_ACCOUNT": 12,
+      "EXISTING_ACCOUNT_CAP": 3,
+      "KNOWN_SOURCE": -40,
+      "PERSISTENT": 15,
+      "PERSISTENT_SECONDS": 7200,
+      "SEVERAL_HOSTS": 10,
+      "SUCCESS": 50,
+      "VOLUME": 5,
+      "VOLUME_RECORDS": 50
+    },
+    "surface_threshold": 25,
+    "tick_seconds": 300
+  },
+  "dataset": {
+    "episodes": 74,
+    "records": 629907,
+    "seed": 20261115,
+    "sha256": {
+      "episodes.json": "bcf6c09ef435bc017cc06592b8044a8c190cb2df0a4a43be528cd216e1e31e7a",
+      "labels.jsonl": "8fa3936f1c0fe90af57c52cae2fd2fd197fa2898439d14dd7e05146dee15b50b",
+      "records.jsonl": "0292d8f5d36473cfd54497a33f05b64c33bbdaa33f819d1198e1518d2140ab5e"
+    },
+    "slice_version": 2,
+    "synthetic": false,
+    "window": {
+      "days": 3,
+      "first_day": 12,
+      "red_team_events": 325
+    }
+  },
+  "evaluation_version": 1,
+  "permutation_control": {
+    "tau_0": {
+      "detected": 4,
+      "episodes": 74,
+      "f1": 0.0686,
+      "miss_rate": 0.9459,
+      "miss_rate_ci95": [
+        0.8919,
+        0.9865
+      ],
+      "missed": 70,
+      "no_alert_episodes": 70,
+      "precision": 0.0938,
+      "recall": 0.0541,
+      "spurious_incidents": 29,
+      "surfaced_incidents": 32,
+      "tau": 0.0
+    },
+    "tau_0.5": {
+      "detected": 4,
+      "episodes": 74,
+      "f1": 0.0686,
+      "miss_rate": 0.9459,
+      "miss_rate_ci95": [
+        0.8919,
+        0.9865
+      ],
+      "missed": 70,
+      "no_alert_episodes": 70,
+      "precision": 0.0938,
+      "recall": 0.0541,
+      "spurious_incidents": 29,
+      "surfaced_incidents": 32,
+      "tau": 0.5
+    }
+  },
+  "pipeline_by_scenario": {
+    "lanl_red_team": {
+      "detected_tau_0": 4,
+      "detected_tau_0.5": 4,
+      "episodes": 74,
+      "raised_an_alert": 4
+    }
+  },
+  "rule_layer": {
+    "episodes": 74,
+    "episodes_with_an_alert": 4
+  },
+  "seed": 20261115,
+  "systems": {
+    "B0 passthrough": {
+      "clustering": {
+        "ari": 0.0,
+        "completeness": 0.8277,
+        "homogeneity": 1.0,
+        "mean_fragmentation": 1.25,
+        "over_merged_incidents": 0,
+        "v_measure": 0.9057
+      },
+      "detection": {
+        "tau_0": {
+          "detected": 4,
+          "episodes": 74,
+          "f1": 0.0042,
+          "miss_rate": 0.9459,
+          "miss_rate_ci95": [
+            0.8919,
+            0.9865
+          ],
+          "missed": 70,
+          "no_alert_episodes": 70,
+          "precision": 0.0022,
+          "recall": 0.0541,
+          "spurious_incidents": 2257,
+          "surfaced_incidents": 2262,
+          "tau": 0.0
+        },
+        "tau_0.5": {
+          "detected": 4,
+          "episodes": 74,
+          "f1": 0.0042,
+          "miss_rate": 0.9459,
+          "miss_rate_ci95": [
+            0.8919,
+            0.9865
+          ],
+          "missed": 70,
+          "no_alert_episodes": 70,
+          "precision": 0.0022,
+          "recall": 0.0541,
+          "spurious_incidents": 2257,
+          "surfaced_incidents": 2262,
+          "tau": 0.5
+        }
+      },
+      "reduction": {
+        "input_alerts": 2262,
+        "median_alerts_per_incident": 1.0,
+        "output_incidents": 2262,
+        "p95_alerts_per_incident": 1,
+        "reduction_pct": 0.0
+      }
+    },
+    "B1 tuple dedup": {
+      "clustering": {
+        "ari": 1.0,
+        "completeness": 1.0,
+        "homogeneity": 1.0,
+        "mean_fragmentation": 1.0,
+        "over_merged_incidents": 0,
+        "v_measure": 1.0
+      },
+      "detection": {
+        "tau_0": {
+          "detected": 4,
+          "episodes": 74,
+          "f1": 0.0061,
+          "miss_rate": 0.9459,
+          "miss_rate_ci95": [
+            0.8919,
+            0.9865
+          ],
+          "missed": 70,
+          "no_alert_episodes": 70,
+          "precision": 0.0032,
+          "recall": 0.0541,
+          "spurious_incidents": 1244,
+          "surfaced_incidents": 1248,
+          "tau": 0.0
+        },
+        "tau_0.5": {
+          "detected": 4,
+          "episodes": 74,
+          "f1": 0.0061,
+          "miss_rate": 0.9459,
+          "miss_rate_ci95": [
+            0.8919,
+            0.9865
+          ],
+          "missed": 70,
+          "no_alert_episodes": 70,
+          "precision": 0.0032,
+          "recall": 0.0541,
+          "spurious_incidents": 1244,
+          "surfaced_incidents": 1248,
+          "tau": 0.5
+        }
+      },
+      "reduction": {
+        "input_alerts": 2262,
+        "median_alerts_per_incident": 1.0,
+        "output_incidents": 1248,
+        "p95_alerts_per_incident": 4,
+        "reduction_pct": 44.828
+      }
+    },
+    "B2 rule window": {
+      "clustering": {
+        "ari": 1.0,
+        "completeness": 1.0,
+        "homogeneity": 1.0,
+        "mean_fragmentation": 1.0,
+        "over_merged_incidents": 0,
+        "v_measure": 1.0
+      },
+      "detection": {
+        "tau_0": {
+          "detected": 4,
+          "episodes": 74,
+          "f1": 0.0076,
+          "miss_rate": 0.9459,
+          "miss_rate_ci95": [
+            0.8919,
+            0.9865
+          ],
+          "missed": 70,
+          "no_alert_episodes": 70,
+          "precision": 0.0041,
+          "recall": 0.0541,
+          "spurious_incidents": 977,
+          "surfaced_incidents": 981,
+          "tau": 0.0
+        },
+        "tau_0.5": {
+          "detected": 4,
+          "episodes": 74,
+          "f1": 0.0076,
+          "miss_rate": 0.9459,
+          "miss_rate_ci95": [
+            0.8919,
+            0.9865
+          ],
+          "missed": 70,
+          "no_alert_episodes": 70,
+          "precision": 0.0041,
+          "recall": 0.0541,
+          "spurious_incidents": 977,
+          "surfaced_incidents": 981,
+          "tau": 0.5
+        }
+      },
+      "reduction": {
+        "input_alerts": 2262,
+        "median_alerts_per_incident": 2,
+        "output_incidents": 981,
+        "p95_alerts_per_incident": 5,
+        "reduction_pct": 56.631
+      }
+    },
+    "pipeline, every incident": {
+      "clustering": {
+        "ari": 0.6154,
+        "completeness": 1.0,
+        "homogeneity": 0.7919,
+        "mean_fragmentation": 1.0,
+        "over_merged_incidents": 1,
+        "v_measure": 0.8839
+      },
+      "detection": {
+        "tau_0": {
+          "detected": 4,
+          "episodes": 74,
+          "f1": 0.0478,
+          "miss_rate": 0.9459,
+          "miss_rate_ci95": [
+            0.8919,
+            0.9865
+          ],
+          "missed": 70,
+          "no_alert_episodes": 70,
+          "precision": 0.0429,
+          "recall": 0.0541,
+          "spurious_incidents": 67,
+          "surfaced_incidents": 70,
+          "tau": 0.0
+        },
+        "tau_0.5": {
+          "detected": 4,
+          "episodes": 74,
+          "f1": 0.0478,
+          "miss_rate": 0.9459,
+          "miss_rate_ci95": [
+            0.8919,
+            0.9865
+          ],
+          "missed": 70,
+          "no_alert_episodes": 70,
+          "precision": 0.0429,
+          "recall": 0.0541,
+          "spurious_incidents": 67,
+          "surfaced_incidents": 70,
+          "tau": 0.5
+        }
+      },
+      "reduction": {
+        "input_alerts": 2262,
+        "median_alerts_per_incident": 5.0,
+        "output_incidents": 70,
+        "p95_alerts_per_incident": 285,
+        "reduction_pct": 96.905
+      }
+    },
+    "pipeline, surfaced": {
+      "clustering": {
+        "ari": 0.6154,
+        "completeness": 1.0,
+        "homogeneity": 0.7919,
+        "mean_fragmentation": 1.0,
+        "over_merged_incidents": 1,
+        "v_measure": 0.8839
+      },
+      "detection": {
+        "tau_0": {
+          "detected": 4,
+          "episodes": 74,
+          "f1": 0.0686,
+          "miss_rate": 0.9459,
+          "miss_rate_ci95": [
+            0.8919,
+            0.9865
+          ],
+          "missed": 70,
+          "no_alert_episodes": 70,
+          "precision": 0.0938,
+          "recall": 0.0541,
+          "spurious_incidents": 29,
+          "surfaced_incidents": 32,
+          "tau": 0.0
+        },
+        "tau_0.5": {
+          "detected": 4,
+          "episodes": 74,
+          "f1": 0.0686,
+          "miss_rate": 0.9459,
+          "miss_rate_ci95": [
+            0.8919,
+            0.9865
+          ],
+          "missed": 70,
+          "no_alert_episodes": 70,
+          "precision": 0.0938,
+          "recall": 0.0541,
+          "spurious_incidents": 29,
+          "surfaced_incidents": 32,
+          "tau": 0.5
+        }
+      },
+      "reduction": {
+        "input_alerts": 2262,
+        "median_alerts_per_incident": 14.0,
+        "output_incidents": 32,
+        "p95_alerts_per_incident": 323,
+        "reduction_pct": 98.585
+      }
+    }
+  },
+  "threshold_sweep": [
+    {
+      "miss_rate_tau_0": 0.9459,
+      "miss_rate_tau_0.5": 0.9459,
+      "precision_tau_0": 0.0429,
+      "precision_tau_0.5": 0.0429,
+      "recall_tau_0": 0.0541,
+      "recall_tau_0.5": 0.0541,
+      "surfaced": 70,
+      "threshold": 0
+    },
+    {
+      "miss_rate_tau_0": 0.9459,
+      "miss_rate_tau_0.5": 0.9459,
+      "precision_tau_0": 0.0429,
+      "precision_tau_0.5": 0.0429,
+      "recall_tau_0": 0.0541,
+      "recall_tau_0.5": 0.0541,
+      "surfaced": 70,
+      "threshold": 12
+    },
+    {
+      "miss_rate_tau_0": 0.9459,
+      "miss_rate_tau_0.5": 0.9459,
+      "precision_tau_0": 0.0938,
+      "precision_tau_0.5": 0.0938,
+      "recall_tau_0": 0.0541,
+      "recall_tau_0.5": 0.0541,
+      "surfaced": 32,
+      "threshold": 25
+    },
+    {
+      "miss_rate_tau_0": 0.9459,
+      "miss_rate_tau_0.5": 0.9459,
+      "precision_tau_0": 0.1579,
+      "precision_tau_0.5": 0.1579,
+      "recall_tau_0": 0.0541,
+      "recall_tau_0.5": 0.0541,
+      "surfaced": 19,
+      "threshold": 40
+    },
+    {
+      "miss_rate_tau_0": 0.9459,
+      "miss_rate_tau_0.5": 0.9459,
+      "precision_tau_0": 0.25,
+      "precision_tau_0.5": 0.25,
+      "recall_tau_0": 0.0541,
+      "recall_tau_0.5": 0.0541,
+      "surfaced": 12,
+      "threshold": 60
+    }
+  ],
+  "window_sweep": [
+    {
+      "B1 tuple dedup": {
+        "miss_rate_tau_0.5": 0.9459,
+        "output_incidents": 2262,
+        "reduction_pct": 0.0
+      },
+      "B2 rule window": {
+        "miss_rate_tau_0.5": 0.9459,
+        "output_incidents": 1447,
+        "reduction_pct": 36.03
+      },
+      "pipeline, surfaced": {
+        "miss_rate_tau_0.5": 0.9459,
+        "output_incidents": 35,
+        "reduction_pct": 98.453
+      },
+      "window_seconds": 60
+    },
+    {
+      "B1 tuple dedup": {
+        "miss_rate_tau_0.5": 0.9459,
+        "output_incidents": 1445,
+        "reduction_pct": 36.118
+      },
+      "B2 rule window": {
+        "miss_rate_tau_0.5": 0.9459,
+        "output_incidents": 1447,
+        "reduction_pct": 36.03
+      },
+      "pipeline, surfaced": {
+        "miss_rate_tau_0.5": 0.9459,
+        "output_incidents": 35,
+        "reduction_pct": 98.453
+      },
+      "window_seconds": 300
+    },
+    {
+      "B1 tuple dedup": {
+        "miss_rate_tau_0.5": 0.9459,
+        "output_incidents": 1248,
+        "reduction_pct": 44.828
+      },
+      "B2 rule window": {
+        "miss_rate_tau_0.5": 0.9459,
+        "output_incidents": 981,
+        "reduction_pct": 56.631
+      },
+      "pipeline, surfaced": {
+        "miss_rate_tau_0.5": 0.9459,
+        "output_incidents": 35,
+        "reduction_pct": 98.453
+      },
+      "window_seconds": 600
+    },
+    {
+      "B1 tuple dedup": {
+        "miss_rate_tau_0.5": 0.9459,
+        "output_incidents": 1010,
+        "reduction_pct": 55.349
+      },
+      "B2 rule window": {
+        "miss_rate_tau_0.5": 0.9459,
+        "output_incidents": 440,
+        "reduction_pct": 80.548
+      },
+      "pipeline, surfaced": {
+        "miss_rate_tau_0.5": 0.9459,
+        "output_incidents": 34,
+        "reduction_pct": 98.497
+      },
+      "window_seconds": 1800
+    },
+    {
+      "B1 tuple dedup": {
+        "miss_rate_tau_0.5": 0.9459,
+        "output_incidents": 920,
+        "reduction_pct": 59.328
+      },
+      "B2 rule window": {
+        "miss_rate_tau_0.5": 0.9459,
+        "output_incidents": 250,
+        "reduction_pct": 88.948
+      },
+      "pipeline, surfaced": {
+        "miss_rate_tau_0.5": 0.9459,
+        "output_incidents": 32,
+        "reduction_pct": 98.585
+      },
+      "window_seconds": 3600
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-.PHONY: help install lint test demo dataset run audit clean
+.PHONY: help install lint test demo dataset evaluate run audit clean
 
 # Everything runs from a project virtual environment, so `make install` works on
 # systems whose Python refuses global installs (PEP 668).
@@ -13,6 +13,7 @@ help:
 	@echo "  test      Run the test suite"
 	@echo "  demo      Run the end-to-end walking-skeleton flow on the sample alerts"
 	@echo "  dataset   Rebuild the synthetic evaluation datasets and verify them against the published manifests"
+	@echo "  evaluate  Run the evaluation on the 7-day synthetic set and write docs/eval/results-synthetic-7d.json"
 	@echo "  run       Start the FastAPI dev server on :8000"
 	@echo "  audit     Run the public-repository secret/PII audit"
 	@echo "  clean     Remove generated Python/pytest caches; preserve private records and runtime data"
@@ -35,6 +36,9 @@ EVAL_DATA ?= runtime-data/eval
 dataset:
 	$(BIN)/python -m app.evaluation.synthetic --days 1 --out $(EVAL_DATA)/synthetic-1d --verify examples/synthetic-sshd/manifest-1d.json
 	$(BIN)/python -m app.evaluation.synthetic --days 7 --out $(EVAL_DATA)/synthetic-7d --verify examples/synthetic-sshd/manifest-7d.json
+
+evaluate: dataset
+	$(BIN)/python -m app.evaluation.run --data $(EVAL_DATA)/synthetic-7d --out docs/eval/results-synthetic-7d.json --timings $(EVAL_DATA)/timings-synthetic-7d.json
 
 run:
 	$(BIN)/python -m uvicorn app.api.app:app --app-dir backend --reload --port 8000

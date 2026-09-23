@@ -84,10 +84,23 @@ def scheduled_alerts(records: list[dict], tick: int = TICK_SECONDS) -> list[dict
     return alerts
 
 
-def convert(data: Path, out: Path) -> dict:
-    """Read ``events.jsonl`` from a dataset directory and write ``alerts.jsonl``."""
+def load_records(data: Path) -> list[dict]:
+    """Normalized records of a dataset: parsed from ``events.jsonl`` (raw sshd
+    messages), or read from ``records.jsonl`` when a source such as the LANL
+    slice arrives already normalized."""
+    normalized = data / "records.jsonl"
+    if normalized.exists():
+        with normalized.open(encoding="utf-8") as handle:
+            records = [json.loads(line) for line in handle]
+        records.sort(key=lambda row: (row["event_ts"], row["source_id"], row["event_id"]))
+        return records
     with (data / "events.jsonl").open(encoding="utf-8") as handle:
-        records = normalize(json.loads(line) for line in handle)
+        return normalize(json.loads(line) for line in handle)
+
+
+def convert(data: Path, out: Path) -> dict:
+    """Read a dataset directory and write ``alerts.jsonl``."""
+    records = load_records(data)
     alerts = scheduled_alerts(records)
     payload = b"".join(json.dumps(alert, sort_keys=True, separators=(",", ":")).encode() + b"\n"
                        for alert in alerts)
