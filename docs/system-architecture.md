@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines the initial logical architecture, system boundary, trust boundaries, module responsibilities, and decision controls for SecAgent RiskOps. It describes the target architecture; implementation status is documented separately in [Current Capability Boundaries](./docs/capability-boundaries.md).
+This document defines the initial logical architecture, system boundary, trust boundaries, module responsibilities, and decision controls for SecAgent RiskOps. It describes the target architecture; implementation status is documented separately in [Current Capability Boundaries](./capability-boundaries.md).
 
 ## System Context
 
@@ -199,7 +199,7 @@ Canonical hash + immutable active scope version
 Runtime policy evaluation at every target boundary
 ```
 
-Blank or ambiguous scope cannot pass this gate for active validation. Material changes create a new scope version and invalidate approvals tied to the previous policy hash. See [Assessment Authorization and Rules of Engagement](./docs/assessment-authorization-and-rules-of-engagement.md).
+Blank or ambiguous scope cannot pass this gate for active validation. Material changes create a new scope version and invalidate approvals tied to the previous policy hash. See [Assessment Authorization and Rules of Engagement](./assessment-authorization-and-rules-of-engagement.md).
 
 ## Workflow Runtime
 
@@ -211,7 +211,7 @@ Flow
         -> Evidence / Artifact
 ```
 
-The runtime supports SOC investigations, GRC mapping, remediation, approval, knowledge review, and replay. Every state transition must be validated and auditable. See [Agent Workflow Runtime](./docs/workflow-runtime.md).
+The runtime supports SOC investigations, GRC mapping, remediation, approval, knowledge review, and replay. Every state transition must be validated and auditable. See [Agent Workflow Runtime](./workflow-runtime.md).
 
 ## Agent Integration Boundary
 
@@ -228,7 +228,7 @@ The stable integration seams are:
 
 Single-agent and multi-agent workflows use the same Flow / Task / Step model. Agents cannot communicate or execute tools outside the orchestrator, policy, evidence, and audit boundaries.
 
-See [Agent Integration Boundary](./docs/agent-integration.md).
+See [Agent Integration Boundary](./agent-integration.md).
 
 ## Initial Technical Architecture
 
@@ -262,9 +262,9 @@ This avoids premature distributed-system complexity while preserving clear seams
 
 ## Related Architecture Extensions
 
-- [Agent Integration Boundary](./docs/agent-integration.md)
-- [External Intelligence Ingestion](./docs/external-intelligence-ingestion.md)
-- [Authorized Security Validation](./docs/authorized-security-validation.md)
-- [Assessment Authorization and Rules of Engagement](./docs/assessment-authorization-and-rules-of-engagement.md)
-- [Curated Knowledge Intake](./docs/curated-knowledge-intake.md)
-- [Controlled Remediation Workflow](./docs/remediation-workflow.md)
+- [Agent Integration Boundary](./agent-integration.md)
+- [External Intelligence Ingestion](./external-intelligence-ingestion.md)
+- [Authorized Security Validation](./authorized-security-validation.md)
+- [Assessment Authorization and Rules of Engagement](./assessment-authorization-and-rules-of-engagement.md)
+- [Curated Knowledge Intake](./curated-knowledge-intake.md)
+- [Controlled Remediation Workflow](./remediation-workflow.md)

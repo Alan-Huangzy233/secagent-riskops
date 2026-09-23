@@ -137,7 +137,7 @@ Active validation or remediation additionally requires:
 
 Missing, ambiguous, expired, or conflicting authorization must fail closed. Possession of credentials or network reachability does not by itself constitute authorization.
 
-See [Security Policy](./SECURITY.md) and [Current Capability Boundaries](./docs/capability-boundaries.md).
+See [Security Policy](../SECURITY.md) and [Current Capability Boundaries](./capability-boundaries.md).
 
 ## Autonomy Policy
 
@@ -152,9 +152,9 @@ See [Security Policy](./SECURITY.md) and [Current Capability Boundaries](./docs/
 
 The configured level is a maximum, not an entitlement. A policy decision can always reduce capability or block an action. Production defaults should be Level 1 or Level 2 until the policy engine, verification, rollback, and audit controls are proven.
 
-See [Autonomy Levels](./docs/autonomy-levels.md).
+See [Autonomy Levels](./autonomy-levels.md).
 
-Agents are replaceable task executors and never own authorization or direct tool access. See [Agent Integration Boundary](./docs/agent-integration.md).
+Agents are replaceable task executors and never own authorization or direct tool access. See [Agent Integration Boundary](./agent-integration.md).
 
 ## Design Principles
 

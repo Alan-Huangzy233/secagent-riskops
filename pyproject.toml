@@ -1,7 +1,9 @@
 [project]
 name = "secagent-riskops"
 version = "0.2.0"
-description = "AI-assisted SOC, GRC, and controlled-remediation platform (MVP walking skeleton)"
+description = "Reduces raw security alerts to a small set of incidents, with reproducible accuracy and miss-rate reporting"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.111",
@@ -25,7 +27,7 @@ where = ["backend"]
 include = ["app*"]
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]

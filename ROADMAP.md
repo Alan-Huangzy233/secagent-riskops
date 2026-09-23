@@ -1,5 +1,40 @@
 # SecAgent RiskOps Roadmap
 
+## Current focus: `v0.3.0-demo` — measured alert reduction
+
+One claim, backed by numbers a third party can re-run: raw alerts are reduced to
+a much smaller set of incidents, reported with episode-level precision, recall,
+**miss rate**, baselines and cost. Method: [EVALUATION.md](./EVALUATION.md).
+
+- Labelled synthetic alert generator (fixed seed) plus a public-dataset slice, and the log-to-alert rule set that feeds both
+- Pure dedup / correlate / score stages with unit tests
+- Baselines, metrics and `make evaluate` with byte-identical reruns
+- Model-backed triage with an offline fallback; agreement, abstention, cost and latency
+- Visible safety behaviours: second-person approval, execute-and-rollback in a sandbox, fail-closed scope, exported audit timeline
+- `docker compose up` with no API key
+
+Nothing else below is in scope for this milestone. Not planned for it: real SIEM
+integration, multi-tenancy, notifications, external intelligence collection,
+GRC or knowledge UI, PostgreSQL.
+
+## Status of every section below
+
+| Section | Status |
+|---|---|
+| v0.1 Foundation | Implemented in the walking skeleton; persistence is SQLite, PostgreSQL is planned, not implemented |
+| v0.1.5 Agent Workflow Runtime | Implemented in the walking skeleton |
+| v0.1.6 External Intelligence Ingestion | Planned, not implemented (design only) |
+| v0.1.7 Authorized Security Validation | Planned, not implemented (design only) |
+| v0.1.8 Curated Knowledge Intake | Planned, not implemented (design only) |
+| v0.1.9 Assessment Authorization and Rules of Engagement | Partly implemented: hash-bound scope and fail-closed policy gates; the rest is planned |
+| v0.2 AI SOC Inbox | Reduction pipeline implemented in the skeleton and measured under `v0.3.0-demo`; inbox UI and daily briefing planned, not implemented |
+| v0.2.4 Approval Service and Local Authentication | Planned, not implemented (a minimal second-approver path is part of `v0.3.0-demo`) |
+| v0.2.5 Web Console | Planned, not implemented |
+| v0.3 GRC Bridge | Planned, not implemented beyond a fixed control mapping; to be renumbered after `v0.3.0-demo` |
+| v0.4 Controlled Remediation | Policy engine and ActionPlan implemented; executors, verification and rollback planned, not implemented |
+| v0.5 Knowledge Loop | Planned, not implemented |
+| v1.0 End-to-End Demo | Planned, not implemented |
+
 > **Reading note.** Entries below are grouped by theme, not strict chronological
 > order — the `v0.1.6`–`v0.1.9` sections are early increments that were appended
 > after the `v0.2`–`v1.0` outline, not work that follows `v1.0`. For what is
