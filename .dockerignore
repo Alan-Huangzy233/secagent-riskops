@@ -1,0 +1,9 @@
+# Allowlist: the image receives program code, sample inputs and the licence,
+# never private records, virtual environments or local runtime data.
+*
+!LICENSE
+!deploy/requirements.lock
+!backend/app
+!examples
+**/__pycache__
+**/*.pyc
