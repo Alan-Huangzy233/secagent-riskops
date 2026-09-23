@@ -24,7 +24,6 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
-import sys
 
 BACKUP_ID_RE = re.compile(r'rp-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}\Z')
 FILE_RE = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z')

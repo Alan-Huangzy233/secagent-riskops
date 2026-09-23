@@ -127,7 +127,7 @@ def run_flow(
             outcome.risk = risk
 
             rem_task = rt.add_task(flow, f"Plan remediation for {incident.incident_id}")
-            plan_step = rt.add_step(flow, rem_task, "build_action_plan", "deterministic")
+            rt.add_step(flow, rem_task, "build_action_plan", "deterministic")
             plan = remediation.build_action_plan(svc, incident, rec)
             if plan is not None:
                 rt.add_artifact(flow, "action_plan", plan.action_plan_id)

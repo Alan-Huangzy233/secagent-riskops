@@ -16,6 +16,8 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "httpx>=0.27",
+    # Pinned to a minor series so a new ruff release cannot turn CI red on its own.
+    "ruff>=0.16,<0.17",
 ]
 
 # The MVP walking skeleton persists to SQLite (stdlib) so `pytest` runs with no
@@ -34,3 +36,11 @@ build-backend = "setuptools.build_meta"
 pythonpath = ["backend"]
 testpaths = ["backend/tests"]
 addopts = "-q"
+
+[tool.ruff]
+target-version = "py311"
+extend-exclude = ["docs/process"]
+
+[tool.ruff.lint]
+# Correctness only: pyflakes plus pycodestyle's syntax and statement checks.
+select = ["E4", "E7", "E9", "F"]

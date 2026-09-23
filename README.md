@@ -1,5 +1,7 @@
 # SecAgent RiskOps
 
+[![CI](https://github.com/Alan-Huangzy233/secagent-riskops/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Alan-Huangzy233/secagent-riskops/actions/workflows/ci.yml) [![Public repository audit](https://github.com/Alan-Huangzy233/secagent-riskops/actions/workflows/public-repo-audit.yml/badge.svg?branch=main)](https://github.com/Alan-Huangzy233/secagent-riskops/actions/workflows/public-repo-audit.yml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
+
 **What it is:** a pipeline that reduces a stream of raw security alerts to a much smaller set of incidents worth an analyst's time, and reports how many real attacks it misses.
 
 **Why:** small security teams drown in duplicate, low-value alerts. Aggressive grouping cuts the noise but can hide an attack, and most tools never say how often that happens.
