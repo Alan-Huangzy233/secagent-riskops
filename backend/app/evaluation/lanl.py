@@ -15,9 +15,15 @@ The slice rule was fixed before any evaluation run:
   events.
 * **Events** — ``LogOn`` records only (LogOff, TGS, TGT and AuthMap are session
   ends and ticket operations, not authentication attempts).
-* **Computers** — every record touching a computer that appears in a red-team
-  event inside the window, plus every record whose destination is one of the
-  other computers chosen by hashing ``seed:name`` (a fixed fraction, one pass).
+* **Sources** — every record whose source computer is a red-team source inside
+  the window, plus every record from the other source computers chosen by
+  hashing ``seed:name`` (a fixed fraction, one pass). A chosen source keeps its
+  whole trail, which is what per-source rules and correlation need.
+
+Slice version 1 kept every record touching any red-team computer instead. A
+count-only dry run showed that meant 15.3 million of the window's 25.8 million
+logons, because several red-team targets are hubs (one destination alone had
+3.7 million); it was replaced by sampling sources before any evaluation ran.
 
 Mapping: destination computer -> ``source_id`` (the host that logged it),
 source computer -> ``src_ip`` (the peer), destination user -> ``ssh_user``,
@@ -43,10 +49,10 @@ from pathlib import Path
 import sys
 from typing import Iterable, Iterator, TextIO
 
-SLICE_VERSION = 1
+SLICE_VERSION = 2
 WINDOW_DAYS = 3
 DEFAULT_SEED = 20261115
-DEFAULT_SAMPLE_PER_MILLE = 15
+DEFAULT_SAMPLE_PER_MILLE = 20
 DAY = 86400
 
 
@@ -77,7 +83,7 @@ def slice_auth(auth: TextIO, events: list[tuple[int, str, str, str]], *, seed: i
     first_day, window_events = busiest_window(events)
     start, end = first_day * DAY, (first_day + WINDOW_DAYS) * DAY
     inside = [event for event in events if start <= event[0] < end]
-    involved = {computer for _, _, source, destination in inside for computer in (source, destination)}
+    red_sources = {source for _, _, source, _ in inside}
     episode_of: dict[tuple[str, int], str] = {}
     for time, user, *_ in inside:
         episode_of.setdefault((user, time // DAY), "")
@@ -102,7 +108,7 @@ def slice_auth(auth: TextIO, events: list[tuple[int, str, str, str]], *, seed: i
             continue
         counts["window_logons"] += 1
         _, src_user, dst_user, source, destination, *_ = fields
-        if not (source in involved or destination in involved or sampled(destination, seed, per_mille)):
+        if not (source in red_sources or sampled(source, seed, per_mille)):
             continue
         event_id = f"L{number}"
         label = "benign"
@@ -125,7 +131,7 @@ def slice_auth(auth: TextIO, events: list[tuple[int, str, str, str]], *, seed: i
                          "hosts": sorted({event[3] for event in own})})
     return {"records": records, "labels": labels, "episodes": episodes,
             "window": {"first_day": first_day, "days": WINDOW_DAYS, "red_team_events": window_events},
-            "involved_computers": len(involved), "counts": dict(counts)}
+            "red_team_sources": sorted(red_sources), "counts": dict(counts)}
 
 
 def _jsonl(rows: list[dict]) -> bytes:
@@ -165,7 +171,7 @@ def write(auth: Path, redteam: Path, out: Path, *, seed: int = DEFAULT_SEED,
         "citation": "A. D. Kent, Los Alamos National Laboratory, 2015, doi:10.17021/1179829",
         "slicer": "app.evaluation.lanl", "slice_version": SLICE_VERSION, "seed": seed,
         "sample_per_mille": per_mille, "window": result["window"],
-        "involved_computers": result["involved_computers"], "counts": result["counts"],
+        "red_team_sources": result["red_team_sources"], "counts": result["counts"],
         "records": len(result["records"]), "attack_records": kinds[True], "benign_records": kinds[False],
         "episodes": len(result["episodes"]),
         "unmatched_red_team_events": sum(e["unmatched_red_team_events"] for e in result["episodes"]),
