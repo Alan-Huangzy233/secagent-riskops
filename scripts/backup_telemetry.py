@@ -49,6 +49,14 @@ def main():
     for old in sorted(args.directory.glob('live-*.sqlite'), reverse=True)[7:]:
         if old.is_file() and not old.is_symlink():
             old.unlink()
+    # A reader of a backup leaves SQLite's -shm/-wal sidecars behind.  Rotation
+    # used to drop only the database, so the orphans accumulated forever; they
+    # are meaningless once the database they describe is gone.
+    for sidecar in sorted(args.directory.glob('live-*.sqlite-*')):
+        suffix = sidecar.name.rsplit('-', 1)[-1]
+        if suffix in ('shm', 'wal') and sidecar.is_file() and not sidecar.is_symlink():
+            if not sidecar.with_name(sidecar.name[:-len(suffix) - 1]).exists():
+                sidecar.unlink()
     print('SQLite backup verified:', target.name)
 
 

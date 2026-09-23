@@ -59,6 +59,8 @@ Run it: `make install && make test && make demo`.
 | 单 IP / 批量手动封禁与解封：预览 → 勾选确认 → 异步任务 → 逐项核实；SSH / TCP / UDP 范围，5 分钟至 24 小时或永久；CSRF 与 Origin 校验、hash 链审计、目标状态定期核实 | `backend/app/telemetry/control.py`, `backend/app/live_api.py`, `docs/manual-blocking.md` |
 | 目标端固定 helper 只改自有 nft 表的本机入站规则，保护地址检查、到期自动解除、永久与未到期条目开机恢复；普通账号固定 relay 网关 | `scripts/ssh_block_control.py`, `scripts/control_gateway.py`, `deploy/systemd/secagent-riskops-control-restore.service` |
 | 告警处置状态（待处理 / 已知晓 / 已处理）：受限的人工转换、封禁核实后自动标为已处理、新证据自动回到待处理、合并保留较低状态、处置记录与按状态筛选计数 | `backend/app/telemetry/store.py`, `backend/app/live_api.py`, `backend/app/telemetry/dashboard.py`, `docs/ssh-detection.md` |
+| 恢复包：先游标后快照的一致捕获、SHA-256 与 schema 指纹清单、zstd 压缩、gpg 指纹加密与清单签名、原子发布、摘要校验 / 深度校验 / 隔离目录恢复演练 | `scripts/recovery_package.py`, `deploy/recovery-package.example.json` |
+| 备份节点主动拉取：固定命令只允许列出 / 取用清单内文件 / 按自身节点名回执，不接受路径、不开 shell；拉取端逐文件校验后才发布副本并回执；本地轮换只删除"已有独立副本确认且超出保留代数"的包 | `scripts/backup_export.py`, `scripts/pull_recovery_packages.py`, `scripts/recovery_package.py` |
 
 试点仅覆盖进入部署者指定 journal 过滤范围的 SSH/auth 日志，不提供全网络活动可见性，
 也不调用模型。封禁只在单个操作员预览并勾选确认后执行，规则命中不会自动封禁；

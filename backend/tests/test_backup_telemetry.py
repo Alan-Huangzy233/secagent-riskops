@@ -69,6 +69,27 @@ def test_retention_keeps_seven_valid_snapshots_and_unrelated_files(tmp_path, mon
     assert unrelated.read_bytes() == b"keep"
 
 
+def test_rotation_removes_the_sidecars_of_backups_it_deleted(tmp_path, monkeypatch):
+    database, directory = tmp_path / "live.sqlite", tmp_path / "backups"
+    with closing(sqlite3.connect(database)) as writer:
+        writer.execute("CREATE TABLE events (message TEXT)")
+    directory.mkdir()
+    orphan = directory / "live-20260101T000000000000.sqlite-shm"
+    orphan.write_bytes(b"\0" * 32768)
+    (directory / "live-20260101T000000000000.sqlite-wal").write_bytes(b"")
+    for _ in range(8):
+        invoke(monkeypatch, database, directory)
+    assert not orphan.exists() and not list(directory.glob("*-wal"))
+    # Sidecars appear when something reads a backup; the oldest copy is the one
+    # the next run rotates out, the newest stays in the retention set.
+    oldest, newest = sorted(directory.glob("live-*.sqlite"))[0], sorted(directory.glob("live-*.sqlite"))[-1]
+    for path in (oldest, newest):
+        (directory / f"{path.name}-shm").write_bytes(b"\0" * 32768)
+    invoke(monkeypatch, database, directory)
+    assert not oldest.exists() and not (directory / f"{oldest.name}-shm").exists()
+    assert newest.exists() and (directory / f"{newest.name}-shm").exists()
+
+
 def test_missing_source_fails_without_creating_a_backup(tmp_path, monkeypatch):
     directory = tmp_path / 'backups'
     with pytest.raises(SystemExit, match='database does not exist'):

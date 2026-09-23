@@ -1,0 +1,32 @@
+{
+  "host_id": "example-host",
+  "description": "Components that together restore a working RiskOps deployment",
+  "recipients": ["REPLACE_WITH_THE_40_HEX_FINGERPRINT_OF_AN_OFF_HOST_KEY"],
+  "components": [
+    {
+      "name": "collector",
+      "kind": "state_dir",
+      "path": "/var/lib/secagent-riskops-collector",
+      "patterns": ["*.state.json", "*.pending.json"],
+      "description": "Per-source journal cursors and the unacknowledged spool"
+    },
+    {
+      "name": "telemetry",
+      "kind": "sqlite",
+      "path": "/var/lib/secagent-riskops/live.sqlite",
+      "description": "Events, receipts, incidents, evidence and triage history"
+    },
+    {
+      "name": "control",
+      "kind": "sqlite",
+      "path": "/var/lib/secagent-riskops/control.sqlite",
+      "description": "Central blocking tasks and their audit trail"
+    },
+    {
+      "name": "release",
+      "kind": "reference",
+      "path": "/opt/secagent-riskops/current",
+      "description": "Release the snapshot was taken under; rebuilt from the repository, not from the package"
+    }
+  ]
+}
