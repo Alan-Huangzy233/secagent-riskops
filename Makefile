@@ -1,4 +1,4 @@
-.PHONY: help install lint test demo flow dataset evaluate report run audit clean
+.PHONY: help install lint test demo flow dataset evaluate triage report run audit clean
 
 # Everything runs from a project virtual environment, so `make install` works on
 # systems whose Python refuses global installs (PEP 668).
@@ -15,6 +15,7 @@ help:
 	@echo "  flow      Run the walking-skeleton flow: triage, incident, policy-gated remediation plan"
 	@echo "  dataset   Rebuild the synthetic evaluation datasets and verify them against the published manifests"
 	@echo "  evaluate  Run the evaluation on the 7-day synthetic set and write docs/eval/results-synthetic-7d.json"
+	@echo "  triage    Replay the recorded model triage of the 7-day set (no API key, no cost)"
 	@echo "  report    Refresh the generated numbers in EVALUATION.md and README.md from docs/eval/"
 	@echo "  run       Start the FastAPI dev server on :8000"
 	@echo "  audit     Run the public-repository secret/PII audit"
@@ -44,6 +45,10 @@ dataset:
 
 evaluate: dataset
 	$(BIN)/python -m app.evaluation.run --data $(EVAL_DATA)/synthetic-7d --out docs/eval/results-synthetic-7d.json --timings $(EVAL_DATA)/timings-synthetic-7d.json
+	$(BIN)/python -m app.evaluation.report
+
+triage: dataset
+	$(BIN)/python -m app.evaluation.triage --data $(EVAL_DATA)/synthetic-7d --tape docs/eval/triage-tape-synthetic-7d.jsonl --out docs/eval/triage-synthetic-7d.json
 	$(BIN)/python -m app.evaluation.report
 
 report:

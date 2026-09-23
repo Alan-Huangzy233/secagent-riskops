@@ -16,6 +16,10 @@ ROOT = Path(__file__).resolve().parents[3]
 RESULTS = {"synthetic": ROOT / "docs" / "eval" / "results-synthetic-7d.json",
            "lanl": ROOT / "docs" / "eval" / "results-lanl-v2.json"}
 DOCUMENTS = (ROOT / "EVALUATION.md", ROOT / "README.md")
+TRIAGE = {name: {"result": ROOT / "docs" / "eval" / f"triage-{slug}.json",
+                 "tape": ROOT / "docs" / "eval" / f"triage-tape-{slug}.jsonl",
+                 "rerun": ROOT / "docs" / "eval" / f"triage-tape-{slug}-rerun.jsonl"}
+          for name, slug in (("synthetic", "synthetic-7d"), ("lanl", "lanl-v2"))}
 SYSTEMS = ("B0 passthrough", "B1 tuple dedup", "B2 rule window", "pipeline, every incident", "pipeline, surfaced")
 LABELS = {"B0 passthrough": "B0 passthrough", "B1 tuple dedup": "B1 tuple dedup", "B2 rule window": "B2 rule window",
           "pipeline, every incident": "Pipeline, every incident", "pipeline, surfaced": "**Pipeline, surfaced**"}
@@ -148,12 +152,72 @@ def readme(results: dict[str, dict]) -> str:
             f"are caught, miss rate {_pct(d['miss_rate'])} (95 % CI {_pct(low)}–{_pct(high)})**, precision "
             f"{d['precision']:.2f}. Tuple dedup keeps {_n(b1['reduction']['output_incidents'])} incidents and misses "
             f"{_pct(b1['detection']['tau_0.5']['miss_rate'])} at the same bar. On real LANL authentication data the "
-            f"rules see only {layer['episodes_with_an_alert']} of {layer['episodes']} red-team episodes; the method, "
-            "baselines and limits are in [EVALUATION.md](./EVALUATION.md).\n")
+            f"rules see only {layer['episodes_with_an_alert']} of {layer['episodes']} red-team episodes."
+            + triage_sentence() + " The method, baselines and limits are in [EVALUATION.md](./EVALUATION.md).\n")
+
+
+def triage_sentence() -> str:
+    if not all(files["result"].exists() for files in TRIAGE.values()):
+        return ""
+    parts, usd, calls = [], 0.0, 0
+    for name, label in (("synthetic", "on the synthetic week"), ("lanl", "on LANL")):
+        result = json.loads(TRIAGE[name]["result"].read_text())
+        row = next(value for key, value in result["agreement"].items() if not key.startswith("score only"))
+        parts.append(f"{row['benign_dismissed']} of {row['benign_incidents']} false alarms {label}")
+        usd, calls = usd + result["cost"]["usd"], calls + result["cost"]["calls"]
+        dismissed = row["attacks_dismissed"]
+        if dismissed:
+            return ""
+    return (f" Model triage (`claude-opus-5`) then dismisses {parts[0]} and {parts[1]} without dismissing a "
+            f"single attack, at about ${usd / calls:.3f} per incident.")
+
+
+def _share(value: float | None) -> str:
+    return "—" if value is None else f"{value:.2f}"
+
+
+def triage_agreement(triage: dict[str, dict]) -> str:
+    rows = []
+    for dataset, result in triage.items():
+        for system, r in result["agreement"].items():
+            rows.append([dataset, system, _n(r["n"]), f"{r['attack_incidents']} / {r['benign_incidents']}",
+                         f"{r['abstained']} ({_pct(r['abstention_rate'], 0)})", _share(r["balanced_accuracy"]),
+                         _share(r["cohens_kappa"]), f"**{r['attacks_dismissed']}**",
+                         f"{r['benign_dismissed']} of {r['benign_incidents']}"])
+    return _table(["Dataset", "Triage", "Incidents", "Attack / benign", "Abstained", "Balanced accuracy",
+                   "Cohen's κ", "**Attacks dismissed**", "Benign dismissed"], rows)
+
+
+def triage_stability(stability: dict[str, dict]) -> str:
+    rows = [[dataset, _n(r["pairs"]), _n(r["same_verdict"]), _pct(r["agreement"]), _share(r["cohens_kappa"]),
+             ", ".join(f"{flip['first']} → {flip['second']}" for flip in r["flips"]) or "none"]
+            for dataset, r in stability.items()]
+    return _table(["Dataset", "Incidents judged twice", "Same verdict", "Agreement", "Cohen's κ",
+                   "Verdicts that changed"], rows)
+
+
+def triage_cost(triage: dict[str, dict]) -> str:
+    rows = []
+    for dataset, result in triage.items():
+        c = result["cost"]
+        served = ", ".join(f"{model} × {count}" for model, count in c["served_by"].items())
+        stops = ", ".join(f"{reason} × {count}" for reason, count in c["stop_reasons"].items())
+        rows.append([dataset, _n(c["calls"]), _n(c["input_tokens"]), _n(c["output_tokens"]), f"${c['usd']:.2f}",
+                     f"${c['usd_per_incident']:.3f}", f"${c['usd_per_1000_input_alerts']:.3f}",
+                     f"{c['latency_p50_seconds']:.1f} s / {c['latency_p95_seconds']:.1f} s", served, stops])
+    return _table(["Dataset", "Calls", "Input tokens", "Output tokens", "USD", "USD per incident",
+                   "USD per 1,000 alerts", "Latency p50 / p95", "Served by", "Stop reasons"], rows)
 
 
 def blocks(results: dict[str, dict]) -> dict[str, str]:
     rendered = {"datasets": datasets(results), "permutation": permutation(results), "readme-results": readme(results)}
+    if all(path.exists() for files in TRIAGE.values() for path in files.values()):
+        from .triage import stability
+        triage = {name: json.loads(files["result"].read_text()) for name, files in TRIAGE.items()}
+        rendered["triage-agreement"] = triage_agreement(triage)
+        rendered["triage-cost"] = triage_cost(triage)
+        rendered["triage-stability"] = triage_stability(
+            {name: stability(files["tape"], files["rerun"]) for name, files in TRIAGE.items()})
     for dataset, result in results.items():
         for name, render in (("reduction", reduction), ("detection", detection), ("clustering", clustering)):
             rendered[f"{name}-{dataset}"] = render(result)

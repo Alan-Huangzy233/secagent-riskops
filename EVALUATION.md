@@ -7,9 +7,9 @@ reproducible from a pinned dataset and a fixed seed; see
 generated from `docs/eval/results-*.json` by `python -m app.evaluation.report`,
 and CI fails if this document and those files disagree.
 
-Status: reduction, detection and clustering are measured on two datasets. AI
-triage agreement (Table 4) and model cost (the LLM rows of Table 5) are not yet
-measured: triage is still the rule-based agent.
+Status: reduction, detection and clustering are measured on two datasets, and
+model-backed triage of the surfaced incidents — agreement, stability, cost and
+latency — on both.
 
 ---
 
@@ -151,16 +151,16 @@ weights were fixed before any evaluation run and developed on a different seed
 
 ## 5. Metrics
 
-Tables 1–3 are in §6. Table 4 and the model rows of Table 5 are pending.
+All tables are in §6.
 
 Miss rate is `1 − recall` and has its own column because it is the only number
 here that corresponds to a real attack going unseen. Its 95 % interval comes
 from 2,000 bootstrap resamples of the episodes (fixed seed), because with few
 episodes one miss moves the rate a lot.
 
-Raw accuracy will not be reported for AI triage: most alerts are benign, so a
-classifier that always answers "benign" scores well and has learned nothing.
-Balanced accuracy, Cohen's κ, abstention and coverage will be reported instead.
+Raw accuracy is not reported for AI triage: a classifier that always answers
+the majority class scores well and has learned nothing. Balanced accuracy,
+Cohen's κ, abstention and the number of attacks dismissed are reported instead.
 
 ---
 
@@ -305,24 +305,93 @@ would group a multi-source one.
 
 ### 6.4 AI triage agreement
 
-Not yet measured. Triage is the deterministic, evidence-grounded agent; the
-model-backed agent and its agreement, abstention, cost and latency are the next
-milestone item (#9).
+`backend/app/agents/model_triage.py` gives `claude-opus-5` (effort `medium`) a
+dossier of each surfaced incident — sources, hosts, timing, the rules that
+fired, per-account attempts and successes, whether sshd marked an account
+invalid, whether a source had logged in cleanly as that account before, and a
+sample of the records — and constrains the answer with a JSON schema to
+`escalate`, `dismiss` or `abstain` with the event ids it relied on. The
+pipeline's score and the labels are never sent. The system prompt states the
+team's triage policy, which is the same line the ground truth draws (targeted
+campaigns and successful guessing are attacks; opportunistic scanning of
+generic names that never succeeds, and a known user mistyping, are noise), and
+tells the model that account names are attacker-chosen data. A refusal or a
+truncated answer counts as an abstention. The model accepts no temperature, so
+every call is recorded in `docs/eval/triage-tape-*.jsonl`; `make triage`
+replays the recording with no key and no cost, and CI checks the replay byte
+for byte.
+
+An incident's truth is `attack` when it holds any attack-labelled alert.
+"Score only" is the status quo: every surfaced incident goes to the analyst.
+
+<!-- generated:triage-agreement -->
+| Dataset | Triage | Incidents | Attack / benign | Abstained | Balanced accuracy | Cohen's κ | **Attacks dismissed** | Benign dismissed |
+|---|---|---|---|---|---|---|---|---|
+| synthetic | claude-opus-5, effort medium | 50 | 43 / 7 | 0 (0 %) | 0.86 | 0.81 | **0** | 5 of 7 |
+| synthetic | score only (every surfaced incident escalated) | 50 | 43 / 7 | 0 (0 %) | 0.50 | 0.00 | **0** | 0 of 7 |
+| lanl | claude-opus-5, effort medium | 32 | 3 / 29 | 3 (9 %) | 0.94 | 0.61 | **0** | 23 of 29 |
+| lanl | score only (every surfaced incident escalated) | 32 | 3 / 29 | 0 (0 %) | 0.50 | 0.00 | **0** | 0 of 29 |
+<!-- /generated:triage-agreement -->
+
+Each dataset was judged twice, in two independent live runs:
+
+<!-- generated:triage-stability -->
+| Dataset | Incidents judged twice | Same verdict | Agreement | Cohen's κ | Verdicts that changed |
+|---|---|---|---|---|---|
+| synthetic | 50 | 48 | 96.0 % | 0.80 | escalate → abstain, dismiss → abstain |
+| lanl | 32 | 32 | 100.0 % | 1.00 | none |
+<!-- /generated:triage-stability -->
+
+On both datasets the model **dismissed no incident that held an attack**, in
+either run. What it adds is on the benign side. On the synthetic week it
+dismissed five of the seven benign incidents the score surfaced — scanners
+sweeping generic names that sshd itself marks invalid — and escalated two: the
+monitor retrying an expired password for six hours, and a user who mistyped
+three times and then logged in on the first day, before any clean login could
+vouch for that source. Both are cases an analyst would also check. On the LANL
+slice it dismissed 23 of 29 benign incidents, almost all Windows machine
+accounts (`C123$`) failing against their own host — stale cached credentials,
+a pattern the rule-based score has no feature for — abstained on 3, and
+escalated all 3 attack incidents. The analyst's queue there drops from 32
+incidents to 6 escalations and 3 for review.
+
+The two verdicts that changed between runs both moved to `abstain`, never
+between `escalate` and `dismiss`; both were the expired-password monitor, which
+the first run had judged once each way. That is the most ambiguous pattern in
+the data, and the model's inconsistency on it is itself informative.
+
+Limits: seven and twenty-nine benign incidents are small samples, and three
+LANL attack incidents are fewer still; the prompt states the same triage policy
+the ground truth encodes; and the model is a second opinion on incidents the
+pipeline already chose. It never sees the incidents the score kept back, so it
+cannot recover the pipeline's misses.
 
 ### 6.5 Cost and latency
 
 Wall-clock on a 4-vCPU AMD EPYC virtual machine, Python 3.12, one run each.
-Single batch runs, so no p50/p95 is claimed. The pipeline makes no model calls,
-so there are no tokens or dollars to report yet.
+The deterministic stages are single batch runs, so no p50/p95 is claimed for
+them.
 
 | Stage | Synthetic week (32,458 alerts) | LANL slice (2,262 alerts from 629,907 records) |
 |---|---|---|
 | Parse and normalize records | 3.5 s | 4.1 s |
 | Rules on the 300 s schedule (log → alert) | 55.7 s | 184.7 s |
 | Dedup + correlate + score | 2.7 s (0.08 s per 1,000 alerts) | 1.7 s |
-| LLM calls, tokens, USD | none | none |
+| Model triage | see below | see below |
 
-The rule schedule dominates; the reduction itself is cheap.
+Model triage, one call per surfaced incident (first live run; prices at $5 / $25
+per million input / output tokens):
+
+<!-- generated:triage-cost -->
+| Dataset | Calls | Input tokens | Output tokens | USD | USD per incident | USD per 1,000 alerts | Latency p50 / p95 | Served by | Stop reasons |
+|---|---|---|---|---|---|---|---|---|---|
+| synthetic | 50 | 141,182 | 20,349 | $1.24 | $0.025 | $0.038 | 8.8 s / 13.8 s | claude-opus-5 × 50 | end_turn × 50 |
+| lanl | 32 | 88,105 | 14,867 | $0.82 | $0.026 | $0.364 | 8.7 s / 16.9 s | claude-opus-5 × 32 | end_turn × 32 |
+<!-- /generated:triage-cost -->
+
+The rule schedule dominates the deterministic stages, and the reduction itself
+is cheap. Model triage costs cents per incident because it only ever sees what
+the pipeline surfaces, never the raw alert stream.
 
 ### 6.6 Window sensitivity (synthetic week)
 
@@ -394,7 +463,7 @@ source fingerprints are in `examples/lanl-slice/README.md`.
 | Results committed | `4d7b9c5` | `38385b7` |
 | Seed | `20261115` | `20261115` (hash sample) |
 | Dataset fingerprint | `examples/synthetic-sshd/manifest-7d.json` | `examples/lanl-slice/manifest-v2.json` |
-| LLM snapshot | none | none |
+| LLM | `claude-opus-5`, effort `medium`, recorded per call | same |
 | Hardware | 4-vCPU AMD EPYC VM | same |
 | Wall-clock for a full run | about 2 minutes | about 9 minutes (slice 5.6 + evaluation 3.5) |
 
@@ -424,7 +493,11 @@ they ever do not, the cause is recorded in §9 rather than silently retried.
    who spreads over many addresses, or stays under the per-source thresholds, is
    summarised away or never alerted on. Distributed spray and slow guessing
    exercise this, and the pipeline misses them.
-6. **LLM nondeterminism.** Not applicable yet; there is no model in the loop.
+6. **LLM nondeterminism.** The model takes no temperature, so a verdict can
+   change between runs; §6.4 measures how often. Published triage numbers come
+   from the recorded first run, replayed byte for byte; the served model is
+   recorded per call. A provider-side model update would change future runs,
+   not the recording.
 7. **Scale.** 32,458 alerts in a week and 2,262 from 630 k LANL records. The rule
    schedule is the bottleneck; behaviour at 10⁶ alerts per day is untested.
 8. **Few episodes.** Sixty and seventy-four. One missed episode moves the
@@ -438,5 +511,6 @@ they ever do not, the cause is recorded in §9 rather than silently retried.
 |---|---|---|---|---|---|
 | 2026-09-23 | `4d7b9c5` | synthetic week, seed 20261115 | none | First headline run; method committed in `c2740b5` | 31.7 % |
 | 2026-09-23 | `38385b7` | LANL slice rule 2 | none | First LANL run; slice rule changed in `6ecdcd6` before it | 94.6 % |
+| 2026-09-23 | `cd90e76` (method) | synthetic week and LANL slice | `claude-opus-5`, effort `medium` | Model triage of surfaced incidents, first run and an independent rerun; triage cannot change the miss rate and dismissed no attack | unchanged |
 
 Every published number traces to a row here. Rows are appended, never edited.
