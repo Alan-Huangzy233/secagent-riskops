@@ -6,7 +6,9 @@
 
 **Why:** small security teams drown in duplicate, low-value alerts. Aggressive grouping cuts the noise but can hide an attack, and most tools never say how often that happens.
 
-**Results:** evaluation in progress. The dataset, ground truth, baselines and miss-rate definition are fixed in [EVALUATION.md](./EVALUATION.md) before any number is produced; the figures ship with `v0.3.0-demo`.
+<!-- generated:readme-results -->
+**Results:** on a labelled synthetic week (seed 20261115), 32,458 raw alerts become **50 incidents surfaced (99.85 % fewer)**; **41 of 60 attacks are caught, miss rate 31.7 % (95 % CI 21.7 %–43.3 %)**, precision 0.82. Tuple dedup keeps 28,716 incidents and misses 96.7 % at the same bar. On real LANL authentication data the rules see only 4 of 74 red-team episodes; the method, baselines and limits are in [EVALUATION.md](./EVALUATION.md).
+<!-- /generated:readme-results -->
 
 **Run it** (Docker, no API key):
 
@@ -21,13 +23,17 @@ docker compose up
 <http://127.0.0.1:8000/docs>. Without Docker, `make install && make demo` does the
 same with Python 3.11+ in a project virtual environment.
 
-The demo runs the walking skeleton on bundled sample alerts: it retains raw
-evidence, normalizes, deduplicates, groups and scores the alerts, runs an
-evidence-grounded triage agent, opens an incident, drafts a remediation plan and
-then has an **independent policy engine deny execution** because no approval
-exists. It verifies the hash-chained audit log and replays the whole run from the
-retained evidence. The sample is four alerts; the reproducible evaluation on a
-labelled dataset is the work tracked in [EVALUATION.md](./EVALUATION.md).
+The demo rebuilds one labelled synthetic day from its seed, checks it byte for
+byte against the published manifest, raises alerts with the production rules,
+reduces them, and ends with the before/after comparison against SIEM-style tuple
+dedup, plus the reasons behind the highest-scoring incidents. It takes about ten
+seconds. `make evaluate` runs the full seven-day evaluation behind the numbers
+above.
+
+`make flow` runs the walking skeleton past the incident: a remediation plan is
+drafted and an **independent policy engine denies execution** because no
+approval exists; the hash-chained audit log is verified and the run is replayed
+from retained evidence.
 
 ## How it works
 
@@ -53,7 +59,7 @@ raw logs ─► detection rules ─► alerts ─► dedup ─► correlate ─�
 
 | Implemented and tested | Planned, not implemented |
 |---|---|
-| Alert normalization, dedup, grouping and scoring (walking skeleton) | Model-backed triage (in progress for `v0.3.0-demo`) |
+| Alert reduction: dedup, correlation, explainable score, measured in [EVALUATION.md](./EVALUATION.md) | Model-backed triage (in progress for `v0.3.0-demo`) |
 | SSH/auth detection rules: burst, slow scan, multiple accounts, cross-source, success after failures | Approval service with a second approver |
 | Evidence-grounded triage agent and skeptic gate | Typed remediation executors with verification and rollback |
 | Fail-closed policy engine, hash-bound assessment scope | Web console (SOC inbox); `frontend/` is a placeholder |

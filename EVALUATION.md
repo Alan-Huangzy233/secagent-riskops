@@ -3,12 +3,13 @@
 This document reports how well SecAgent RiskOps reduces alert volume without
 losing real incidents, and how those numbers were produced. Every number here is
 reproducible from a pinned dataset and a fixed seed; see
-[Reproducing these numbers](#7-reproducing-these-numbers).
+[Reproducing these numbers](#7-reproducing-these-numbers). The tables are
+generated from `docs/eval/results-*.json` by `python -m app.evaluation.report`,
+and CI fails if this document and those files disagree.
 
-Status: **numbers not yet filled in.** Cells marked `—` are pending. The
-evaluation harness (`scripts/eval/`, `make evaluate`) and the dataset are being
-built; this document fixes the method before any number is produced, so the
-metrics cannot be chosen after seeing the results.
+Status: reduction, detection and clustering are measured on two datasets. AI
+triage agreement (Table 4) and model cost (the LLM rows of Table 5) are not yet
+measured: triage is still the rule-based agent.
 
 ---
 
@@ -32,28 +33,49 @@ quality. Those are described in `ROADMAP.md` and are not evaluated yet.
 
 ---
 
-## 2. Dataset
+## 2. Datasets
 
-| Field | Value |
-|---|---|
-| Dataset | — |
-| Version / release | — |
-| SHA-256 of the archive | — |
-| Time span covered | — |
-| Raw records | — |
-| Detection rule set used to generate alerts | `rules/` @ commit — |
-| Alerts generated | — |
-| Attack episodes labelled | — |
-| Sample committed to the repo | `examples/` (— MB, — alerts) |
+<!-- generated:datasets -->
+|  | Synthetic week (seed 20261115) | LANL slice v2 |
+|---|---|---|
+| Kind | Synthetic, labelled by construction | Real (LANL, public domain), red-team labels |
+| Span | 7 days | days 12–14 of 58 |
+| Raw records | 169,649 sshd log lines | 629,907 logon records |
+| Attack episodes | 60 | 74 |
+| Alerts raised | 32,458 | 2,262 |
+| Alerts on attack records | 1,999 | 5 |
+| Benign share of alerts | 93.8 % | 99.8 % |
+| Fingerprint | `events.jsonl` SHA-256 `227a458837940c3f…` | `records.jsonl` SHA-256 `0292d8f5d36473cf…` |
+<!-- /generated:datasets -->
 
-The public datasets are network traffic and host logs, **not alerts**. A fixed
-rule set in `rules/` converts them into alerts first; that conversion is part of
-the measured system and its code is in the repository. Changing the rule set
-changes the input volume and therefore every reduction figure below, so the rule
-set commit is pinned in the table above.
+**Synthetic week** (`backend/app/evaluation/synthetic.py`, seed `20261115`).
+Raw sshd journal messages for twelve hosts over seven days: people logging in
+and sometimes mistyping, automation, a monitor retrying an expired password,
+internet scanners and commodity bots, and five attack scenarios, twelve of
+each. Addresses come from `198.18.0.0/15`, one pool for every role. The events,
+their labels and the episode list are separate files; the committed manifests
+in `examples/synthetic-sshd/` hold the SHA-256 of each, and `make dataset`
+rebuilds and verifies them.
 
-No data from any real SOC engagement is used here. All inputs are public or
-synthetic, so any third party can re-run these numbers.
+**LANL slice** (`backend/app/evaluation/lanl.py`). Real Windows authentication
+data from A. D. Kent, *Comprehensive, Multi-Source Cyber-Security Events*, Los
+Alamos National Laboratory, 2015, doi:10.17021/1179829 (public domain). The
+slice rule, fixed before any evaluation ran: the three consecutive days with the
+most red-team events (days 12–14), `LogOn` records only, every record from the
+window's red-team source computers plus a 2 % hash sample of the other source
+computers. Slice rule 1 (every record touching a red-team computer) selected
+15.3 million records through hub destinations and was replaced before any run.
+`examples/lanl-slice/` holds the manifest and the SHA-256 of the source files.
+
+**From logs to alerts.** The datasets are logs, not alerts. The production
+rules of the live pilot (`backend/app/telemetry/detection.py`: burst,
+slow scan, multiple accounts, cross-source, success after failures) run every
+300 s over their lookback, the way a scheduled SIEM search does, and raise an
+alert for each match that contains a record newer than the previous run
+(`backend/app/evaluation/alerts.py`). This layer is part of the measured system:
+it decides which attacks reach the pipeline at all.
+
+No data from any real SOC engagement, and none from the live pilot, is used here.
 
 ---
 
@@ -61,250 +83,360 @@ synthetic, so any third party can re-run these numbers.
 
 ### 3.1 Alert labels
 
-Each generated alert inherits a label from the underlying dataset record:
-
-- `benign`
-- `attack:<episode_id>` — the alert is part of a known attack episode
+Each record carries `benign` or `attack:<episode_id>`. An alert takes the
+episode that owns most of its evidence records, or `benign` when none do. No
+alert on either dataset mixes attack and benign evidence.
 
 ### 3.2 Episodes
 
-An **episode** is one ground-truth attack, identified by the dataset's own
-campaign or scenario labels. An episode usually spans many alerts across
-multiple rules and hosts. Episodes are the unit that matters: an analyst needs
-to learn about the attack once, not once per alert.
+An **episode** is one ground-truth attack. In the synthetic week it is one
+injected campaign. In the LANL slice it is one red-team account on one day —
+deliberately not "one source close in time", which would mirror the pipeline's
+own correlation rule and flatter it.
 
 ### 3.3 Matching predicted incidents to episodes
-
-Everything in §5 depends on this rule, so it is stated explicitly.
 
 Let an incident `I` be a set of alerts, and an episode `E` be the set of alerts
 labelled `attack:E`.
 
-- `I` **covers** `E` at threshold τ when `|I ∩ E| / |E| ≥ τ`.
-- `E` is **detected** when at least one incident covers it. Results are reported
-  at **τ = 0** (any overlap — the analyst sees something about this attack) and
-  at **τ = 0.5** (the majority of the episode lands in one incident — the analyst
-  sees a coherent picture). Both are reported because τ = 0 flatters the system.
-- `E` is **missed** when no incident covers it at the stated τ.
-- `I` is **spurious** when `I` contains no attack-labelled alerts at all. This is
-  wasted analyst time.
-- `I` is **over-merged** when it contains alerts from two or more distinct
-  episodes. Two attacks presented as one is a safety problem, not just a quality
-  problem.
-- **Fragmentation** of `E` is the number of distinct incidents containing alerts
-  of `E`. Fragmentation above 1 means the analyst has to reassemble the story.
+- `I` **covers** `E` at threshold τ when `|I ∩ E| / |E| ≥ τ`. **τ = 0 means any
+  overlap** (the analyst sees something about this attack); **τ = 0.5** means
+  most of the episode lands in one incident (the analyst sees a coherent
+  picture). Both are reported because τ = 0 flatters the system; §6.7 shows by
+  how much.
+- `E` is **detected** when at least one *surfaced* incident covers it.
+- `E` is **missed** when no surfaced incident covers it. **An episode that raised
+  no alert at all is missed**, and is counted separately so the rule layer's
+  share of the misses stays visible.
+- `I` is **spurious** when it contains no attack-labelled alert.
+- **Precision** is the share of surfaced incidents that cover some episode at τ.
+- `I` is **over-merged** when it contains alerts from two or more episodes.
+- **Fragmentation** of `E` is the number of incidents holding alerts of `E`.
 
 ---
 
-## 4. Baselines
+## 4. Systems compared
 
-A reduction percentage with no baseline is not a result. Four comparisons are run
-on identical input.
+A reduction percentage with no baseline is not a result. All systems read the
+same alert stream (`backend/app/evaluation/baselines.py`,
+`backend/app/reduction/`).
 
-| ID | Baseline | What it represents |
+| ID | System | What it represents |
 |---|---|---|
 | B0 | Passthrough — one incident per alert | The analyst's status quo; supplies the denominator |
-| B1 | Tuple dedup on `(rule_id, src_ip, dst_ip)` within a fixed window | What a SIEM does out of the box; the bar to beat |
-| B2 | Tumbling-window aggregation on `rule_id` alone | Cruder still; catches whether correlation adds anything over time-bucketing |
+| B1 | Tuple dedup on `(rule_id, src_ip, hosts)`; a gap longer than the window starts a new group | What a SIEM does out of the box; the bar to beat |
+| B2 | Tumbling-window aggregation on `rule_id` alone | Cruder still; tests whether correlation adds anything over time-bucketing |
+| — | Pipeline, every incident: dedup + correlate, no score | Correlation alone |
+| — | **Pipeline, surfaced**: dedup + correlate + score, incidents at or above the threshold | The claim |
 | B3 | Label permutation control | Sanity check on the metric itself, not a competitor |
 
-B3 shuffles the ground-truth labels across alerts and re-runs scoring unchanged.
-If the system's detection scores do not collapse to chance under B3, the metric
-or the matching rule is broken and the other rows mean nothing. Run it every time.
+Baselines have no score, so every group they form reaches the analyst. The
+window of B1 and B2 and the correlation gap of the pipeline are pinned at 600 s
+and 3,600 s for the headline tables; §6.6 sweeps both.
 
-### Reference implementation
-
-Canonical code lives in `scripts/eval/baselines.py`; the definitions are short
-enough to state here so that the comparison is unambiguous.
-
-```python
-from collections import defaultdict
-
-WINDOW_S = 600  # pinned; sensitivity reported in §6
-
-def b0_passthrough(alerts):
-    return [[a] for a in alerts]
-
-def b1_tuple_dedup(alerts, window_s=WINDOW_S):
-    """Group by (rule_id, src_ip, dst_ip); start a new group when the gap
-    since the previous alert in that group exceeds the window."""
-    buckets, out = {}, defaultdict(list)
-    for a in sorted(alerts, key=lambda x: x.ts):
-        key = (a.rule_id, a.src_ip, a.dst_ip)
-        prev = buckets.get(key)
-        if prev is None or a.ts - prev[1] > window_s:
-            gid = (key, a.ts)
-            buckets[key] = (gid, a.ts)
-        else:
-            gid = prev[0]
-            buckets[key] = (gid, a.ts)
-        out[gid].append(a)
-    return list(out.values())
-
-def b2_window_agg(alerts, window_s=WINDOW_S):
-    """Tumbling windows keyed on rule_id only."""
-    out = defaultdict(list)
-    for a in alerts:
-        out[(a.rule_id, int(a.ts // window_s))].append(a)
-    return list(out.values())
-
-def b3_permuted_labels(alerts, seed):
-    """Returns a copy of the alert set with labels shuffled. The pipeline under
-    test is NOT modified; only scoring input changes."""
-    import random
-    rng = random.Random(seed)
-    labels = [a.label for a in alerts]
-    rng.shuffle(labels)
-    return [a.with_label(l) for a, l in zip(alerts, labels)]
-```
-
-`WINDOW_S` is a free parameter that makes B1 and B2 look better or worse. It is
-pinned at 600 s for the headline table, and §6.6 reports the sweep so the choice
-cannot be accused of being tuned against the baselines.
+**The pipeline** (`backend/app/reduction/`). *Dedup*: alerts of one rule, source
+and set of hosts that share a log record are the same detection raised again.
+*Correlate*: groups that share a record, or come from one source with active
+periods at most an hour apart, form one incident; different sources are never
+joined without a shared record. *Score*: fixed weights from what the logs show —
+success after failures +50, each existing non-root account attempted +12 (at
+most three; sshd's own `Invalid user` marks the rest), several hosts +10,
+persistence over two hours +15, fifty or more failures +5, and −40 when every
+success comes from a source that had already logged in as that user. Incidents
+scoring 25 or more are surfaced; the rest are kept with their reasons. The
+weights were fixed before any evaluation run and developed on a different seed
+(7); §6.8 sweeps the threshold.
 
 ---
 
 ## 5. Metrics
 
-### Table 1 — Reduction
+Tables 1–3 are in §6. Table 4 and the model rows of Table 5 are pending.
 
-| System | Input alerts | Output incidents | Reduction % | Median alerts/incident | p95 alerts/incident |
-|---|---|---|---|---|---|
+Miss rate is `1 − recall` and has its own column because it is the only number
+here that corresponds to a real attack going unseen. Its 95 % interval comes
+from 2,000 bootstrap resamples of the episodes (fixed seed), because with few
+episodes one miss moves the rate a lot.
 
-### Table 2 — Detection quality, episode level
-
-Reported at τ = 0 and τ = 0.5 as separate blocks.
-
-| System | Episodes | Detected | **Missed** | **Miss rate** | Spurious incidents | Precision | Recall | F1 |
-|---|---|---|---|---|---|---|---|---|
-
-Miss rate is `1 − recall` and is given its own column deliberately. It is the
-only number in this document that corresponds to a real attack going unseen, and
-it should not require arithmetic to find. A bootstrap 95 % CI accompanies it,
-because with few episodes a single miss moves the rate a lot.
-
-### Table 3 — Clustering quality
-
-| System | Homogeneity | Completeness | V-measure | ARI | Mean fragmentation | Over-merged incidents |
-|---|---|---|---|---|---|---|
-
-Table 2 can look good while the grouping is incoherent — an attack detected but
-smeared across eleven incidents is technically detected and practically useless.
-Table 3 is what catches that.
-
-### Table 4 — AI triage agreement
-
-Measured only on the incidents surfaced by the pipeline, against the same ground
-truth.
-
-| Model / config | n | Abstention rate | Coverage | Balanced accuracy | Cohen's κ | Escalation recall |
-|---|---|---|---|---|---|---|
-
-Raw accuracy is **not** reported. Most alerts in this setting are benign, so a
-classifier that answers "benign" every time scores a high raw accuracy and has
-learned nothing. Balanced accuracy and κ are used instead; the benign share of
-the evaluated set is reported in §2.
-
-Abstention is a feature, not a failure: a triage agent that declines low-confidence
-calls and routes them to a human is behaving correctly. Coverage and accuracy are
-therefore reported as a pair, and the coverage/accuracy curve is plotted in
-`docs/eval/coverage.svg`.
-
-### Table 5 — Cost and latency, per 1 000 input alerts
-
-| Stage | p50 latency | p95 latency | LLM calls | Input tokens | Output tokens | USD |
-|---|---|---|---|---|---|---|
-| Normalize | | | | | | |
-| Deduplicate | | | | | | |
-| Correlate | | | | | | |
-| Enrich | | | | | | |
-| Score | | | | | | |
-| AI triage | | | | | | |
-| **Total** | | | | | | |
+Raw accuracy will not be reported for AI triage: most alerts are benign, so a
+classifier that always answers "benign" scores well and has learned nothing.
+Balanced accuracy, Cohen's κ, abstention and coverage will be reported instead.
 
 ---
 
 ## 6. Results
 
 ### 6.1 Reduction
-*(Table 1)*
+
+**Synthetic week**
+
+<!-- generated:reduction-synthetic -->
+| System | Input alerts | Output incidents | Reduction | Median alerts / incident | p95 alerts / incident |
+|---|---|---|---|---|---|
+| B0 passthrough | 32,458 | 32,458 | 0.00 % | 1 | 1 |
+| B1 tuple dedup | 32,458 | 28,716 | 11.53 % | 1 | 2 |
+| B2 rule window | 32,458 | 3,809 | 88.27 % | 6 | 26 |
+| Pipeline, every incident | 32,458 | 9,473 | 70.81 % | 3 | 7 |
+| **Pipeline, surfaced** | 32,458 | 50 | 99.85 % | 24 | 153 |
+<!-- /generated:reduction-synthetic -->
+
+**LANL slice**
+
+<!-- generated:reduction-lanl -->
+| System | Input alerts | Output incidents | Reduction | Median alerts / incident | p95 alerts / incident |
+|---|---|---|---|---|---|
+| B0 passthrough | 2,262 | 2,262 | 0.00 % | 1 | 1 |
+| B1 tuple dedup | 2,262 | 1,248 | 44.83 % | 1 | 4 |
+| B2 rule window | 2,262 | 981 | 56.63 % | 2 | 5 |
+| Pipeline, every incident | 2,262 | 70 | 96.91 % | 5 | 285 |
+| **Pipeline, surfaced** | 2,262 | 32 | 98.58 % | 14 | 323 |
+<!-- /generated:reduction-lanl -->
 
 ### 6.2 Detection quality
-*(Table 2, τ = 0 and τ = 0.5)*
+
+**Synthetic week**
+
+<!-- generated:detection-synthetic -->
+**τ = 0 (any overlap)**
+
+| System | Episodes | Detected | **Missed** | **Miss rate** (95 % CI) | Spurious incidents | Precision | Recall | F1 |
+|---|---|---|---|---|---|---|---|---|
+| B0 passthrough | 60 | 42 | **18** | **30.0 %** (20.0 %–41.7 %) | 30,459 | 0.06 | 0.70 | 0.11 |
+| B1 tuple dedup | 60 | 42 | **18** | **30.0 %** (20.0 %–41.7 %) | 28,008 | 0.02 | 0.70 | 0.05 |
+| B2 rule window | 60 | 42 | **18** | **30.0 %** (20.0 %–41.7 %) | 3,024 | 0.21 | 0.70 | 0.32 |
+| Pipeline, every incident | 60 | 42 | **18** | **30.0 %** (20.0 %–41.7 %) | 9,429 | 0.00 | 0.70 | 0.01 |
+| **Pipeline, surfaced** | 60 | 41 | **19** | **31.7 %** (21.7 %–43.3 %) | 7 | 0.86 | 0.68 | 0.76 |
+
+**τ = 0.5 (most of the episode in one incident)**
+
+| System | Episodes | Detected | **Missed** | **Miss rate** (95 % CI) | Spurious incidents | Precision | Recall | F1 |
+|---|---|---|---|---|---|---|---|---|
+| B0 passthrough | 60 | 1 | **59** | **98.3 %** (95.0 %–100.0 %) | 30,459 | 0.00 | 0.02 | 0.00 |
+| B1 tuple dedup | 60 | 2 | **58** | **96.7 %** (91.7 %–100.0 %) | 28,008 | 0.00 | 0.03 | 0.00 |
+| B2 rule window | 60 | 1 | **59** | **98.3 %** (95.0 %–100.0 %) | 3,024 | 0.00 | 0.02 | 0.00 |
+| Pipeline, every incident | 60 | 42 | **18** | **30.0 %** (20.0 %–41.7 %) | 9,429 | 0.00 | 0.70 | 0.01 |
+| **Pipeline, surfaced** | 60 | 41 | **19** | **31.7 %** (21.7 %–43.3 %) | 7 | 0.82 | 0.68 | 0.75 |
+
+The rules raised at least one alert for 42 of 60 episodes; the other 18 are missed by every system, which caps recall at 0.70.
+<!-- /generated:detection-synthetic -->
+
+By scenario, for the surfaced pipeline:
+
+<!-- generated:scenarios-synthetic -->
+| Scenario | Episodes | Raised an alert | Surfaced, τ = 0 | Surfaced, τ = 0.5 |
+|---|---|---|---|---|
+| brute force success | 12 | 12 | 12 | 12 |
+| distributed spray | 12 | 1 | 0 | 0 |
+| low and slow | 12 | 5 | 5 | 5 |
+| password spray | 12 | 12 | 12 | 12 |
+| stuffing then success | 12 | 12 | 12 | 12 |
+<!-- /generated:scenarios-synthetic -->
+
+Almost every miss happens before the pipeline: distributed spray and slow
+guessing were built to stay under the per-source thresholds, and they do. Of the
+episodes the rules saw, the pipeline surfaced all but one. The baselines see the
+same episodes at τ = 0 but scatter each one over many incidents, so at τ = 0.5
+they miss almost everything.
+
+**LANL slice**
+
+<!-- generated:detection-lanl -->
+**τ = 0 (any overlap)**
+
+| System | Episodes | Detected | **Missed** | **Miss rate** (95 % CI) | Spurious incidents | Precision | Recall | F1 |
+|---|---|---|---|---|---|---|---|---|
+| B0 passthrough | 74 | 4 | **70** | **94.6 %** (89.2 %–98.7 %) | 2,257 | 0.00 | 0.05 | 0.00 |
+| B1 tuple dedup | 74 | 4 | **70** | **94.6 %** (89.2 %–98.7 %) | 1,244 | 0.00 | 0.05 | 0.01 |
+| B2 rule window | 74 | 4 | **70** | **94.6 %** (89.2 %–98.7 %) | 977 | 0.00 | 0.05 | 0.01 |
+| Pipeline, every incident | 74 | 4 | **70** | **94.6 %** (89.2 %–98.7 %) | 67 | 0.04 | 0.05 | 0.05 |
+| **Pipeline, surfaced** | 74 | 4 | **70** | **94.6 %** (89.2 %–98.7 %) | 29 | 0.09 | 0.05 | 0.07 |
+
+**τ = 0.5 (most of the episode in one incident)**
+
+| System | Episodes | Detected | **Missed** | **Miss rate** (95 % CI) | Spurious incidents | Precision | Recall | F1 |
+|---|---|---|---|---|---|---|---|---|
+| B0 passthrough | 74 | 4 | **70** | **94.6 %** (89.2 %–98.7 %) | 2,257 | 0.00 | 0.05 | 0.00 |
+| B1 tuple dedup | 74 | 4 | **70** | **94.6 %** (89.2 %–98.7 %) | 1,244 | 0.00 | 0.05 | 0.01 |
+| B2 rule window | 74 | 4 | **70** | **94.6 %** (89.2 %–98.7 %) | 977 | 0.00 | 0.05 | 0.01 |
+| Pipeline, every incident | 74 | 4 | **70** | **94.6 %** (89.2 %–98.7 %) | 67 | 0.04 | 0.05 | 0.05 |
+| **Pipeline, surfaced** | 74 | 4 | **70** | **94.6 %** (89.2 %–98.7 %) | 29 | 0.09 | 0.05 | 0.07 |
+
+The rules raised at least one alert for 4 of 74 episodes; the other 70 are missed by every system, which caps recall at 0.05.
+<!-- /generated:detection-lanl -->
+
+On real data the method mostly fails, and the reason is specific: the red team
+logs in with valid credentials, and every rule here is driven by failed logins.
+The pipeline surfaces the few episodes the rules see, but its precision is low
+because the score's strongest signal, sshd's `Invalid user`, has no counterpart
+in Windows authentication. Credential misuse without failures is outside what
+this rule set can detect; it is listed in `ROADMAP.md` as future work, not
+claimed here.
 
 ### 6.3 Clustering quality
-*(Table 3)*
+
+**Synthetic week**
+
+<!-- generated:clustering-synthetic -->
+| System | Homogeneity | Completeness | V-measure | ARI | Mean fragmentation | Over-merged incidents |
+|---|---|---|---|---|---|---|
+| B0 passthrough | 1.000 | 0.425 | 0.597 | 0.000 | 47.60 | 0 |
+| B1 tuple dedup | 1.000 | 0.545 | 0.705 | 0.172 | 16.86 | 0 |
+| B2 rule window | 0.956 | 0.478 | 0.638 | 0.043 | 21.38 | 92 |
+| Pipeline, every incident | 1.000 | 0.998 | 0.999 | 1.000 | 1.05 | 0 |
+| **Pipeline, surfaced** | 1.000 | 0.998 | 0.999 | 1.000 | 1.05 | 0 |
+<!-- /generated:clustering-synthetic -->
+
+**LANL slice**
+
+<!-- generated:clustering-lanl -->
+| System | Homogeneity | Completeness | V-measure | ARI | Mean fragmentation | Over-merged incidents |
+|---|---|---|---|---|---|---|
+| B0 passthrough | 1.000 | 0.828 | 0.906 | 0.000 | 1.25 | 0 |
+| B1 tuple dedup | 1.000 | 1.000 | 1.000 | 1.000 | 1.00 | 0 |
+| B2 rule window | 1.000 | 1.000 | 1.000 | 1.000 | 1.00 | 0 |
+| Pipeline, every incident | 0.792 | 1.000 | 0.884 | 0.615 | 1.00 | 1 |
+| **Pipeline, surfaced** | 0.792 | 1.000 | 0.884 | 0.615 | 1.00 | 1 |
+<!-- /generated:clustering-lanl -->
+
+The near-perfect synthetic clustering is partly a property of the generator:
+every synthetic episode except distributed spray comes from one address. It is
+evidence that correlation does not smear a single-source attack, not that it
+would group a multi-source one.
 
 ### 6.4 AI triage agreement
-*(Table 4)*
+
+Not yet measured. Triage is the deterministic, evidence-grounded agent; the
+model-backed agent and its agreement, abstention, cost and latency are the next
+milestone item (#9).
 
 ### 6.5 Cost and latency
-*(Table 5)*
 
-### 6.6 Window sensitivity
-Reduction and miss rate for B1, B2 and the full pipeline at
-`WINDOW_S ∈ {60, 300, 600, 1800, 3600}`.
+Wall-clock on a 4-vCPU AMD EPYC virtual machine, Python 3.12, one run each.
+Single batch runs, so no p50/p95 is claimed. The pipeline makes no model calls,
+so there are no tokens or dollars to report yet.
+
+| Stage | Synthetic week (32,458 alerts) | LANL slice (2,262 alerts from 629,907 records) |
+|---|---|---|
+| Parse and normalize records | 3.5 s | 4.1 s |
+| Rules on the 300 s schedule (log → alert) | 55.7 s | 184.7 s |
+| Dedup + correlate + score | 2.7 s (0.08 s per 1,000 alerts) | 1.7 s |
+| LLM calls, tokens, USD | none | none |
+
+The rule schedule dominates; the reduction itself is cheap.
+
+### 6.6 Window sensitivity (synthetic week)
+
+<!-- generated:windows-synthetic -->
+| Window / gap (s) | B1 incidents | B1 miss rate | B2 incidents | B2 miss rate | Pipeline surfaced | Pipeline miss rate |
+|---|---|---|---|---|---|---|
+| 60 | 32,458 | 98.3 % | 6,800 | 98.3 % | 48 | 31.7 % |
+| 300 | 28,986 | 96.7 % | 6,800 | 98.3 % | 48 | 31.7 % |
+| 600 | 28,716 | 96.7 % | 3,809 | 98.3 % | 48 | 31.7 % |
+| 1,800 | 28,237 | 88.3 % | 1,371 | 98.3 % | 48 | 31.7 % |
+| 3,600 | 28,190 | 88.3 % | 701 | 98.3 % | 50 | 31.7 % |
+<!-- /generated:windows-synthetic -->
+
+The pipeline barely moves across a sixty-fold range of gaps; the baselines only
+trade one kind of failure for another.
 
 ### 6.7 Permutation control
-B3 scores. Expected: detection collapses to chance. If it does not, §6.1–6.4 are
-void.
+
+<!-- generated:permutation -->
+| Dataset | τ | Detected, real labels | Detected, shuffled labels | Precision, real | Precision, shuffled |
+|---|---|---|---|---|---|
+| synthetic | 0 | 41 | 31 | 0.86 | 0.68 |
+| synthetic | 0.5 | 41 | 0 | 0.82 | 0.00 |
+| lanl | 0 | 4 | 4 | 0.09 | 0.09 |
+| lanl | 0.5 | 4 | 4 | 0.09 | 0.09 |
+<!-- /generated:permutation -->
+
+At τ = 0.5 the synthetic result collapses to nothing under shuffled labels, as
+it should. At τ = 0 it does not: with shuffled labels a large surfaced incident
+still overlaps many random "episodes", which is exactly why τ = 0 alone would
+flatter the system. On the LANL slice the control does not collapse at either
+threshold, because the detected episodes raised only one or two alerts each;
+**the LANL detection figure cannot be distinguished from chance**, and only the
+rule-layer finding in §6.2 should be taken from it.
+
+### 6.8 Surface threshold (synthetic week)
+
+<!-- generated:thresholds-synthetic -->
+| Surface threshold | Surfaced incidents | Precision τ = 0.5 | Recall τ = 0.5 | Miss rate τ = 0.5 |
+|---|---|---|---|---|
+| 0 | 9,473 | 0.00 | 0.70 | 30.0 % |
+| 12 | 1,464 | 0.03 | 0.70 | 30.0 % |
+| **25** (default) | 50 | 0.82 | 0.68 | 31.7 % |
+| 40 | 38 | 0.95 | 0.60 | 40.0 % |
+| 60 | 32 | 0.97 | 0.52 | 48.3 % |
+<!-- /generated:thresholds-synthetic -->
+
+The default was chosen before any evaluation run; the sweep shows it sits at the
+knee, and what moving it costs in either direction.
 
 ---
 
 ## 7. Reproducing these numbers
 
 ```bash
-git clone https://github.com/Alan-Huangzy233/secagent-riskops
-cd secagent-riskops
-docker compose up -d
-make evaluate          # writes docs/eval/results.json and refreshes §6
+git clone https://github.com/Alan-Huangzy233/secagent-riskops && cd secagent-riskops
+make install
+make evaluate      # rebuilds the synthetic week, verifies it, writes docs/eval/results-synthetic-7d.json
 ```
 
-| Field | Value |
-|---|---|
-| Git commit | — |
-| Seed | `20261115` |
-| Dataset SHA-256 | — |
-| LLM snapshot | — |
-| Hardware | — |
-| Wall-clock for a full run | — |
+CI runs the same steps on a clean runner and fails unless the result is
+byte-identical to the committed file. The LANL slice needs the source data
+(registration at <https://csr.lanl.gov/data/cyber1/>); the commands and the
+source fingerprints are in `examples/lanl-slice/README.md`.
 
-Two runs of `make evaluate` on the same commit, seed and model snapshot must
-produce byte-identical `results.json`. If they do not, the run is not
-reproducible and the cause is recorded in §9 rather than being silently retried.
+| Field | Synthetic week | LANL slice |
+|---|---|---|
+| Method committed | `c2740b5` | `6ecdcd6` (slice rule 2) |
+| Results committed | `4d7b9c5` | `38385b7` |
+| Seed | `20261115` | `20261115` (hash sample) |
+| Dataset fingerprint | `examples/synthetic-sshd/manifest-7d.json` | `examples/lanl-slice/manifest-v2.json` |
+| LLM snapshot | none | none |
+| Hardware | 4-vCPU AMD EPYC VM | same |
+| Wall-clock for a full run | about 2 minutes | about 9 minutes (slice 5.6 + evaluation 3.5) |
+
+Two runs on the same commit and seed produce byte-identical `results.json`. If
+they ever do not, the cause is recorded in §9 rather than silently retried.
 
 ---
 
 ## 8. Threats to validity
 
-1. **Ground truth is dataset labels, not analyst decisions.** A labelled attack
-   record and "an alert a human would have wanted to see" are not the same set.
-   Real triage is narrower and partly subjective; these numbers likely flatter
-   recall relative to a live SOC.
-2. **The alert-generation rule set is mine.** A different rule set produces a
-   different input volume, so reduction percentages are not comparable across
-   papers or products that started from different alerts.
-3. **Single dataset, single topology.** No claim of generalisation is made. Cross-
-   dataset evaluation is listed in `ROADMAP.md`.
-4. **No adaptive adversary.** Correlation and suppression keys are themselves an
-   attack surface: an attacker who knows that alerts merge on
-   `(rule_id, src_ip)` can shelter inside an existing noisy cluster and be
-   summarised away. Nothing here tests that, and it is the most security-relevant
-   gap in this evaluation.
-5. **LLM nondeterminism.** Temperature 0 does not guarantee stability across
-   provider-side model updates. Runs are pinned to a model snapshot; drift is
-   recorded in §9.
-6. **Scale.** Evaluated at the volume in §2. Behaviour at 10⁶ alerts/day is
-   untested and the correlation stage is the likely bottleneck.
-7. **Few episodes.** With a small number of ground-truth episodes, one missed
-   episode moves the miss rate by a large margin; CIs are reported and point
-   estimates alone should not be quoted.
+1. **Ground truth is dataset labels, not analyst decisions.** Synthetic labels
+   are true by construction; LANL labels are the red team's own record. Neither
+   is "an alert a human would have wanted to see", and the benign/attack line
+   for the synthetic week (commodity scanning is benign, targeted campaigns are
+   attacks) is a choice stated in §2.
+2. **The rules and the generator have one author.** The scenario catalogue and
+   the score were written by the same person, so the synthetic week is not an
+   independent test of the score. The weights were fixed before any evaluation
+   run and developed on another seed, and the LANL slice is the external check;
+   on it the method does poorly, which is reported, not tuned away.
+3. **The rule layer caps recall.** Most misses on both datasets are attacks the
+   rules never alert on. The reduction pipeline cannot recover what never
+   reaches it.
+4. **Synthetic structure.** Synthetic episodes are single-source except
+   distributed spray, which favours source-based correlation (§6.3).
+5. **No adaptive adversary.** Correlation keys are an attack surface: an attacker
+   who spreads over many addresses, or stays under the per-source thresholds, is
+   summarised away or never alerted on. Distributed spray and slow guessing
+   exercise this, and the pipeline misses them.
+6. **LLM nondeterminism.** Not applicable yet; there is no model in the loop.
+7. **Scale.** 32,458 alerts in a week and 2,262 from 630 k LANL records. The rule
+   schedule is the bottleneck; behaviour at 10⁶ alerts per day is untested.
+8. **Few episodes.** Sixty and seventy-four. One missed episode moves the
+   synthetic miss rate by 1.7 points; quote the interval, not the point.
 
 ---
 
 ## 9. Evaluation run log
 
-| Date | Commit | Dataset | Model snapshot | Change | Miss rate (τ=0.5) |
+| Date | Commit | Dataset | Model snapshot | Change | Miss rate (τ = 0.5) |
 |---|---|---|---|---|---|
+| 2026-09-23 | `4d7b9c5` | synthetic week, seed 20261115 | none | First headline run; method committed in `c2740b5` | 31.7 % |
+| 2026-09-23 | `38385b7` | LANL slice rule 2 | none | First LANL run; slice rule changed in `6ecdcd6` before it | 94.6 % |
 
 Every published number traces to a row here. Rows are appended, never edited.

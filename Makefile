@@ -1,4 +1,4 @@
-.PHONY: help install lint test demo dataset evaluate run audit clean
+.PHONY: help install lint test demo flow dataset evaluate report run audit clean
 
 # Everything runs from a project virtual environment, so `make install` works on
 # systems whose Python refuses global installs (PEP 668).
@@ -11,9 +11,11 @@ help:
 	@echo "  install   Create $(VENV) and install runtime + dev dependencies (editable)"
 	@echo "  lint      Run ruff (correctness rules)"
 	@echo "  test      Run the test suite"
-	@echo "  demo      Run the end-to-end walking-skeleton flow on the sample alerts"
+	@echo "  demo      Reduce one labelled synthetic day and print the before/after comparison"
+	@echo "  flow      Run the walking-skeleton flow: triage, incident, policy-gated remediation plan"
 	@echo "  dataset   Rebuild the synthetic evaluation datasets and verify them against the published manifests"
 	@echo "  evaluate  Run the evaluation on the 7-day synthetic set and write docs/eval/results-synthetic-7d.json"
+	@echo "  report    Refresh the generated numbers in EVALUATION.md and README.md from docs/eval/"
 	@echo "  run       Start the FastAPI dev server on :8000"
 	@echo "  audit     Run the public-repository secret/PII audit"
 	@echo "  clean     Remove generated Python/pytest caches; preserve private records and runtime data"
@@ -29,6 +31,9 @@ test:
 	$(BIN)/python -m pytest
 
 demo:
+	$(BIN)/python -m app.evaluation.demo
+
+flow:
 	$(BIN)/python -m app.demo
 
 EVAL_DATA ?= runtime-data/eval
@@ -39,6 +44,10 @@ dataset:
 
 evaluate: dataset
 	$(BIN)/python -m app.evaluation.run --data $(EVAL_DATA)/synthetic-7d --out docs/eval/results-synthetic-7d.json --timings $(EVAL_DATA)/timings-synthetic-7d.json
+	$(BIN)/python -m app.evaluation.report
+
+report:
+	$(BIN)/python -m app.evaluation.report
 
 run:
 	$(BIN)/python -m uvicorn app.api.app:app --app-dir backend --reload --port 8000

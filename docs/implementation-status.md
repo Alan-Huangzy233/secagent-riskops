@@ -30,6 +30,7 @@ Criteria* in the [Project Charter](./project-charter.md):
 | CI: run tests + demo smoke | `.github/workflows/ci.yml` |
 | Seeded, labelled synthetic sshd dataset (ground truth kept apart) and scheduled log-to-alert conversion through the production parser and rules | `backend/app/evaluation/` |
 | Alert reduction: dedup (re-raised detections), correlate (shared evidence, one source close in time), explainable score and surface decision | `backend/app/reduction/` |
+| Evaluation harness: baselines B0–B2, episode matching at τ = 0 / 0.5, miss rate with bootstrap CI, clustering quality, permutation control, sweeps; byte-identical `results.json` checked in CI; numbers rendered into EVALUATION.md and README; LANL slicer; five-minute demo | `backend/app/evaluation/`, `docs/eval/` |
 
 Run it: `make install && make test && make demo`.
 
