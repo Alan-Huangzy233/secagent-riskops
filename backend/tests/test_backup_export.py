@@ -183,13 +183,23 @@ def test_a_confirmation_lands_in_the_directory_the_build_prepared(store, capfdbi
     assert package_of(store, capfdbinary)["confirmed_by_you"] is True
 
 
+@pytest.mark.skipif(os.geteuid() != 0, reason="handing a directory to another user needs root")
+def test_the_store_check_refuses_a_directory_another_account_owns(tmp_path):
+    foreign = tmp_path / "store"
+    foreign.mkdir(mode=0o755)
+    os.chown(foreign, 65534, -1)
+    with pytest.raises(export.ExportError, match="unsafe"):
+        export.secure_directory(foreign)
+
+
 def test_the_store_check_refuses_directories_anyone_could_swap(tmp_path):
     with pytest.raises(export.ExportError, match="absolute"):
         export.secure_directory(Path("relative/store"))
     safe = tmp_path / "store"
     safe.mkdir(mode=0o700)
-    # /tmp is world-writable but sticky, so a root-owned directory under it
-    # cannot be renamed away by anybody else.
+    # /tmp is world-writable but sticky, so a directory under it that belongs to
+    # root or to the account running the export cannot be renamed away by
+    # anybody else.
     assert export.secure_directory(safe) == safe
     link = tmp_path / "link"
     link.symlink_to(safe, target_is_directory=True)

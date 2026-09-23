@@ -60,18 +60,22 @@ def reply(payload: dict) -> None:
 
 
 def secure_directory(path: Path) -> Path:
-    """Refuse a store that someone other than root could swap under us.
+    """Refuse a store that a third party could swap under us.
 
-    A world-writable ancestor is only disqualifying when it is not sticky: the
-    sticky bit is exactly what stops a non-owner renaming or removing an entry
-    it does not own, which is the substitution this check exists to prevent.
+    As with sshd's StrictModes, the store and every ancestor must belong to root
+    or to the account running the export, and must not be writable by anyone
+    else. A world-writable ancestor is only disqualifying when it is not sticky:
+    the sticky bit is exactly what stops a non-owner renaming or removing an
+    entry it does not own, which is the substitution this check exists to
+    prevent.
     """
     if not path.is_absolute():
         raise ExportError('store must be an absolute path')
+    trusted = {0, os.geteuid()}
     for item in (path, *path.parents):
         info = item.lstat()
         swappable = info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX
-        if stat.S_ISLNK(info.st_mode) or info.st_uid != 0 or swappable:
+        if stat.S_ISLNK(info.st_mode) or info.st_uid not in trusted or swappable:
             raise ExportError('unsafe store directory')
     if not path.is_dir():
         raise ExportError('store directory does not exist')
