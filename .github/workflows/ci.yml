@@ -28,8 +28,14 @@ jobs:
       - name: Run tests
         run: python -m pytest
 
-      - name: Run end-to-end demo (smoke)
+      - name: Run the walking-skeleton flow (smoke)
         run: PYTHONPATH=backend python -m app.demo
+
+      - name: Run the reduction demo (smoke)
+        run: PYTHONPATH=backend python -m app.evaluation.demo
+
+      - name: Published numbers match docs/eval
+        run: PYTHONPATH=backend python -m app.evaluation.report --check
 
   docker:
     runs-on: ubuntu-latest

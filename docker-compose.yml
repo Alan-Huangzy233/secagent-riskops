@@ -16,7 +16,7 @@ x-image: &image
 services:
   demo:
     <<: *image
-    command: ["python", "-m", "app.demo"]
+    command: ["python", "-m", "app.evaluation.demo"]
 
   api:
     <<: *image
