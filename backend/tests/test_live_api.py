@@ -14,7 +14,6 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app.live_api import MAX_BODY_BYTES, create_app
-from app import live_api
 from app.telemetry import operator_auth
 from app.telemetry.config import LiveConfig, hash_operator_password, load_config
 

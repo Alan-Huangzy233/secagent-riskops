@@ -9,7 +9,7 @@ Last updated for: `v0.2` — MVP walking skeleton plus an independent SSH/auth t
 ## Implemented (runnable, tested)
 
 A single end-to-end vertical slice that satisfies the eight *Initial Success
-Criteria* in the [Project Charter](../PROJECT_CHARTER.md):
+Criteria* in the [Project Charter](./project-charter.md):
 
 | Capability | Where |
 |---|---|

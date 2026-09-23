@@ -1,7 +1,9 @@
 [project]
 name = "secagent-riskops"
 version = "0.2.0"
-description = "AI-assisted SOC, GRC, and controlled-remediation platform (MVP walking skeleton)"
+description = "Reduces raw security alerts to a small set of incidents, with reproducible accuracy and miss-rate reporting"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.111",
@@ -14,6 +16,8 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "httpx>=0.27",
+    # Pinned to a minor series so a new ruff release cannot turn CI red on its own.
+    "ruff>=0.16,<0.17",
 ]
 
 # The MVP walking skeleton persists to SQLite (stdlib) so `pytest` runs with no
@@ -25,10 +29,18 @@ where = ["backend"]
 include = ["app*"]
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 pythonpath = ["backend"]
 testpaths = ["backend/tests"]
 addopts = "-q"
+
+[tool.ruff]
+target-version = "py311"
+extend-exclude = ["docs/process"]
+
+[tool.ruff.lint]
+# Correctness only: pyflakes plus pycodestyle's syntax and statement checks.
+select = ["E4", "E7", "E9", "F"]

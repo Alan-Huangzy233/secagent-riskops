@@ -44,9 +44,9 @@ Audit records everything.
 
 ## Related Baselines
 
-- [Project Charter](../PROJECT_CHARTER.md)
-- [System Architecture](../SYSTEM_ARCHITECTURE.md)
-- [Threat Model](../THREAT_MODEL.md)
+- [Project Charter](./project-charter.md)
+- [System Architecture](./system-architecture.md)
+- [Threat Model](./threat-model.md)
 - [Autonomy Levels](./autonomy-levels.md)
 - [Security Policy](../SECURITY.md)
 - [Assessment Authorization and Rules of Engagement](./assessment-authorization-and-rules-of-engagement.md)
