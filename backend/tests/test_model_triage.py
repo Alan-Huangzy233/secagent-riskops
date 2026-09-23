@@ -121,3 +121,17 @@ def test_a_recorded_run_replays_without_calls_and_gives_the_same_result(tmp_path
     replayed = triage.evaluate(data, tape)
     assert replayed == first
     assert triage.evaluate(data, tmp_path / "empty.jsonl")["not_judged"]
+
+
+def test_stability_counts_how_often_two_runs_agree(tmp_path):
+    def tape(path, verdicts):
+        path.write_text("".join(json.dumps({"prompt_sha256": f"p{n}", "incident_id": f"INC-{n}", "verdict": v}) + "\n"
+                                for n, v in enumerate(verdicts)))
+        return path
+
+    first = tape(tmp_path / "a.jsonl", ["escalate", "escalate", "dismiss", "abstain"])
+    second = tape(tmp_path / "b.jsonl", ["escalate", "dismiss", "dismiss", "abstain"])
+    result = triage.stability(first, second)
+    assert result["pairs"] == 4 and result["same_verdict"] == 3 and result["agreement"] == 0.75
+    assert result["flips"] == [{"incident_id": "INC-1", "first": "escalate", "second": "dismiss"}]
+    assert triage.stability(first, first)["cohens_kappa"] == 1.0

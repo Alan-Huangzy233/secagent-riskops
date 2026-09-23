@@ -79,3 +79,8 @@ jobs:
         run: |
           python -m app.evaluation.run --data runtime-data/eval/synthetic-7d --out docs/eval/results-synthetic-7d.json
           git diff --exit-code docs/eval/results-synthetic-7d.json
+
+      - name: Replay the recorded model triage byte for byte
+        run: |
+          python -m app.evaluation.triage --data runtime-data/eval/synthetic-7d --tape docs/eval/triage-tape-synthetic-7d.jsonl --out docs/eval/triage-synthetic-7d.json
+          git diff --exit-code docs/eval/triage-synthetic-7d.json

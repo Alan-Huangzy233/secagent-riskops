@@ -1,0 +1,60 @@
+{
+  "agreement": {
+    "claude-opus-5, effort medium": {
+      "abstained": 3,
+      "abstention_rate": 0.0938,
+      "attack_incidents": 3,
+      "attacks_dismissed": 0,
+      "attacks_escalated": 3,
+      "attacks_kept_for_an_analyst": 1.0,
+      "balanced_accuracy": 0.9423,
+      "benign_dismissed": 23,
+      "benign_dismissed_share": 0.7931,
+      "benign_incidents": 29,
+      "cohens_kappa": 0.6133,
+      "coverage": 0.9062,
+      "n": 32
+    },
+    "score only (every surfaced incident escalated)": {
+      "abstained": 0,
+      "abstention_rate": 0.0,
+      "attack_incidents": 3,
+      "attacks_dismissed": 0,
+      "attacks_escalated": 3,
+      "attacks_kept_for_an_analyst": 1.0,
+      "balanced_accuracy": 0.5,
+      "benign_dismissed": 0,
+      "benign_dismissed_share": 0.0,
+      "benign_incidents": 29,
+      "cohens_kappa": 0.0,
+      "coverage": 1.0,
+      "n": 32
+    }
+  },
+  "attack_incidents_dismissed": [],
+  "cost": {
+    "cache_read_input_tokens": 24480,
+    "calls": 32,
+    "input_tokens": 88105,
+    "latency_p50_seconds": 8.74,
+    "latency_p95_seconds": 16.92,
+    "output_tokens": 14867,
+    "served_by": {
+      "claude-opus-5": 32
+    },
+    "stop_reasons": {
+      "end_turn": 32
+    },
+    "usd": 0.8244,
+    "usd_per_1000_input_alerts": 0.3645,
+    "usd_per_incident": 0.0258
+  },
+  "effort": "medium",
+  "input_alerts": 2262,
+  "judged": 32,
+  "model": "claude-opus-5",
+  "not_judged": [],
+  "prompt_version": 1,
+  "stopped_by_budget": null,
+  "surfaced_incidents": 32
+}

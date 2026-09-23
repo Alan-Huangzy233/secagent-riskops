@@ -53,6 +53,29 @@ def _rates(pairs: list[tuple[str, str]]) -> dict:
             "benign_dismissed": tn, "benign_dismissed_share": round(tn / benign, 4) if benign else None}
 
 
+def stability(first: Path, second: Path) -> dict:
+    """Agreement between two independent live runs on the same requests.
+
+    The model accepts no temperature, so the same dossier can be judged twice
+    differently; this measures how often that happens.
+    """
+    runs = [{row["prompt_sha256"]: row for row in map(json.loads, path.read_text().splitlines())}
+            for path in (first, second)]
+    shared = sorted(set(runs[0]) & set(runs[1]))
+    pairs = [(runs[0][key]["verdict"], runs[1][key]["verdict"]) for key in shared]
+    same = sum(a == b for a, b in pairs)
+    kappa = None
+    if pairs:
+        observed = same / len(pairs)
+        left, right = Counter(a for a, _ in pairs), Counter(b for _, b in pairs)
+        expected = sum(left[v] * right[v] for v in model_triage.VERDICTS) / len(pairs) ** 2
+        kappa = round((observed - expected) / (1 - expected), 4) if expected != 1 else 1.0
+    return {"pairs": len(pairs), "same_verdict": same,
+            "agreement": round(same / len(pairs), 4) if pairs else None, "cohens_kappa": kappa,
+            "flips": [{"incident_id": runs[0][key]["incident_id"], "first": a, "second": b}
+                      for key, (a, b) in zip(shared, pairs) if a != b]}
+
+
 def surfaced_cases(data: Path) -> tuple[list[dict], dict[str, str], int]:
     """Dossiers of the surfaced incidents in id order, their truth, and the alert count."""
     records = alert_layer.load_records(data)
