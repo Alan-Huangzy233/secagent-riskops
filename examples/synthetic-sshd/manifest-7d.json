@@ -1,0 +1,39 @@
+{
+  "address_space": "198.18.0.0/15 (RFC 2544, synthetic)",
+  "attack_events": 6263,
+  "benign_events": 163386,
+  "days": 7,
+  "episodes": 60,
+  "episodes_by_scenario": {
+    "brute_force_success": 12,
+    "distributed_spray": 12,
+    "low_and_slow": 12,
+    "password_spray": 12,
+    "stuffing_then_success": 12
+  },
+  "events": 169649,
+  "generator": "app.evaluation.synthetic",
+  "generator_version": 1,
+  "hosts": [
+    "bastion-01",
+    "web-01",
+    "web-02",
+    "web-03",
+    "web-04",
+    "api-01",
+    "api-02",
+    "mail-01",
+    "db-01",
+    "db-02",
+    "ci-01",
+    "backup-01"
+  ],
+  "seed": 20261115,
+  "sha256": {
+    "episodes.json": "e0316934519e9805523769b17a3934e4f2860be12817d43c50958011add8b3f7",
+    "events.jsonl": "227a458837940c3f214f3230b9c8b387e7e30b9afef2c8e16b65b33a3d3da2cf",
+    "labels.jsonl": "28d1d8228f2db95e434783aea663ab56ad28c8b73fe411bcb1c93dc6eaa5a4e6"
+  },
+  "start": "2026-01-05T00:00:00Z",
+  "synthetic": true
+}

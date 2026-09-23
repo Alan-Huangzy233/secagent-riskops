@@ -1,0 +1,1298 @@
+[
+  {
+    "end": "2026-01-06T01:54:14Z",
+    "episode_id": "EP-001",
+    "failed_passwords": 63,
+    "hosts": [
+      "mail-01"
+    ],
+    "scenario": "brute_force_success",
+    "source_ips": [
+      "198.18.85.18"
+    ],
+    "start": "2026-01-06T01:08:32Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-07T15:54:37Z",
+    "episode_id": "EP-002",
+    "failed_passwords": 84,
+    "hosts": [
+      "api-01"
+    ],
+    "scenario": "brute_force_success",
+    "source_ips": [
+      "198.19.29.161"
+    ],
+    "start": "2026-01-07T15:21:39Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-08T05:16:38Z",
+    "episode_id": "EP-003",
+    "failed_passwords": 94,
+    "hosts": [
+      "api-01"
+    ],
+    "scenario": "brute_force_success",
+    "source_ips": [
+      "198.18.83.167"
+    ],
+    "start": "2026-01-08T04:49:50Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-08T04:19:22Z",
+    "episode_id": "EP-004",
+    "failed_passwords": 97,
+    "hosts": [
+      "web-03"
+    ],
+    "scenario": "brute_force_success",
+    "source_ips": [
+      "198.18.25.178"
+    ],
+    "start": "2026-01-08T03:35:29Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-06T00:35:56Z",
+    "episode_id": "EP-005",
+    "failed_passwords": 155,
+    "hosts": [
+      "bastion-01"
+    ],
+    "scenario": "brute_force_success",
+    "source_ips": [
+      "198.19.74.248"
+    ],
+    "start": "2026-01-06T00:05:28Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-05T19:47:44Z",
+    "episode_id": "EP-006",
+    "failed_passwords": 63,
+    "hosts": [
+      "web-02"
+    ],
+    "scenario": "brute_force_success",
+    "source_ips": [
+      "198.18.77.144"
+    ],
+    "start": "2026-01-05T19:10:13Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-11T00:12:14Z",
+    "episode_id": "EP-007",
+    "failed_passwords": 129,
+    "hosts": [
+      "bastion-01"
+    ],
+    "scenario": "brute_force_success",
+    "source_ips": [
+      "198.18.167.238"
+    ],
+    "start": "2026-01-10T23:47:08Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-10T17:03:38Z",
+    "episode_id": "EP-008",
+    "failed_passwords": 57,
+    "hosts": [
+      "web-04"
+    ],
+    "scenario": "brute_force_success",
+    "source_ips": [
+      "198.18.175.199"
+    ],
+    "start": "2026-01-10T16:57:32Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-08T15:10:44Z",
+    "episode_id": "EP-009",
+    "failed_passwords": 120,
+    "hosts": [
+      "web-03"
+    ],
+    "scenario": "brute_force_success",
+    "source_ips": [
+      "198.19.214.150"
+    ],
+    "start": "2026-01-08T14:36:38Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-06T08:56:38Z",
+    "episode_id": "EP-010",
+    "failed_passwords": 126,
+    "hosts": [
+      "api-01"
+    ],
+    "scenario": "brute_force_success",
+    "source_ips": [
+      "198.18.128.221"
+    ],
+    "start": "2026-01-06T08:31:50Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-07T12:05:32Z",
+    "episode_id": "EP-011",
+    "failed_passwords": 155,
+    "hosts": [
+      "mail-01"
+    ],
+    "scenario": "brute_force_success",
+    "source_ips": [
+      "198.19.19.139"
+    ],
+    "start": "2026-01-07T11:32:50Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-07T22:38:41Z",
+    "episode_id": "EP-012",
+    "failed_passwords": 115,
+    "hosts": [
+      "api-02"
+    ],
+    "scenario": "brute_force_success",
+    "source_ips": [
+      "198.19.26.227"
+    ],
+    "start": "2026-01-07T22:05:38Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-06T18:34:54Z",
+    "episode_id": "EP-013",
+    "failed_passwords": 26,
+    "hosts": [
+      "mail-01",
+      "web-03"
+    ],
+    "scenario": "password_spray",
+    "source_ips": [
+      "198.18.35.218"
+    ],
+    "start": "2026-01-06T17:40:56Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 13
+  },
+  {
+    "end": "2026-01-05T05:52:51Z",
+    "episode_id": "EP-014",
+    "failed_passwords": 40,
+    "hosts": [
+      "bastion-01",
+      "web-02",
+      "web-03",
+      "web-04"
+    ],
+    "scenario": "password_spray",
+    "source_ips": [
+      "198.18.194.131"
+    ],
+    "start": "2026-01-05T04:59:05Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 10
+  },
+  {
+    "end": "2026-01-08T15:24:54Z",
+    "episode_id": "EP-015",
+    "failed_passwords": 65,
+    "hosts": [
+      "api-01",
+      "bastion-01",
+      "web-01",
+      "web-02",
+      "web-04"
+    ],
+    "scenario": "password_spray",
+    "source_ips": [
+      "198.19.235.29"
+    ],
+    "start": "2026-01-08T13:41:34Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 13
+  },
+  {
+    "end": "2026-01-07T02:20:55Z",
+    "episode_id": "EP-016",
+    "failed_passwords": 90,
+    "hosts": [
+      "api-01",
+      "api-02",
+      "bastion-01",
+      "mail-01",
+      "web-01"
+    ],
+    "scenario": "password_spray",
+    "source_ips": [
+      "198.19.218.68"
+    ],
+    "start": "2026-01-06T20:34:49Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 18
+  },
+  {
+    "end": "2026-01-05T11:14:14Z",
+    "episode_id": "EP-017",
+    "failed_passwords": 38,
+    "hosts": [
+      "web-03",
+      "web-04"
+    ],
+    "scenario": "password_spray",
+    "source_ips": [
+      "198.18.26.99"
+    ],
+    "start": "2026-01-05T08:42:24Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 19
+  },
+  {
+    "end": "2026-01-10T18:52:59Z",
+    "episode_id": "EP-018",
+    "failed_passwords": 60,
+    "hosts": [
+      "api-01",
+      "api-02",
+      "web-02",
+      "web-03",
+      "web-04"
+    ],
+    "scenario": "password_spray",
+    "source_ips": [
+      "198.18.252.125"
+    ],
+    "start": "2026-01-10T15:49:47Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 12
+  },
+  {
+    "end": "2026-01-09T16:47:20Z",
+    "episode_id": "EP-019",
+    "failed_passwords": 48,
+    "hosts": [
+      "api-02",
+      "mail-01",
+      "web-04"
+    ],
+    "scenario": "password_spray",
+    "source_ips": [
+      "198.18.58.114"
+    ],
+    "start": "2026-01-09T15:04:58Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 16
+  },
+  {
+    "end": "2026-01-08T09:05:26Z",
+    "episode_id": "EP-020",
+    "failed_passwords": 80,
+    "hosts": [
+      "bastion-01",
+      "mail-01",
+      "web-01",
+      "web-03"
+    ],
+    "scenario": "password_spray",
+    "source_ips": [
+      "198.19.4.221"
+    ],
+    "start": "2026-01-08T08:29:00Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 20
+  },
+  {
+    "end": "2026-01-06T13:10:28Z",
+    "episode_id": "EP-021",
+    "failed_passwords": 54,
+    "hosts": [
+      "api-01",
+      "mail-01",
+      "web-04"
+    ],
+    "scenario": "password_spray",
+    "source_ips": [
+      "198.19.181.12"
+    ],
+    "start": "2026-01-06T11:08:09Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 18
+  },
+  {
+    "end": "2026-01-06T19:47:57Z",
+    "episode_id": "EP-022",
+    "failed_passwords": 60,
+    "hosts": [
+      "bastion-01",
+      "mail-01",
+      "web-01",
+      "web-02",
+      "web-03"
+    ],
+    "scenario": "password_spray",
+    "source_ips": [
+      "198.19.119.69"
+    ],
+    "start": "2026-01-06T16:54:03Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 12
+  },
+  {
+    "end": "2026-01-10T16:18:23Z",
+    "episode_id": "EP-023",
+    "failed_passwords": 70,
+    "hosts": [
+      "api-01",
+      "bastion-01",
+      "mail-01",
+      "web-03",
+      "web-04"
+    ],
+    "scenario": "password_spray",
+    "source_ips": [
+      "198.18.135.101"
+    ],
+    "start": "2026-01-10T15:10:33Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 14
+  },
+  {
+    "end": "2026-01-11T03:07:48Z",
+    "episode_id": "EP-024",
+    "failed_passwords": 80,
+    "hosts": [
+      "api-01",
+      "bastion-01",
+      "mail-01",
+      "web-03"
+    ],
+    "scenario": "password_spray",
+    "source_ips": [
+      "198.19.220.209"
+    ],
+    "start": "2026-01-10T21:47:14Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 20
+  },
+  {
+    "end": "2026-01-06T12:53:38Z",
+    "episode_id": "EP-025",
+    "failed_passwords": 40,
+    "hosts": [
+      "bastion-01"
+    ],
+    "scenario": "low_and_slow",
+    "source_ips": [
+      "198.18.143.107"
+    ],
+    "start": "2026-01-05T18:22:15Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-11T09:33:20Z",
+    "episode_id": "EP-026",
+    "failed_passwords": 59,
+    "hosts": [
+      "web-03"
+    ],
+    "scenario": "low_and_slow",
+    "source_ips": [
+      "198.19.243.33"
+    ],
+    "start": "2026-01-10T14:38:13Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-11T13:42:54Z",
+    "episode_id": "EP-027",
+    "failed_passwords": 26,
+    "hosts": [
+      "web-03"
+    ],
+    "scenario": "low_and_slow",
+    "source_ips": [
+      "198.19.233.18"
+    ],
+    "start": "2026-01-11T02:40:17Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-10T23:59:20Z",
+    "episode_id": "EP-028",
+    "failed_passwords": 98,
+    "hosts": [
+      "web-04"
+    ],
+    "scenario": "low_and_slow",
+    "source_ips": [
+      "198.18.200.250"
+    ],
+    "start": "2026-01-10T04:54:19Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-06T13:07:37Z",
+    "episode_id": "EP-029",
+    "failed_passwords": 42,
+    "hosts": [
+      "bastion-01"
+    ],
+    "scenario": "low_and_slow",
+    "source_ips": [
+      "198.19.218.129"
+    ],
+    "start": "2026-01-05T19:29:53Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-05T20:49:58Z",
+    "episode_id": "EP-030",
+    "failed_passwords": 41,
+    "hosts": [
+      "api-01"
+    ],
+    "scenario": "low_and_slow",
+    "source_ips": [
+      "198.19.92.74"
+    ],
+    "start": "2026-01-05T07:05:08Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-05T15:57:39Z",
+    "episode_id": "EP-031",
+    "failed_passwords": 18,
+    "hosts": [
+      "mail-01"
+    ],
+    "scenario": "low_and_slow",
+    "source_ips": [
+      "198.19.219.157"
+    ],
+    "start": "2026-01-05T06:57:22Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-11T13:14:45Z",
+    "episode_id": "EP-032",
+    "failed_passwords": 26,
+    "hosts": [
+      "web-01"
+    ],
+    "scenario": "low_and_slow",
+    "source_ips": [
+      "198.19.94.252"
+    ],
+    "start": "2026-01-10T22:57:31Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-06T02:41:18Z",
+    "episode_id": "EP-033",
+    "failed_passwords": 30,
+    "hosts": [
+      "web-03"
+    ],
+    "scenario": "low_and_slow",
+    "source_ips": [
+      "198.19.89.246"
+    ],
+    "start": "2026-01-05T12:01:29Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-08T09:18:05Z",
+    "episode_id": "EP-034",
+    "failed_passwords": 17,
+    "hosts": [
+      "web-04"
+    ],
+    "scenario": "low_and_slow",
+    "source_ips": [
+      "198.19.216.112"
+    ],
+    "start": "2026-01-08T01:17:41Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-05T23:11:30Z",
+    "episode_id": "EP-035",
+    "failed_passwords": 66,
+    "hosts": [
+      "mail-01"
+    ],
+    "scenario": "low_and_slow",
+    "source_ips": [
+      "198.19.140.17"
+    ],
+    "start": "2026-01-05T10:27:54Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-11T00:20:41Z",
+    "episode_id": "EP-036",
+    "failed_passwords": 29,
+    "hosts": [
+      "mail-01"
+    ],
+    "scenario": "low_and_slow",
+    "source_ips": [
+      "198.19.111.222"
+    ],
+    "start": "2026-01-10T16:07:26Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 1
+  },
+  {
+    "end": "2026-01-08T14:56:56Z",
+    "episode_id": "EP-037",
+    "failed_passwords": 30,
+    "hosts": [
+      "api-01",
+      "api-02",
+      "bastion-01",
+      "mail-01",
+      "web-01",
+      "web-02",
+      "web-03",
+      "web-04"
+    ],
+    "scenario": "distributed_spray",
+    "source_ips": [
+      "198.19.107.149",
+      "198.19.58.167",
+      "198.18.31.129",
+      "198.19.154.142",
+      "198.18.225.189",
+      "198.18.27.41",
+      "198.19.143.23",
+      "198.18.204.95",
+      "198.19.237.116",
+      "198.18.64.49",
+      "198.19.117.88",
+      "198.18.162.148",
+      "198.18.54.186",
+      "198.18.190.88",
+      "198.18.117.252",
+      "198.19.87.38",
+      "198.19.121.28",
+      "198.18.101.12",
+      "198.19.213.129",
+      "198.19.141.17"
+    ],
+    "start": "2026-01-08T11:33:16Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 13
+  },
+  {
+    "end": "2026-01-09T22:50:47Z",
+    "episode_id": "EP-038",
+    "failed_passwords": 30,
+    "hosts": [
+      "api-01",
+      "api-02",
+      "bastion-01",
+      "mail-01",
+      "web-01",
+      "web-02",
+      "web-03",
+      "web-04"
+    ],
+    "scenario": "distributed_spray",
+    "source_ips": [
+      "198.18.172.194",
+      "198.18.171.81",
+      "198.18.202.149",
+      "198.18.46.176",
+      "198.19.210.27",
+      "198.18.13.212",
+      "198.18.208.35",
+      "198.18.227.208",
+      "198.19.225.100",
+      "198.18.70.217",
+      "198.19.120.58",
+      "198.18.55.203",
+      "198.19.43.18",
+      "198.18.154.32",
+      "198.18.237.146",
+      "198.19.77.202",
+      "198.18.27.19",
+      "198.19.128.47",
+      "198.18.121.230",
+      "198.18.153.40",
+      "198.19.130.101",
+      "198.19.132.14"
+    ],
+    "start": "2026-01-09T20:51:00Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 14
+  },
+  {
+    "end": "2026-01-06T17:30:44Z",
+    "episode_id": "EP-039",
+    "failed_passwords": 22,
+    "hosts": [
+      "api-01",
+      "api-02",
+      "bastion-01",
+      "mail-01",
+      "web-01",
+      "web-02",
+      "web-03"
+    ],
+    "scenario": "distributed_spray",
+    "source_ips": [
+      "198.18.67.81",
+      "198.19.215.38",
+      "198.19.17.30",
+      "198.18.117.170",
+      "198.18.42.64",
+      "198.18.32.92",
+      "198.18.146.206",
+      "198.18.127.6",
+      "198.18.151.132",
+      "198.19.80.118",
+      "198.19.141.194",
+      "198.18.95.54",
+      "198.18.174.227",
+      "198.18.75.110",
+      "198.19.20.55",
+      "198.18.102.136"
+    ],
+    "start": "2026-01-06T14:39:16Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 12
+  },
+  {
+    "end": "2026-01-08T06:32:42Z",
+    "episode_id": "EP-040",
+    "failed_passwords": 20,
+    "hosts": [
+      "api-01",
+      "api-02",
+      "bastion-01",
+      "mail-01",
+      "web-01",
+      "web-02",
+      "web-03"
+    ],
+    "scenario": "distributed_spray",
+    "source_ips": [
+      "198.18.95.13",
+      "198.19.73.166",
+      "198.18.214.238",
+      "198.19.173.245",
+      "198.19.204.133",
+      "198.18.149.57",
+      "198.19.246.72",
+      "198.18.217.133",
+      "198.18.78.56",
+      "198.18.40.214",
+      "198.18.112.5",
+      "198.19.254.223",
+      "198.19.83.171"
+    ],
+    "start": "2026-01-08T04:10:52Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 20
+  },
+  {
+    "end": "2026-01-10T11:46:00Z",
+    "episode_id": "EP-041",
+    "failed_passwords": 23,
+    "hosts": [
+      "api-01",
+      "api-02",
+      "bastion-01",
+      "mail-01",
+      "web-01",
+      "web-02",
+      "web-03",
+      "web-04"
+    ],
+    "scenario": "distributed_spray",
+    "source_ips": [
+      "198.19.23.196",
+      "198.19.22.241",
+      "198.18.35.206",
+      "198.18.222.24",
+      "198.18.250.90",
+      "198.18.122.123",
+      "198.18.66.119",
+      "198.19.136.147",
+      "198.19.70.230",
+      "198.19.215.183",
+      "198.19.61.139",
+      "198.19.128.50",
+      "198.19.80.31",
+      "198.19.47.181",
+      "198.19.175.83"
+    ],
+    "start": "2026-01-10T08:18:24Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 16
+  },
+  {
+    "end": "2026-01-10T12:59:10Z",
+    "episode_id": "EP-042",
+    "failed_passwords": 23,
+    "hosts": [
+      "api-01",
+      "api-02",
+      "bastion-01",
+      "mail-01",
+      "web-01",
+      "web-02",
+      "web-03",
+      "web-04"
+    ],
+    "scenario": "distributed_spray",
+    "source_ips": [
+      "198.19.69.40",
+      "198.18.233.157",
+      "198.18.24.25",
+      "198.19.140.125",
+      "198.18.117.131",
+      "198.18.33.142",
+      "198.19.137.225",
+      "198.18.23.208",
+      "198.19.161.184",
+      "198.18.14.86",
+      "198.19.51.201",
+      "198.18.124.215",
+      "198.19.164.188",
+      "198.19.190.57"
+    ],
+    "start": "2026-01-10T09:48:48Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 19
+  },
+  {
+    "end": "2026-01-08T14:33:10Z",
+    "episode_id": "EP-043",
+    "failed_passwords": 33,
+    "hosts": [
+      "api-01",
+      "api-02",
+      "bastion-01",
+      "mail-01",
+      "web-01",
+      "web-02",
+      "web-03",
+      "web-04"
+    ],
+    "scenario": "distributed_spray",
+    "source_ips": [
+      "198.18.200.253",
+      "198.18.84.151",
+      "198.19.168.192",
+      "198.19.44.199",
+      "198.19.134.183",
+      "198.19.61.134",
+      "198.19.254.222",
+      "198.19.79.134",
+      "198.19.92.99",
+      "198.19.247.54",
+      "198.18.147.34",
+      "198.19.75.107",
+      "198.19.20.32",
+      "198.18.122.46",
+      "198.19.12.206",
+      "198.18.23.166",
+      "198.19.56.229",
+      "198.18.94.234",
+      "198.19.208.172",
+      "198.19.78.228",
+      "198.18.152.139"
+    ],
+    "start": "2026-01-08T12:46:07Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 10
+  },
+  {
+    "end": "2026-01-08T23:14:15Z",
+    "episode_id": "EP-044",
+    "failed_passwords": 50,
+    "hosts": [
+      "api-01",
+      "api-02",
+      "bastion-01",
+      "mail-01",
+      "web-01",
+      "web-02",
+      "web-03",
+      "web-04"
+    ],
+    "scenario": "distributed_spray",
+    "source_ips": [
+      "198.19.107.137",
+      "198.19.178.5",
+      "198.19.99.119",
+      "198.18.3.227",
+      "198.19.107.148",
+      "198.19.132.183",
+      "198.19.45.209",
+      "198.19.168.227",
+      "198.19.185.238",
+      "198.19.208.3",
+      "198.19.157.101",
+      "198.19.108.44",
+      "198.19.225.59",
+      "198.18.5.226",
+      "198.19.144.173",
+      "198.19.61.17",
+      "198.19.172.44",
+      "198.19.104.186",
+      "198.18.95.22",
+      "198.19.242.19",
+      "198.19.146.179",
+      "198.18.164.5",
+      "198.18.140.152",
+      "198.19.240.23",
+      "198.19.193.123",
+      "198.18.102.85",
+      "198.19.204.103",
+      "198.19.49.198",
+      "198.19.48.111",
+      "198.19.90.61",
+      "198.19.249.124",
+      "198.19.51.12",
+      "198.18.64.222"
+    ],
+    "start": "2026-01-08T20:50:18Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 11
+  },
+  {
+    "end": "2026-01-09T12:42:24Z",
+    "episode_id": "EP-045",
+    "failed_passwords": 30,
+    "hosts": [
+      "api-01",
+      "api-02",
+      "bastion-01",
+      "mail-01",
+      "web-01",
+      "web-02",
+      "web-03",
+      "web-04"
+    ],
+    "scenario": "distributed_spray",
+    "source_ips": [
+      "198.19.20.209",
+      "198.18.218.249",
+      "198.19.99.100",
+      "198.19.230.15",
+      "198.19.86.165",
+      "198.19.241.186",
+      "198.19.35.124",
+      "198.19.210.105",
+      "198.19.110.84",
+      "198.19.16.238",
+      "198.19.178.143",
+      "198.19.73.101",
+      "198.19.127.119",
+      "198.18.28.236",
+      "198.19.211.20",
+      "198.18.135.27",
+      "198.18.54.171",
+      "198.18.140.240",
+      "198.18.173.48",
+      "198.19.125.163",
+      "198.19.228.42"
+    ],
+    "start": "2026-01-09T10:02:03Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 12
+  },
+  {
+    "end": "2026-01-10T15:13:24Z",
+    "episode_id": "EP-046",
+    "failed_passwords": 25,
+    "hosts": [
+      "api-01",
+      "api-02",
+      "bastion-01",
+      "mail-01",
+      "web-01",
+      "web-02",
+      "web-03",
+      "web-04"
+    ],
+    "scenario": "distributed_spray",
+    "source_ips": [
+      "198.19.23.24",
+      "198.18.150.220",
+      "198.18.216.80",
+      "198.19.163.3",
+      "198.18.25.120",
+      "198.19.179.133",
+      "198.19.81.174",
+      "198.18.9.249",
+      "198.18.148.185",
+      "198.18.219.44",
+      "198.19.112.155",
+      "198.18.183.6",
+      "198.19.186.81",
+      "198.18.207.1",
+      "198.18.109.198",
+      "198.19.110.122"
+    ],
+    "start": "2026-01-10T13:24:45Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 19
+  },
+  {
+    "end": "2026-01-07T07:24:22Z",
+    "episode_id": "EP-047",
+    "failed_passwords": 26,
+    "hosts": [
+      "api-01",
+      "api-02",
+      "bastion-01",
+      "mail-01",
+      "web-01",
+      "web-02",
+      "web-03",
+      "web-04"
+    ],
+    "scenario": "distributed_spray",
+    "source_ips": [
+      "198.19.118.89",
+      "198.19.39.153",
+      "198.18.84.12",
+      "198.18.66.126",
+      "198.19.4.162",
+      "198.18.117.154",
+      "198.18.39.217",
+      "198.18.113.172",
+      "198.19.36.47",
+      "198.18.140.80",
+      "198.18.15.199",
+      "198.18.61.77",
+      "198.18.72.194",
+      "198.19.235.146",
+      "198.18.87.11",
+      "198.19.112.11",
+      "198.18.91.168",
+      "198.18.110.237"
+    ],
+    "start": "2026-01-07T03:32:26Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 11
+  },
+  {
+    "end": "2026-01-08T09:41:38Z",
+    "episode_id": "EP-048",
+    "failed_passwords": 25,
+    "hosts": [
+      "api-01",
+      "api-02",
+      "bastion-01",
+      "mail-01",
+      "web-01",
+      "web-02",
+      "web-03",
+      "web-04"
+    ],
+    "scenario": "distributed_spray",
+    "source_ips": [
+      "198.19.142.13",
+      "198.18.233.129",
+      "198.18.22.145",
+      "198.19.172.249",
+      "198.18.210.220",
+      "198.18.245.15",
+      "198.18.75.181",
+      "198.18.220.29",
+      "198.18.142.252",
+      "198.19.178.214",
+      "198.19.119.123",
+      "198.18.206.88",
+      "198.18.134.26",
+      "198.19.122.209",
+      "198.18.220.74",
+      "198.19.91.109"
+    ],
+    "start": "2026-01-08T07:50:49Z",
+    "succeeded": false,
+    "synthetic": true,
+    "target_users": 20
+  },
+  {
+    "end": "2026-01-08T08:36:12Z",
+    "episode_id": "EP-049",
+    "failed_passwords": 76,
+    "hosts": [
+      "mail-01"
+    ],
+    "scenario": "stuffing_then_success",
+    "source_ips": [
+      "198.19.168.207"
+    ],
+    "start": "2026-01-08T08:06:13Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 33
+  },
+  {
+    "end": "2026-01-08T06:41:42Z",
+    "episode_id": "EP-050",
+    "failed_passwords": 87,
+    "hosts": [
+      "api-02",
+      "web-04"
+    ],
+    "scenario": "stuffing_then_success",
+    "source_ips": [
+      "198.19.94.237"
+    ],
+    "start": "2026-01-08T05:56:24Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 34
+  },
+  {
+    "end": "2026-01-10T10:11:38Z",
+    "episode_id": "EP-051",
+    "failed_passwords": 59,
+    "hosts": [
+      "mail-01",
+      "web-02"
+    ],
+    "scenario": "stuffing_then_success",
+    "source_ips": [
+      "198.19.207.58"
+    ],
+    "start": "2026-01-10T09:22:42Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 29
+  },
+  {
+    "end": "2026-01-06T07:58:28Z",
+    "episode_id": "EP-052",
+    "failed_passwords": 76,
+    "hosts": [
+      "api-02"
+    ],
+    "scenario": "stuffing_then_success",
+    "source_ips": [
+      "198.18.204.100"
+    ],
+    "start": "2026-01-06T07:20:41Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 33
+  },
+  {
+    "end": "2026-01-08T12:10:21Z",
+    "episode_id": "EP-053",
+    "failed_passwords": 46,
+    "hosts": [
+      "api-02",
+      "web-01"
+    ],
+    "scenario": "stuffing_then_success",
+    "source_ips": [
+      "198.18.119.123"
+    ],
+    "start": "2026-01-08T11:23:24Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 27
+  },
+  {
+    "end": "2026-01-06T05:59:56Z",
+    "episode_id": "EP-054",
+    "failed_passwords": 89,
+    "hosts": [
+      "api-01",
+      "web-02"
+    ],
+    "scenario": "stuffing_then_success",
+    "source_ips": [
+      "198.19.54.233"
+    ],
+    "start": "2026-01-06T05:28:01Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 35
+  },
+  {
+    "end": "2026-01-05T14:11:05Z",
+    "episode_id": "EP-055",
+    "failed_passwords": 49,
+    "hosts": [
+      "bastion-01",
+      "web-04"
+    ],
+    "scenario": "stuffing_then_success",
+    "source_ips": [
+      "198.18.202.158"
+    ],
+    "start": "2026-01-05T13:41:50Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 23
+  },
+  {
+    "end": "2026-01-06T22:09:30Z",
+    "episode_id": "EP-056",
+    "failed_passwords": 64,
+    "hosts": [
+      "mail-01",
+      "web-02"
+    ],
+    "scenario": "stuffing_then_success",
+    "source_ips": [
+      "198.19.156.170"
+    ],
+    "start": "2026-01-06T21:13:18Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 26
+  },
+  {
+    "end": "2026-01-05T11:53:53Z",
+    "episode_id": "EP-057",
+    "failed_passwords": 32,
+    "hosts": [
+      "web-01"
+    ],
+    "scenario": "stuffing_then_success",
+    "source_ips": [
+      "198.18.71.128"
+    ],
+    "start": "2026-01-05T10:47:13Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 21
+  },
+  {
+    "end": "2026-01-10T16:40:24Z",
+    "episode_id": "EP-058",
+    "failed_passwords": 64,
+    "hosts": [
+      "web-03"
+    ],
+    "scenario": "stuffing_then_success",
+    "source_ips": [
+      "198.19.8.18"
+    ],
+    "start": "2026-01-10T15:38:50Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 25
+  },
+  {
+    "end": "2026-01-07T12:44:28Z",
+    "episode_id": "EP-059",
+    "failed_passwords": 46,
+    "hosts": [
+      "web-04"
+    ],
+    "scenario": "stuffing_then_success",
+    "source_ips": [
+      "198.18.18.59"
+    ],
+    "start": "2026-01-07T11:50:33Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 26
+  },
+  {
+    "end": "2026-01-09T11:57:34Z",
+    "episode_id": "EP-060",
+    "failed_passwords": 60,
+    "hosts": [
+      "web-03"
+    ],
+    "scenario": "stuffing_then_success",
+    "source_ips": [
+      "198.18.52.54"
+    ],
+    "start": "2026-01-09T11:09:14Z",
+    "succeeded": true,
+    "synthetic": true,
+    "target_users": 30
+  }
+]
