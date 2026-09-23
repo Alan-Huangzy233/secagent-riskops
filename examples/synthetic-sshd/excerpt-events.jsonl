@@ -1,0 +1,182 @@
+{"event_id":"E0009810","host":"bastion-01","message":"Accepted publickey for monitor from 198.19.248.182 port 35258 ssh2: ED25519 SHA256:/TYHFtC3jrpumokAjBLFpGLZXlAjnEmAfSGOlNtmVTx","ts":"2026-01-05T06:07:43.360Z"}
+{"event_id":"E0009811","host":"bastion-01","message":"pam_unix(sshd:session): session opened for user monitor(uid=1001) by (uid=0)","ts":"2026-01-05T06:07:43.380Z"}
+{"event_id":"E0009818","host":"bastion-01","message":"Accepted password for jonas from 198.18.25.178 port 10696 ssh2","ts":"2026-01-05T06:08:03.472Z"}
+{"event_id":"E0009819","host":"bastion-01","message":"pam_unix(sshd:session): session opened for user jonas(uid=1001) by (uid=0)","ts":"2026-01-05T06:08:03.492Z"}
+{"event_id":"E0009825","host":"bastion-01","message":"Connection closed by 198.18.40.17 port 57388 [preauth]","ts":"2026-01-05T06:08:18.298Z"}
+{"event_id":"E0009829","host":"bastion-01","message":"Invalid user www from 198.18.40.17 port 29370","ts":"2026-01-05T06:08:42.060Z"}
+{"event_id":"E0009830","host":"bastion-01","message":"Received disconnect from 198.19.248.182 port 35258:11: disconnected by user","ts":"2026-01-05T06:08:43.360Z"}
+{"event_id":"E0009831","host":"bastion-01","message":"pam_unix(sshd:session): session closed for user monitor","ts":"2026-01-05T06:08:43.370Z"}
+{"event_id":"E0009832","host":"bastion-01","message":"Failed password for invalid user www from 198.18.40.17 port 29370 ssh2","ts":"2026-01-05T06:08:45.181Z"}
+{"event_id":"E0009833","host":"bastion-01","message":"Failed password for invalid user www from 198.18.40.17 port 29370 ssh2","ts":"2026-01-05T06:08:48.612Z"}
+{"event_id":"E0009834","host":"bastion-01","message":"Connection closed by invalid user www 198.18.40.17 port 29370 [preauth]","ts":"2026-01-05T06:08:48.812Z"}
+{"event_id":"E0009836","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 4641 ssh2","ts":"2026-01-05T06:08:49.915Z"}
+{"event_id":"E0009839","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 4641 ssh2","ts":"2026-01-05T06:08:52.216Z"}
+{"event_id":"E0009845","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 4641 ssh2","ts":"2026-01-05T06:08:55.846Z"}
+{"event_id":"E0009848","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 4641 ssh2","ts":"2026-01-05T06:08:57.946Z"}
+{"event_id":"E0009849","host":"bastion-01","message":"Connection closed by authenticating user jonas 198.18.85.18 port 4641 [preauth]","ts":"2026-01-05T06:08:58.146Z"}
+{"event_id":"E0009850","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 13178 ssh2","ts":"2026-01-05T06:09:01.209Z"}
+{"event_id":"E0009851","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 13178 ssh2","ts":"2026-01-05T06:09:02.989Z"}
+{"event_id":"E0009852","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 13178 ssh2","ts":"2026-01-05T06:09:04.870Z"}
+{"event_id":"E0009853","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 13178 ssh2","ts":"2026-01-05T06:09:08.444Z"}
+{"event_id":"E0009854","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 13178 ssh2","ts":"2026-01-05T06:09:10.779Z"}
+{"event_id":"E0009855","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 13178 ssh2","ts":"2026-01-05T06:09:13.429Z"}
+{"event_id":"E0009856","host":"bastion-01","message":"Connection closed by authenticating user jonas 198.18.85.18 port 13178 [preauth]","ts":"2026-01-05T06:09:13.629Z"}
+{"event_id":"E0009865","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 42249 ssh2","ts":"2026-01-05T06:09:25.013Z"}
+{"event_id":"E0009869","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 42249 ssh2","ts":"2026-01-05T06:09:27.641Z"}
+{"event_id":"E0009870","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 42249 ssh2","ts":"2026-01-05T06:09:28.432Z"}
+{"event_id":"E0009872","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 42249 ssh2","ts":"2026-01-05T06:09:32.064Z"}
+{"event_id":"E0009873","host":"bastion-01","message":"Connection closed by authenticating user jonas 198.18.85.18 port 42249 [preauth]","ts":"2026-01-05T06:09:32.264Z"}
+{"event_id":"E0009878","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 18871 ssh2","ts":"2026-01-05T06:09:41.082Z"}
+{"event_id":"E0009880","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 18871 ssh2","ts":"2026-01-05T06:09:43.218Z"}
+{"event_id":"E0009882","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 18871 ssh2","ts":"2026-01-05T06:09:44.790Z"}
+{"event_id":"E0009883","host":"bastion-01","message":"Connection closed by 198.18.41.75 port 39145 [preauth]","ts":"2026-01-05T06:09:45.493Z"}
+{"event_id":"E0009885","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 18871 ssh2","ts":"2026-01-05T06:09:46.721Z"}
+{"event_id":"E0009887","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 18871 ssh2","ts":"2026-01-05T06:09:49.882Z"}
+{"event_id":"E0009889","host":"bastion-01","message":"Invalid user administrator from 198.18.41.75 port 32109","ts":"2026-01-05T06:09:49.926Z"}
+{"event_id":"E0009890","host":"bastion-01","message":"Connection closed by authenticating user jonas 198.18.85.18 port 18871 [preauth]","ts":"2026-01-05T06:09:50.082Z"}
+{"event_id":"E0009891","host":"bastion-01","message":"Failed password for invalid user administrator from 198.18.41.75 port 32109 ssh2","ts":"2026-01-05T06:09:51.924Z"}
+{"event_id":"E0009892","host":"bastion-01","message":"Failed password for invalid user administrator from 198.18.41.75 port 32109 ssh2","ts":"2026-01-05T06:09:53.425Z"}
+{"event_id":"E0009896","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 56949 ssh2","ts":"2026-01-05T06:09:57.257Z"}
+{"event_id":"E0009897","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 56949 ssh2","ts":"2026-01-05T06:09:58.107Z"}
+{"event_id":"E0009898","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 56949 ssh2","ts":"2026-01-05T06:09:58.858Z"}
+{"event_id":"E0009901","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 56949 ssh2","ts":"2026-01-05T06:10:00.063Z"}
+{"event_id":"E0009902","host":"bastion-01","message":"Failed password for git from 198.18.41.75 port 46419 ssh2","ts":"2026-01-05T06:10:02.109Z"}
+{"event_id":"E0009903","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 16968 ssh2","ts":"2026-01-05T06:10:08.681Z"}
+{"event_id":"E0009904","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 16968 ssh2","ts":"2026-01-05T06:10:10.021Z"}
+{"event_id":"E0009905","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 16968 ssh2","ts":"2026-01-05T06:10:11.497Z"}
+{"event_id":"E0009906","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 16968 ssh2","ts":"2026-01-05T06:10:14.501Z"}
+{"event_id":"E0009909","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 17551 ssh2","ts":"2026-01-05T06:10:19.377Z"}
+{"event_id":"E0009910","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 17551 ssh2","ts":"2026-01-05T06:10:20.908Z"}
+{"event_id":"E0009913","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 17551 ssh2","ts":"2026-01-05T06:10:24.157Z"}
+{"event_id":"E0009919","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 17551 ssh2","ts":"2026-01-05T06:10:26.560Z"}
+{"event_id":"E0009920","host":"bastion-01","message":"Connection closed by authenticating user jonas 198.18.85.18 port 17551 [preauth]","ts":"2026-01-05T06:10:26.760Z"}
+{"event_id":"E0009927","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 16924 ssh2","ts":"2026-01-05T06:10:38.636Z"}
+{"event_id":"E0009928","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 16924 ssh2","ts":"2026-01-05T06:10:40.008Z"}
+{"event_id":"E0009930","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 16924 ssh2","ts":"2026-01-05T06:10:42.545Z"}
+{"event_id":"E0009931","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 16924 ssh2","ts":"2026-01-05T06:10:44.395Z"}
+{"event_id":"E0009935","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 16924 ssh2","ts":"2026-01-05T06:10:48.152Z"}
+{"event_id":"E0009936","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 16924 ssh2","ts":"2026-01-05T06:10:51.702Z"}
+{"event_id":"E0009937","host":"bastion-01","message":"Connection closed by authenticating user jonas 198.18.85.18 port 16924 [preauth]","ts":"2026-01-05T06:10:51.902Z"}
+{"event_id":"E0009943","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 45357 ssh2","ts":"2026-01-05T06:11:02.315Z"}
+{"event_id":"E0009946","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 45357 ssh2","ts":"2026-01-05T06:11:05.078Z"}
+{"event_id":"E0009947","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 45357 ssh2","ts":"2026-01-05T06:11:06.078Z"}
+{"event_id":"E0009952","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 45357 ssh2","ts":"2026-01-05T06:11:09.570Z"}
+{"event_id":"E0009956","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 45357 ssh2","ts":"2026-01-05T06:11:13.367Z"}
+{"event_id":"E0009957","host":"bastion-01","message":"Connection closed by authenticating user jonas 198.18.85.18 port 45357 [preauth]","ts":"2026-01-05T06:11:13.567Z"}
+{"event_id":"E0009959","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 46265 ssh2","ts":"2026-01-05T06:11:16.933Z"}
+{"event_id":"E0009962","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 46265 ssh2","ts":"2026-01-05T06:11:18.312Z"}
+{"event_id":"E0009968","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 46265 ssh2","ts":"2026-01-05T06:11:22.036Z"}
+{"event_id":"E0009969","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 46265 ssh2","ts":"2026-01-05T06:11:24.692Z"}
+{"event_id":"E0009970","host":"bastion-01","message":"Connection closed by authenticating user jonas 198.18.85.18 port 46265 [preauth]","ts":"2026-01-05T06:11:24.892Z"}
+{"event_id":"E0009972","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 22031 ssh2","ts":"2026-01-05T06:11:35.825Z"}
+{"event_id":"E0009975","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 22031 ssh2","ts":"2026-01-05T06:11:38.280Z"}
+{"event_id":"E0009978","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 22031 ssh2","ts":"2026-01-05T06:11:38.991Z"}
+{"event_id":"E0009980","host":"bastion-01","message":"Invalid user mysql from 198.18.172.96 port 58128","ts":"2026-01-05T06:11:41.352Z"}
+{"event_id":"E0009981","host":"bastion-01","message":"Failed password for invalid user mysql from 198.18.172.96 port 58128 ssh2","ts":"2026-01-05T06:11:42.536Z"}
+{"event_id":"E0009984","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 58326 ssh2","ts":"2026-01-05T06:11:45.080Z"}
+{"event_id":"E0009985","host":"bastion-01","message":"Failed password for invalid user mysql from 198.18.172.96 port 58128 ssh2","ts":"2026-01-05T06:11:45.537Z"}
+{"event_id":"E0009986","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 58326 ssh2","ts":"2026-01-05T06:11:46.510Z"}
+{"event_id":"E0009987","host":"bastion-01","message":"Failed password for invalid user mysql from 198.18.172.96 port 58128 ssh2","ts":"2026-01-05T06:11:49.210Z"}
+{"event_id":"E0009989","host":"bastion-01","message":"Connection closed by invalid user mysql 198.18.172.96 port 58128 [preauth]","ts":"2026-01-05T06:11:49.410Z"}
+{"event_id":"E0009990","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 58326 ssh2","ts":"2026-01-05T06:11:49.802Z"}
+{"event_id":"E0009992","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 58326 ssh2","ts":"2026-01-05T06:11:52.605Z"}
+{"event_id":"E0009997","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 62122 ssh2","ts":"2026-01-05T06:11:56.770Z"}
+{"event_id":"E0009998","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 62122 ssh2","ts":"2026-01-05T06:11:59.033Z"}
+{"event_id":"E0010000","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 62122 ssh2","ts":"2026-01-05T06:12:00.034Z"}
+{"event_id":"E0010001","host":"bastion-01","message":"Connection closed by authenticating user jonas 198.18.85.18 port 62122 [preauth]","ts":"2026-01-05T06:12:00.234Z"}
+{"event_id":"E0010005","host":"bastion-01","message":"Invalid user test from 198.18.172.96 port 53417","ts":"2026-01-05T06:12:05.172Z"}
+{"event_id":"E0010010","host":"bastion-01","message":"Failed password for invalid user test from 198.18.172.96 port 53417 ssh2","ts":"2026-01-05T06:12:08.244Z"}
+{"event_id":"E0010011","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 52398 ssh2","ts":"2026-01-05T06:12:08.407Z"}
+{"event_id":"E0010012","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 52398 ssh2","ts":"2026-01-05T06:12:09.340Z"}
+{"event_id":"E0010013","host":"bastion-01","message":"Failed password for invalid user test from 198.18.172.96 port 53417 ssh2","ts":"2026-01-05T06:12:10.229Z"}
+{"event_id":"E0010014","host":"bastion-01","message":"Connection closed by invalid user test 198.18.172.96 port 53417 [preauth]","ts":"2026-01-05T06:12:10.429Z"}
+{"event_id":"E0010016","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 52398 ssh2","ts":"2026-01-05T06:12:12.614Z"}
+{"event_id":"E0010018","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 52398 ssh2","ts":"2026-01-05T06:12:13.254Z"}
+{"event_id":"E0010019","host":"bastion-01","message":"Connection closed by authenticating user jonas 198.18.85.18 port 52398 [preauth]","ts":"2026-01-05T06:12:13.454Z"}
+{"event_id":"E0010026","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 7184 ssh2","ts":"2026-01-05T06:12:24.040Z"}
+{"event_id":"E0010027","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 7184 ssh2","ts":"2026-01-05T06:12:25.130Z"}
+{"event_id":"E0010029","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 7184 ssh2","ts":"2026-01-05T06:12:28.849Z"}
+{"event_id":"E0010032","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 7184 ssh2","ts":"2026-01-05T06:12:31.356Z"}
+{"event_id":"E0010034","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 7184 ssh2","ts":"2026-01-05T06:12:32.266Z"}
+{"event_id":"E0010035","host":"bastion-01","message":"Connection closed by authenticating user jonas 198.18.85.18 port 7184 [preauth]","ts":"2026-01-05T06:12:32.466Z"}
+{"event_id":"E0010037","host":"bastion-01","message":"Invalid user pi from 198.19.249.234 port 36026","ts":"2026-01-05T06:12:33.138Z"}
+{"event_id":"E0010038","host":"bastion-01","message":"Failed password for invalid user pi from 198.19.249.234 port 36026 ssh2","ts":"2026-01-05T06:12:34.813Z"}
+{"event_id":"E0010040","host":"bastion-01","message":"Connection closed by invalid user pi 198.19.249.234 port 36026 [preauth]","ts":"2026-01-05T06:12:35.013Z"}
+{"event_id":"E0010042","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 33473 ssh2","ts":"2026-01-05T06:12:39.324Z"}
+{"event_id":"E0010043","host":"bastion-01","message":"Invalid user guest from 198.18.172.96 port 31724","ts":"2026-01-05T06:12:40.553Z"}
+{"event_id":"E0010044","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 33473 ssh2","ts":"2026-01-05T06:12:42.276Z"}
+{"event_id":"E0010045","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 33473 ssh2","ts":"2026-01-05T06:12:42.848Z"}
+{"event_id":"E0010046","host":"bastion-01","message":"Failed password for invalid user guest from 198.18.172.96 port 31724 ssh2","ts":"2026-01-05T06:12:44.049Z"}
+{"event_id":"E0010047","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 33473 ssh2","ts":"2026-01-05T06:12:45.915Z"}
+{"event_id":"E0010048","host":"bastion-01","message":"Connection closed by authenticating user jonas 198.18.85.18 port 33473 [preauth]","ts":"2026-01-05T06:12:46.115Z"}
+{"event_id":"E0010049","host":"bastion-01","message":"Failed password for invalid user guest from 198.18.172.96 port 31724 ssh2","ts":"2026-01-05T06:12:46.485Z"}
+{"event_id":"E0010050","host":"bastion-01","message":"Invalid user guest from 198.18.198.252 port 1672","ts":"2026-01-05T06:12:47.991Z"}
+{"event_id":"E0010051","host":"bastion-01","message":"Failed password for invalid user guest from 198.18.172.96 port 31724 ssh2","ts":"2026-01-05T06:12:48.991Z"}
+{"event_id":"E0010052","host":"bastion-01","message":"Connection closed by invalid user guest 198.18.172.96 port 31724 [preauth]","ts":"2026-01-05T06:12:49.191Z"}
+{"event_id":"E0010053","host":"bastion-01","message":"Failed password for invalid user guest from 198.18.198.252 port 1672 ssh2","ts":"2026-01-05T06:12:49.239Z"}
+{"event_id":"E0010054","host":"bastion-01","message":"Failed password for invalid user guest from 198.18.198.252 port 1672 ssh2","ts":"2026-01-05T06:12:53.220Z"}
+{"event_id":"E0010055","host":"bastion-01","message":"Connection closed by invalid user guest 198.18.198.252 port 1672 [preauth]","ts":"2026-01-05T06:12:53.420Z"}
+{"event_id":"E0010056","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 59625 ssh2","ts":"2026-01-05T06:12:55.674Z"}
+{"event_id":"E0010059","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 59625 ssh2","ts":"2026-01-05T06:12:57.069Z"}
+{"event_id":"E0010060","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 59625 ssh2","ts":"2026-01-05T06:12:59.498Z"}
+{"event_id":"E0010062","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 59625 ssh2","ts":"2026-01-05T06:13:02.560Z"}
+{"event_id":"E0010063","host":"bastion-01","message":"Connection closed by authenticating user jonas 198.18.85.18 port 59625 [preauth]","ts":"2026-01-05T06:13:02.760Z"}
+{"event_id":"E0010066","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 48763 ssh2","ts":"2026-01-05T06:13:08.395Z"}
+{"event_id":"E0010068","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 48763 ssh2","ts":"2026-01-05T06:13:08.948Z"}
+{"event_id":"E0010071","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 48763 ssh2","ts":"2026-01-05T06:13:12.524Z"}
+{"event_id":"E0010076","host":"bastion-01","message":"Received disconnect from 198.18.198.252 port 28905:11: Bye Bye [preauth]","ts":"2026-01-05T06:13:15.024Z"}
+{"event_id":"E0010077","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 48763 ssh2","ts":"2026-01-05T06:13:16.012Z"}
+{"event_id":"E0010078","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 48763 ssh2","ts":"2026-01-05T06:13:18.986Z"}
+{"event_id":"E0010079","host":"bastion-01","message":"Connection closed by authenticating user jonas 198.18.85.18 port 48763 [preauth]","ts":"2026-01-05T06:13:19.186Z"}
+{"event_id":"E0010081","host":"bastion-01","message":"Did not receive identification string from 198.18.198.252 port 10583","ts":"2026-01-05T06:13:22.909Z"}
+{"event_id":"E0010084","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 15311 ssh2","ts":"2026-01-05T06:13:25.719Z"}
+{"event_id":"E0010085","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 15311 ssh2","ts":"2026-01-05T06:13:26.688Z"}
+{"event_id":"E0010086","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 15311 ssh2","ts":"2026-01-05T06:13:27.366Z"}
+{"event_id":"E0010087","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 15311 ssh2","ts":"2026-01-05T06:13:29.512Z"}
+{"event_id":"E0010088","host":"bastion-01","message":"Connection closed by authenticating user jonas 198.18.85.18 port 15311 [preauth]","ts":"2026-01-05T06:13:29.712Z"}
+{"event_id":"E0010090","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 4034 ssh2","ts":"2026-01-05T06:13:34.623Z"}
+{"event_id":"E0010093","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 4034 ssh2","ts":"2026-01-05T06:13:37.535Z"}
+{"event_id":"E0010094","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 4034 ssh2","ts":"2026-01-05T06:13:40.117Z"}
+{"event_id":"E0010095","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 4034 ssh2","ts":"2026-01-05T06:13:42.824Z"}
+{"event_id":"E0010097","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 4034 ssh2","ts":"2026-01-05T06:13:46.620Z"}
+{"event_id":"E0010102","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 12097 ssh2","ts":"2026-01-05T06:13:53.303Z"}
+{"event_id":"E0010103","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 12097 ssh2","ts":"2026-01-05T06:13:54.417Z"}
+{"event_id":"E0010104","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 12097 ssh2","ts":"2026-01-05T06:13:54.987Z"}
+{"event_id":"E0010105","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 12097 ssh2","ts":"2026-01-05T06:13:56.848Z"}
+{"event_id":"E0010106","host":"bastion-01","message":"Connection closed by authenticating user jonas 198.18.85.18 port 12097 [preauth]","ts":"2026-01-05T06:13:57.048Z"}
+{"event_id":"E0010110","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 11892 ssh2","ts":"2026-01-05T06:14:02.553Z"}
+{"event_id":"E0010111","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 11892 ssh2","ts":"2026-01-05T06:14:03.894Z"}
+{"event_id":"E0010112","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 11892 ssh2","ts":"2026-01-05T06:14:07.152Z"}
+{"event_id":"E0010113","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 11892 ssh2","ts":"2026-01-05T06:14:10.378Z"}
+{"event_id":"E0010114","host":"bastion-01","message":"Connection closed by authenticating user jonas 198.18.85.18 port 11892 [preauth]","ts":"2026-01-05T06:14:10.578Z"}
+{"event_id":"E0010116","host":"bastion-01","message":"Invalid user www from 198.19.52.186 port 47077","ts":"2026-01-05T06:14:16.562Z"}
+{"event_id":"E0010117","host":"bastion-01","message":"Failed password for invalid user www from 198.19.52.186 port 47077 ssh2","ts":"2026-01-05T06:14:18.252Z"}
+{"event_id":"E0010118","host":"bastion-01","message":"Connection closed by invalid user www 198.19.52.186 port 47077 [preauth]","ts":"2026-01-05T06:14:18.452Z"}
+{"event_id":"E0010119","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 44064 ssh2","ts":"2026-01-05T06:14:21.209Z"}
+{"event_id":"E0010120","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 44064 ssh2","ts":"2026-01-05T06:14:21.782Z"}
+{"event_id":"E0010121","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 44064 ssh2","ts":"2026-01-05T06:14:25.405Z"}
+{"event_id":"E0010122","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 27051 ssh2","ts":"2026-01-05T06:14:32.581Z"}
+{"event_id":"E0010123","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 27051 ssh2","ts":"2026-01-05T06:14:35.439Z"}
+{"event_id":"E0010124","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 27051 ssh2","ts":"2026-01-05T06:14:36.161Z"}
+{"event_id":"E0010125","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 27051 ssh2","ts":"2026-01-05T06:14:39.224Z"}
+{"event_id":"E0010128","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 27051 ssh2","ts":"2026-01-05T06:14:42.110Z"}
+{"event_id":"E0010129","host":"bastion-01","message":"Connection closed by authenticating user jonas 198.18.85.18 port 27051 [preauth]","ts":"2026-01-05T06:14:42.310Z"}
+{"event_id":"E0010132","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 14871 ssh2","ts":"2026-01-05T06:14:47.961Z"}
+{"event_id":"E0010133","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 14871 ssh2","ts":"2026-01-05T06:14:48.811Z"}
+{"event_id":"E0010134","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 14871 ssh2","ts":"2026-01-05T06:14:51.820Z"}
+{"event_id":"E0010135","host":"bastion-01","message":"Failed password for jonas from 198.18.85.18 port 14871 ssh2","ts":"2026-01-05T06:14:54.335Z"}
+{"event_id":"E0010136","host":"bastion-01","message":"Connection closed by authenticating user jonas 198.18.85.18 port 14871 [preauth]","ts":"2026-01-05T06:14:54.535Z"}
+{"event_id":"E0010140","host":"bastion-01","message":"Accepted password for jonas from 198.18.85.18 port 58899 ssh2","ts":"2026-01-05T06:14:59.249Z"}
+{"event_id":"E0010141","host":"bastion-01","message":"pam_unix(sshd:session): session opened for user jonas(uid=1001) by (uid=0)","ts":"2026-01-05T06:14:59.269Z"}
+{"event_id":"E0010153","host":"bastion-01","message":"Invalid user postgres from 198.18.242.165 port 6669","ts":"2026-01-05T06:16:03.042Z"}
+{"event_id":"E0010154","host":"bastion-01","message":"Failed password for invalid user postgres from 198.18.242.165 port 6669 ssh2","ts":"2026-01-05T06:16:04.588Z"}
+{"event_id":"E0010155","host":"bastion-01","message":"Connection closed by invalid user postgres 198.18.242.165 port 6669 [preauth]","ts":"2026-01-05T06:16:04.788Z"}
+{"event_id":"E0010156","host":"bastion-01","message":"Invalid user ftpuser from 198.18.242.165 port 35403","ts":"2026-01-05T06:16:13.082Z"}
+{"event_id":"E0010158","host":"bastion-01","message":"Failed password for invalid user ftpuser from 198.18.242.165 port 35403 ssh2","ts":"2026-01-05T06:16:15.503Z"}
+{"event_id":"E0010161","host":"bastion-01","message":"Failed password for invalid user ftpuser from 198.18.242.165 port 35403 ssh2","ts":"2026-01-05T06:16:18.270Z"}
+{"event_id":"E0010162","host":"bastion-01","message":"Connection closed by invalid user ftpuser 198.18.242.165 port 35403 [preauth]","ts":"2026-01-05T06:16:18.470Z"}
+{"event_id":"E0010164","host":"bastion-01","message":"Connection closed by 198.18.242.165 port 7999 [preauth]","ts":"2026-01-05T06:16:23.903Z"}
+{"event_id":"E0010189","host":"bastion-01","message":"Received disconnect from 198.18.25.178 port 10696:11: disconnected by user","ts":"2026-01-05T06:18:03.472Z"}
+{"event_id":"E0010190","host":"bastion-01","message":"pam_unix(sshd:session): session closed for user jonas","ts":"2026-01-05T06:18:03.482Z"}
+{"event_id":"E0010198","host":"bastion-01","message":"Received disconnect from 198.18.85.18 port 58899:11: disconnected by user","ts":"2026-01-05T06:19:59.249Z"}
+{"event_id":"E0010199","host":"bastion-01","message":"pam_unix(sshd:session): session closed for user jonas","ts":"2026-01-05T06:19:59.259Z"}
