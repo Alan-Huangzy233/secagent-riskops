@@ -28,6 +28,8 @@ Criteria* in the [Project Charter](./project-charter.md):
 | FastAPI surface + SQLite persistence | `backend/app/api/app.py`, `backend/app/storage/repository.py` |
 | Test suite incl. adversarial scope enforcement | `backend/tests/` |
 | CI: run tests + demo smoke | `.github/workflows/ci.yml` |
+| Seeded, labelled synthetic sshd dataset (ground truth kept apart) and scheduled log-to-alert conversion through the production parser and rules | `backend/app/evaluation/` |
+| Alert reduction: dedup (re-raised detections), correlate (shared evidence, one source close in time), explainable score and surface decision | `backend/app/reduction/` |
 
 Run it: `make install && make test && make demo`.
 
