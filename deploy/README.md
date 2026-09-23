@@ -91,8 +91,53 @@ journal cursors produce a gap report, not a promise of complete history.
   AbuseIPDB. Dashboard refresh and offline lookup do not make that request.
 - Refresh is manual by default, with optional 1/5/15-minute intervals. Pagination
   includes total pages and direct page navigation.
-- `scripts/backup_telemetry.py` creates verified SQLite copies. Store backups
-  securely and separately from published source code.
+- `scripts/backup_telemetry.py` creates verified SQLite copies and keeps the
+  newest seven; `--keep <n>` or `RISKOPS_BACKUP_KEEP=<n>` (one drop-in covers
+  every ExecStart line of the unit) changes that. Store backups securely and
+  separately from published source code.
+- `scripts/recovery_package.py build --config <file> --output-dir <directory>`
+  bundles what a restore actually needs: consistent snapshots of every
+  configured database, the collector cursors that match them, and a manifest
+  with SHA-256 digests, schema fingerprints and restore order. See
+  `deploy/recovery-package.example.json`. Cursors are captured before the
+  snapshots, so a restored cursor can only replay acknowledged events, never
+  skip them; collection keeps running while a package is built. Pass
+  `--recipient <40-hex-fingerprint>` to encrypt with `gpg` to a key whose
+  private half is kept off the host, or `--allow-unencrypted` for a local
+  staging copy. `verify <package>` re-checks the stored bytes; `verify
+  <package> --deep` decrypts, unpacks and runs `integrity_check` on every
+  database; `verify <package> --into <empty-directory>` leaves the verified
+  contents behind for a restore drill.
+  Recipients can also be listed under `recipients` in the configuration, which
+  keeps fingerprints out of unit files; `--recipient` replaces that list.
+- `scripts/backup_export.py` is the only thing a backup node's SSH key may run.
+  Give the node a dedicated system account whose `~/.ssh/authorized_keys` is
+  root-owned, and install the key there with `restrict,command="/usr/bin/python3
+  -I .../backup_export.py --store <directory> --peer <name>"`. The store and its
+  parents must be root-owned and not group- or world-writable; make the store
+  `root:<account group> 0750` and build with `--share-group <account group>` so
+  each published package is group-readable and only its `confirmations/`
+  directory is group-writable. The peer name comes from the key, never from the
+  client; the client may only `list`, `fetch <backup-id> <file>` for a file that
+  package's own manifest lists, and `ack <backup-id> <sha256>` once it holds the
+  published object. It cannot supply a path, open a shell or forward a port, and
+  its only write is its own confirmation record.
+- `deploy/systemd/secagent-riskops-recovery-package.service` and `.timer` build
+  one package a day after the plain backup and then prune. The unit reads
+  `/etc/secagent-riskops/recovery-package.json`, encrypts with a public-only
+  keyring in `/var/lib/secagent-riskops-recovery/gnupg`, and publishes to
+  `/var/backups/secagent-riskops-packages` for the `riskops-backup` group.
+- `scripts/pull_recovery_packages.py --target <ssh-destination> --destination
+  <directory>` runs on the backup node. It pulls, checks every file against the
+  package's `SHA256SUMS`, publishes the copy only once it verifies, and then
+  confirms it. The control node holds no credential for the backup node, so a
+  compromised control node cannot delete what the node already pulled.
+- `scripts/recovery_package.py prune <store> --keep <n> --require-confirmations
+  <n>` reports which local packages an independent confirmed copy protects, and
+  deletes them with `--apply`. It never goes below the retained generations,
+  never touches a package whose manifest it cannot read, and refuses any package
+  directory holding files it did not publish. Without confirmations it deletes
+  nothing, which is why a package timer is only safe once a node is pulling.
 - `scripts/reparse_ssh_telemetry.py --database <absolute-path>` defaults to dry-run.
   Applying requires `--apply --backup <new-absolute-path>` and a maintenance pause
   for writers. Raw record identity and existing incident links are protected.

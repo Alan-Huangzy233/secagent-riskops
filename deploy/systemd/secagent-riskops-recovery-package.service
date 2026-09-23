@@ -1,0 +1,33 @@
+[Unit]
+Description=Encrypted RiskOps recovery package for the pulling backup node
+After=secagent-riskops.service
+
+[Service]
+Type=oneshot
+# Runs as root: the package pairs the telemetry and control databases with the
+# collector cursors, and those live under three different service accounts.
+# Recipients come from the configuration; this keyring holds public keys only.
+Environment=GNUPGHOME=/var/lib/secagent-riskops-recovery/gnupg
+# The pulling account reads packages through its group and may write nothing
+# but its own confirmations.
+ExecStart=/usr/bin/python3 /opt/secagent-riskops/current/scripts/recovery_package.py build \
+    --config /etc/secagent-riskops/recovery-package.json \
+    --output-dir /var/backups/secagent-riskops-packages \
+    --share-group riskops-backup
+# Deletes a local package only where a pulling node has confirmed it holds the
+# same object, and never below the retained generations.
+ExecStart=/usr/bin/python3 /opt/secagent-riskops/current/scripts/recovery_package.py prune \
+    /var/backups/secagent-riskops-packages --keep 2 --require-confirmations 1 --apply
+UMask=0077
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+StateDirectory=secagent-riskops-recovery
+StateDirectoryMode=0700
+# SQLite needs to manage its -shm sidecar beside a WAL database even for a
+# read-only snapshot; the packages directory is the only other write target.
+ReadWritePaths=/var/lib/secagent-riskops /var/backups/secagent-riskops-packages

@@ -24,6 +24,11 @@ role-based access control, or authorization for autonomous model actions.
    result requires checking the target state before creating a new request.
 5. To remove a block, choose its unban preview, review it, then confirm. Removing
    one channel does not remove another channel's block for the same IP.
+6. Once a ban on the SSH or TCP channel is verified, the alerts for that peer whose
+   participating sources all hold a verified SSH-covering block move to the
+   "resolved" triage state, with the job ID and the reason as the record. A
+   partially covered alert, a UDP-only ban and an unban never change triage.
+   See "处置状态" in `ssh-detection.md`.
 
 The console shows the last verified state and the latest source check. When a
 source is unavailable, the last confirmed entries remain visible with a failed

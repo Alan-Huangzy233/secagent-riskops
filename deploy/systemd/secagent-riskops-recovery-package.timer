@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily RiskOps recovery package
+
+[Timer]
+# After the plain database backup, so the two do not read the same database at
+# the same time.
+OnCalendar=*-*-* 03:45:00 UTC
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target

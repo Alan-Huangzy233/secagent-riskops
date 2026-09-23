@@ -35,6 +35,17 @@ _SSH_UNITS = {"ssh.service", "sshd.service"}
 _FAILURE_TYPES = tuple(sorted(FAILURE_KINDS | {"ssh_failure"}))
 _SUCCESS_TYPES = ("auth_success", "ssh_success")
 _FAILURE_SQL = ",".join("?" * len(_FAILURE_TYPES))
+# Operator triage of an incident, kept apart from the detector's own status
+# column so an older release can still read and write this database.
+TRIAGE_STATES = ("pending", "acknowledged", "resolved")
+# Transitions an operator may request. System causes (a verified block, newer
+# evidence, a merge) bypass this table, and every change is logged with its cause.
+TRIAGE_TRANSITIONS = {"pending": {"acknowledged", "resolved"},
+                      "acknowledged": {"pending", "resolved"},
+                      "resolved": {"pending"}}
+_TRIAGE_RANK = {state: rank for rank, state in enumerate(TRIAGE_STATES)}
+_TRIAGE_STATE = "coalesce(incident_triage.state,'pending')"
+_INCIDENT_FROM = "FROM incidents LEFT JOIN incident_triage ON incident_triage.incident_id=incidents.incident_id"
 
 
 def _compatible_evidence_kind(old: str, new: str) -> bool:
@@ -214,6 +225,21 @@ class TelemetryStore:
                     success_count INTEGER NOT NULL, evidence_count INTEGER NOT NULL,
                     username_count INTEGER NOT NULL, usernames_json TEXT NOT NULL
                 );
+                -- Absent row means pending. Additive so a rollback keeps working.
+                CREATE TABLE IF NOT EXISTS incident_triage (
+                    incident_id TEXT PRIMARY KEY REFERENCES incidents(incident_id),
+                    state TEXT NOT NULL, state_ts REAL NOT NULL, state_at TEXT NOT NULL,
+                    actor TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS incident_triage_log (
+                    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                    incident_id TEXT NOT NULL REFERENCES incidents(incident_id),
+                    at TEXT NOT NULL, ts REAL NOT NULL, actor TEXT NOT NULL,
+                    from_state TEXT NOT NULL, to_state TEXT NOT NULL, cause TEXT NOT NULL,
+                    note TEXT, reference TEXT
+                );
+                CREATE INDEX IF NOT EXISTS incident_triage_log_incident
+                    ON incident_triage_log(incident_id, seq);
             """)
         # Additive migration: old IDs, receipts and raw evidence remain intact.
         with self._connection(write=True) as db:
@@ -353,6 +379,30 @@ class TelemetryStore:
             SELECT ?,rule_id,rule_version,window_seconds,reason FROM incident_rules WHERE incident_id=?""", (target, other))
         db.execute("UPDATE incidents SET status='merged',merged_into=?,updated_at=? WHERE incident_id=?",
                    (target, now, other))
+        # A merge must never hide unhandled activity behind a handled identity.
+        absorbed = TelemetryStore._triage_state(db, other)
+        if _TRIAGE_RANK[absorbed] < _TRIAGE_RANK[TelemetryStore._triage_state(db, target)]:
+            TelemetryStore._set_triage(db, target, absorbed, now, actor="system", cause="merge", reference=other)
+
+    @staticmethod
+    def _triage_state(db: sqlite3.Connection, incident_id: str) -> str:
+        row = db.execute("SELECT state FROM incident_triage WHERE incident_id=?", (incident_id,)).fetchone()
+        return row[0] if row else "pending"
+
+    @staticmethod
+    def _set_triage(db: sqlite3.Connection, incident_id: str, state: str, now: str, *, actor: str,
+                    cause: str, note: str | None = None, reference: str | None = None) -> bool:
+        previous = TelemetryStore._triage_state(db, incident_id)
+        if previous == state:
+            return False
+        stamp = datetime.fromisoformat(now.replace("Z", "+00:00")).timestamp()
+        db.execute("""INSERT INTO incident_triage VALUES(?,?,?,?,?) ON CONFLICT(incident_id) DO UPDATE SET
+            state=excluded.state,state_ts=excluded.state_ts,state_at=excluded.state_at,actor=excluded.actor""",
+            (incident_id, state, stamp, now, actor))
+        db.execute("""INSERT INTO incident_triage_log(incident_id,at,ts,actor,from_state,to_state,cause,note,reference)
+            VALUES(?,?,?,?,?,?,?,?,?)""", (incident_id, now, stamp, actor, previous, state, cause, note, reference))
+        db.execute("UPDATE incidents SET updated_at=? WHERE incident_id=?", (now, incident_id))
+        return True
 
     def _refresh_incident(self, db: sqlite3.Connection, incident_id: str) -> None:
         # Counts cover retained evidence, including after raw-event expiry. Read
@@ -398,17 +448,29 @@ class TelemetryStore:
         else:
             incident_id = "SSH-" + uuid.uuid4().hex
             timestamp = _iso(datetime.fromtimestamp(first["event_ts"], timezone.utc))
-            db.execute("INSERT INTO incidents VALUES(?,?,?,?,?,'open',?,?,?,?,0,?,?,NULL)",
-                       (incident_id, first["source_id"], first["hostname"], first["src_ip"],
-                        f"SSH authentication activity from {first['src_ip']}", timestamp, timestamp,
-                        first["event_ts"], first["event_ts"], now, now))
+            db.execute("""INSERT INTO incidents(incident_id,source_id,hostname,src_ip,title,status,first_seen,
+                last_seen,first_ts,last_ts,failure_count,created_at,updated_at,merged_into)
+                VALUES(?,?,?,?,?,'open',?,?,?,?,0,?,?,NULL)""",
+                (incident_id, first["source_id"], first["hostname"], first["src_ip"],
+                 f"SSH authentication activity from {first['src_ip']}", timestamp, timestamp,
+                 first["event_ts"], first["event_ts"], now, now))
+        newest = None
         for row in evidence:
-            db.execute("INSERT OR IGNORE INTO incident_evidence VALUES(?,?,?,?,?)",
-                       (row["source_id"], row["event_id"], incident_id, row["event_ts"], row["record_json"]))
+            added = db.execute("INSERT OR IGNORE INTO incident_evidence VALUES(?,?,?,?,?)",
+                               (row["source_id"], row["event_id"], incident_id, row["event_ts"], row["record_json"])).rowcount
             db.execute("UPDATE events SET incident_id=? WHERE source_id=? AND event_id=?",
                        (incident_id, row["source_id"], row["event_id"]))
+            if added and (newest is None or row["event_ts"] > newest["event_ts"]):
+                newest = row
         self._record_rule(db, incident_id, match)
         db.execute("UPDATE incidents SET updated_at=? WHERE incident_id=?", (now, incident_id))
+        if newest is not None:
+            # Activity after the operator resolved the incident reopens it. Late
+            # delivery or historical re-evaluation of older records does not.
+            triage = db.execute("SELECT state,state_ts FROM incident_triage WHERE incident_id=?", (incident_id,)).fetchone()
+            if triage and triage["state"] == "resolved" and newest["event_ts"] > triage["state_ts"]:
+                self._set_triage(db, incident_id, "pending", now, actor="system", cause="evidence",
+                                 reference=_json({"source_id": newest["source_id"], "event_id": newest["event_id"]}))
         return incident_id
 
     def _detect_advanced(self, db: sqlite3.Connection, triggers: list[dict[str, Any]], now: str) -> set[str]:
@@ -565,13 +627,15 @@ class TelemetryStore:
 
     def _incidents(self, db: sqlite3.Connection, source_id: str | None,
                    limit: int, offset: int, *, include_evidence: bool = True,
-                   incident_id: str | None = None) -> list[dict[str, Any]]:
-        where, params = self._incident_filter(source_id)
+                   incident_id: str | None = None, triage: str | None = None) -> list[dict[str, Any]]:
+        where, params = self._incident_filter(source_id, triage)
         if incident_id is not None:
-            where += " AND incident_id=?"
+            where += " AND incidents.incident_id=?"
             params += (incident_id,)
-        rows = db.execute(f"SELECT * FROM incidents WHERE status!='merged' {where} ORDER BY last_ts DESC,incident_id LIMIT ? OFFSET ?",
-                          (*params, limit, offset)).fetchall()
+        rows = db.execute(f"""SELECT incidents.*,{_TRIAGE_STATE} AS triage_status,
+            incident_triage.state_at AS triage_updated_at {_INCIDENT_FROM}
+            WHERE incidents.status!='merged' {where} ORDER BY incidents.last_ts DESC,incidents.incident_id LIMIT ? OFFSET ?""",
+            (*params, limit, offset)).fetchall()
         result = []
         for row in rows:
             evidence = db.execute("SELECT source_id,event_id,snapshot_json FROM incident_evidence WHERE incident_id=? ORDER BY event_ts,source_id,event_id LIMIT ?",
@@ -596,21 +660,112 @@ class TelemetryStore:
         return result
 
     @staticmethod
-    def _incident_filter(source_id: str | None) -> tuple[str, tuple]:
-        if source_id is None:
-            return "", ()
-        return ("AND (source_id=? OR incident_id IN (SELECT incident_id FROM incident_sources WHERE source_id=?))",
-                (source_id, source_id))
+    def _incident_filter(source_id: str | None, triage: str | None = None) -> tuple[str, tuple]:
+        where, params = "", ()
+        if source_id is not None:
+            where += " AND (incidents.source_id=? OR incidents.incident_id IN (SELECT incident_id FROM incident_sources WHERE source_id=?))"
+            params += (source_id, source_id)
+        if triage is not None and triage != "all":
+            if triage not in TRIAGE_STATES:
+                raise ValueError("triage must be pending, acknowledged, resolved or all")
+            where += f" AND {_TRIAGE_STATE}=?"
+            params += (triage,)
+        return where, params
 
     def count_incidents(self) -> int:
         with self._connection() as db:
             return db.execute("SELECT count(*) FROM incidents WHERE status!='merged'").fetchone()[0]
 
+    def _triage_counts(self, db: sqlite3.Connection, source_id: str | None) -> dict[str, int]:
+        where, params = self._incident_filter(source_id)
+        counts = {state: 0 for state in TRIAGE_STATES}
+        for state, total in db.execute(f"""SELECT {_TRIAGE_STATE} AS state,count(*) {_INCIDENT_FROM}
+                WHERE incidents.status!='merged' {where} GROUP BY state""", params):
+            counts[state] = total
+        counts["total"] = sum(counts.values())
+        return counts
+
+    def triage_counts(self, source_id: str | None = None) -> dict[str, int]:
+        with self._connection() as db:
+            return self._triage_counts(db, source_id)
+
     def get_incident(self, incident_id: str) -> dict[str, Any] | None:
         with self._connection() as db:
             canonical = self._canonical_incident(db, incident_id)
             rows = self._incidents(db, None, 1, 0, include_evidence=False, incident_id=canonical)
-            return {**rows[0], "requested_incident_id": incident_id} if rows else None
+            if not rows:
+                return None
+            log = [dict(row) for row in db.execute("""SELECT seq,at,actor,from_state,to_state,cause,note,reference
+                FROM incident_triage_log WHERE incident_id=? ORDER BY seq DESC LIMIT 50""", (canonical,))]
+            return {**rows[0], "requested_incident_id": incident_id, "triage_log": log}
+
+    def set_triage(self, incident_ids: list[str], state: str, *, actor: str,
+                   note: str | None = None) -> dict[str, Any]:
+        """Apply one operator transition to each listed incident.
+
+        Results are reported per incident: a merged alias resolves to its
+        canonical identity, an already matching state is unchanged, and a
+        transition outside TRIAGE_TRANSITIONS is refused rather than forced.
+        """
+        if state not in TRIAGE_STATES:
+            raise ValueError("state must be pending, acknowledged or resolved")
+        if not isinstance(incident_ids, list) or not 1 <= len(incident_ids) <= 100:
+            raise ValueError("incident_ids must list between 1 and 100 incidents")
+        actor = _bounded_text(actor, "actor", 128)
+        if note is not None:
+            note = _bounded_text(note, "note", 300, empty=True).strip() or None
+        now = _iso(_now())
+        results, changed = [], 0
+        with self._connection(write=True) as db:
+            for requested in incident_ids:
+                requested = _bounded_text(requested, "incident_id", 256)
+                canonical = self._canonical_incident(db, requested)
+                if not db.execute("SELECT 1 FROM incidents WHERE incident_id=?", (canonical,)).fetchone():
+                    results.append({"incident_id": requested, "result": "missing"})
+                    continue
+                previous = self._triage_state(db, canonical)
+                if previous == state:
+                    result = "unchanged"
+                elif state not in TRIAGE_TRANSITIONS[previous]:
+                    result = "invalid"
+                else:
+                    self._set_triage(db, canonical, state, now, actor=actor, cause="manual", note=note)
+                    result = "changed"
+                    changed += 1
+                results.append({"incident_id": requested, "canonical_incident_id": canonical, "previous": previous,
+                                "state": self._triage_state(db, canonical), "result": result})
+            counts = self._triage_counts(db, None)
+        return {"results": results, "changed": changed, "triage_counts": counts}
+
+    def resolve_blocked_incidents(self, ip: str, source_ids: list[str], *, actor: str,
+                                  reference: str, note: str | None = None) -> list[str]:
+        """Resolve unhandled incidents for a peer once every participating source blocks it.
+
+        Called after a block was verified on a source. An incident that also
+        involves a source without a verified SSH-covering block stays as it is,
+        so a partially blocked peer is never shown as handled.
+        """
+        ip = str(ipaddress.ip_address(ip))
+        covered = sorted({_bounded_text(item, "source_id", 128) for item in source_ids})
+        if not covered:
+            return []
+        actor = _bounded_text(actor, "actor", 128)
+        reference = _bounded_text(reference, "reference", 256)
+        if note is not None:
+            note = _bounded_text(note, "note", 300, empty=True).strip() or None
+        marks = ",".join("?" * len(covered))
+        with self._connection(write=True) as db:
+            rows = db.execute(f"""SELECT incidents.incident_id {_INCIDENT_FROM}
+                WHERE incidents.status!='merged' AND incidents.src_ip=? AND {_TRIAGE_STATE}!='resolved'
+                AND NOT EXISTS (SELECT 1 FROM incident_sources WHERE incident_sources.incident_id=incidents.incident_id
+                    AND incident_sources.source_id NOT IN ({marks}))
+                AND (incidents.source_id IN ({marks})
+                    OR EXISTS (SELECT 1 FROM incident_sources WHERE incident_sources.incident_id=incidents.incident_id))
+                ORDER BY incidents.incident_id""", (ip, *covered, *covered)).fetchall()
+            now = _iso(_now())
+            for row in rows:
+                self._set_triage(db, row[0], "resolved", now, actor=actor, cause="block", note=note, reference=reference)
+            return [row[0] for row in rows]
 
     def paginate_incident_evidence(self, incident_id: str, limit: int = 100,
                                    page: int = 1, source_id: str | None = None):
@@ -631,19 +786,23 @@ class TelemetryStore:
             return {"items": [self._event(json.loads(row[0])) for row in rows], **pagination,
                     "incident_id": canonical, "requested_incident_id": incident_id}
 
-    def list_incidents(self, source_id: str | None = None, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
+    def list_incidents(self, source_id: str | None = None, limit: int = 100, offset: int = 0,
+                       triage: str | None = None) -> list[dict[str, Any]]:
         self._page(limit, offset)
         with self._connection() as db:
-            return self._incidents(db, source_id, limit, offset)
+            return self._incidents(db, source_id, limit, offset, triage=triage)
 
     def paginate_incidents(self, source_id: str | None = None, limit: int = 100,
-                           page: int = 1, *, include_evidence: bool = True) -> dict[str, Any]:
+                           page: int = 1, *, include_evidence: bool = True,
+                           triage: str | None = None) -> dict[str, Any]:
         self._page_number(limit, page)
-        where, params = self._incident_filter(source_id)
+        where, params = self._incident_filter(source_id, triage)
         with self._connection() as db:
-            total = db.execute(f"SELECT count(*) FROM incidents WHERE status!='merged' {where}", params).fetchone()[0]
+            total = db.execute(f"SELECT count(*) {_INCIDENT_FROM} WHERE incidents.status!='merged' {where}", params).fetchone()[0]
             pagination = self._pagination(total, limit, page)
-            return {"items": self._incidents(db, source_id, limit, pagination["offset"], include_evidence=include_evidence), **pagination}
+            return {"items": self._incidents(db, source_id, limit, pagination["offset"],
+                                             include_evidence=include_evidence, triage=triage),
+                    **pagination, "triage": triage or "all", "triage_counts": self._triage_counts(db, source_id)}
 
     def list_sources(self, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
         self._page(limit, offset)
