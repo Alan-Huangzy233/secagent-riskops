@@ -17,8 +17,8 @@ assert _SPEC.loader is not None
 _SPEC.loader.exec_module(backup)
 
 
-def invoke(monkeypatch, database, directory):
-    monkeypatch.setattr(sys, "argv", ["backup", "--database", str(database), "--directory", str(directory)])
+def invoke(monkeypatch, database, directory, *extra):
+    monkeypatch.setattr(sys, "argv", ["backup", "--database", str(database), "--directory", str(directory), *extra])
     backup.main()
 
 
@@ -53,6 +53,7 @@ def test_corrupt_source_preserves_old_backup_and_removes_partial_copy(tmp_path, 
 
 
 def test_retention_keeps_seven_valid_snapshots_and_unrelated_files(tmp_path, monkeypatch):
+    monkeypatch.delenv("RISKOPS_BACKUP_KEEP", raising=False)
     database, directory = tmp_path / "live.sqlite", tmp_path / "backups"
     with closing(sqlite3.connect(database)) as writer:
         writer.execute("CREATE TABLE events (message TEXT)")
@@ -67,6 +68,30 @@ def test_retention_keeps_seven_valid_snapshots_and_unrelated_files(tmp_path, mon
         with closing(sqlite3.connect(path)) as restored:
             assert restored.execute("SELECT count(*) FROM events").fetchone()[0] == 0
     assert unrelated.read_bytes() == b"keep"
+
+
+def test_retention_follows_the_environment_and_the_command_line(tmp_path, monkeypatch):
+    database, directory = tmp_path / "live.sqlite", tmp_path / "backups"
+    with closing(sqlite3.connect(database)) as writer:
+        writer.execute("CREATE TABLE events (message TEXT)")
+    monkeypatch.setenv("RISKOPS_BACKUP_KEEP", "3")
+    for _ in range(5):
+        invoke(monkeypatch, database, directory)
+    kept = sorted(directory.glob("live-*.sqlite"))
+    assert len(kept) == 3
+    # The flag wins over the environment.
+    invoke(monkeypatch, database, directory, "--keep", "2")
+    remaining = sorted(directory.glob("live-*.sqlite"))
+    assert len(remaining) == 2 and remaining[0] == kept[-1]
+
+
+def test_retention_never_drops_every_snapshot(tmp_path, monkeypatch):
+    database, directory = tmp_path / "live.sqlite", tmp_path / "backups"
+    with closing(sqlite3.connect(database)) as writer:
+        writer.execute("CREATE TABLE events (message TEXT)")
+    with pytest.raises(SystemExit, match="at least one"):
+        invoke(monkeypatch, database, directory, "--keep", "0")
+    assert not directory.exists()
 
 
 def test_rotation_removes_the_sidecars_of_backups_it_deleted(tmp_path, monkeypatch):

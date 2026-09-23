@@ -91,8 +91,10 @@ journal cursors produce a gap report, not a promise of complete history.
   AbuseIPDB. Dashboard refresh and offline lookup do not make that request.
 - Refresh is manual by default, with optional 1/5/15-minute intervals. Pagination
   includes total pages and direct page navigation.
-- `scripts/backup_telemetry.py` creates verified SQLite copies. Store backups
-  securely and separately from published source code.
+- `scripts/backup_telemetry.py` creates verified SQLite copies and keeps the
+  newest seven; `--keep <n>` or `RISKOPS_BACKUP_KEEP=<n>` (one drop-in covers
+  every ExecStart line of the unit) changes that. Store backups securely and
+  separately from published source code.
 - `scripts/recovery_package.py build --config <file> --output-dir <directory>`
   bundles what a restore actually needs: consistent snapshots of every
   configured database, the collector cursors that match them, and a manifest
