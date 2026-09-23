@@ -1,0 +1,30 @@
+# `docker compose up` builds the image, runs the pipeline demo once and serves
+# the API at http://127.0.0.1:8000/docs. No API key or external service is used.
+x-image: &image
+  build:
+    context: .
+    dockerfile: deploy/Dockerfile
+  image: secagent-riskops:local
+  read_only: true
+  tmpfs:
+    - /tmp
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+
+services:
+  demo:
+    <<: *image
+    command: ["python", "-m", "app.demo"]
+
+  api:
+    <<: *image
+    command: ["python", "-m", "uvicorn", "app.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12

@@ -8,14 +8,18 @@
 
 **Results:** evaluation in progress. The dataset, ground truth, baselines and miss-rate definition are fixed in [EVALUATION.md](./EVALUATION.md) before any number is produced; the figures ship with `v0.3.0-demo`.
 
-**Run it** (Python 3.11+, no API key):
+**Run it** (Docker, no API key):
 
 ```bash
 git clone https://github.com/Alan-Huangzy233/secagent-riskops && cd secagent-riskops
-make install && make demo
+docker compose up
 ```
 
-## What `make demo` shows today
+## What the demo shows today
+
+`docker compose up` runs the demo once and then serves the API at
+<http://127.0.0.1:8000/docs>. Without Docker, `make install && make demo` does the
+same with Python 3.11+ in a project virtual environment.
 
 The demo runs the walking skeleton on bundled sample alerts: it retains raw
 evidence, normalizes, deduplicates, groups and scores the alerts, runs an
@@ -86,7 +90,7 @@ See [SECURITY.md](./SECURITY.md), [capability boundaries](./docs/capability-boun
 ```text
 backend/    pipeline, agents, policy engine, storage, workflow runtime, telemetry pilot, tests
 scripts/    collector, backup and recovery tools, public-repository audit
-deploy/     example systemd units and the deployment guide
+deploy/     container image, example systemd units and the deployment guide
 docs/       design documents; docs/process/ keeps the historical GitHub seeding scripts
 examples/   sanitized sample inputs
 frontend/   placeholder: the web console is planned, not implemented

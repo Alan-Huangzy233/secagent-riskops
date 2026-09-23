@@ -31,6 +31,28 @@ jobs:
       - name: Run end-to-end demo (smoke)
         run: PYTHONPATH=backend python -m app.demo
 
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build the image
+        run: docker compose build
+
+      - name: Run the demo in the container
+        run: docker compose run --rm demo
+
+      - name: API becomes healthy
+        run: |
+          docker compose up --detach --wait api
+          curl --fail --silent --show-error http://127.0.0.1:8000/health
+          curl --fail --silent --show-error --request POST http://127.0.0.1:8000/flows/run
+
+      - name: Stop
+        if: always()
+        run: docker compose down
+
+
   evaluate:
     runs-on: ubuntu-latest
     steps:
@@ -51,4 +73,3 @@ jobs:
         run: |
           python -m app.evaluation.run --data runtime-data/eval/synthetic-7d --out docs/eval/results-synthetic-7d.json
           git diff --exit-code docs/eval/results-synthetic-7d.json
-
