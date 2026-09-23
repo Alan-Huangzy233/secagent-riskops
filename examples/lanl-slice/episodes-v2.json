@@ -1,0 +1,1258 @@
+[
+  {
+    "account": "U1133@DOM1",
+    "day": 12,
+    "episode_id": "EP-001",
+    "hosts": [
+      "C2012",
+      "C3635"
+    ],
+    "red_team_events": 2,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U1145@DOM1",
+    "day": 12,
+    "episode_id": "EP-002",
+    "hosts": [
+      "C115",
+      "C1737",
+      "C2388",
+      "C2877",
+      "C3019",
+      "C307",
+      "C3173"
+    ],
+    "red_team_events": 11,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U1289@DOM1",
+    "day": 12,
+    "episode_id": "EP-003",
+    "hosts": [
+      "C17640",
+      "C2519",
+      "C3758"
+    ],
+    "red_team_events": 5,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 2
+  },
+  {
+    "account": "U12@DOM1",
+    "day": 12,
+    "episode_id": "EP-004",
+    "hosts": [
+      "C366",
+      "C368"
+    ],
+    "red_team_events": 4,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U13@DOM1",
+    "day": 12,
+    "episode_id": "EP-005",
+    "hosts": [
+      "C3288",
+      "C430"
+    ],
+    "red_team_events": 2,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U1450@DOM1",
+    "day": 12,
+    "episode_id": "EP-006",
+    "hosts": [
+      "C1268"
+    ],
+    "red_team_events": 4,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U1480@DOM1",
+    "day": 12,
+    "episode_id": "EP-007",
+    "hosts": [
+      "C2388"
+    ],
+    "red_team_events": 2,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U1519@DOM1",
+    "day": 12,
+    "episode_id": "EP-008",
+    "hosts": [
+      "C849"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U1569@DOM1",
+    "day": 12,
+    "episode_id": "EP-009",
+    "hosts": [
+      "C3019"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U1581@DOM1",
+    "day": 12,
+    "episode_id": "EP-010",
+    "hosts": [
+      "C3019"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U1592@DOM1",
+    "day": 12,
+    "episode_id": "EP-011",
+    "hosts": [
+      "C1382",
+      "C18464",
+      "C20677",
+      "C3758",
+      "C395"
+    ],
+    "red_team_events": 6,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U162@DOM1",
+    "day": 12,
+    "episode_id": "EP-012",
+    "hosts": [
+      "C2388"
+    ],
+    "red_team_events": 2,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U1723@DOM1",
+    "day": 12,
+    "episode_id": "EP-013",
+    "hosts": [
+      "C1438",
+      "C2519"
+    ],
+    "red_team_events": 5,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U1789@DOM1",
+    "day": 12,
+    "episode_id": "EP-014",
+    "hosts": [
+      "C3019"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U207@DOM1",
+    "day": 12,
+    "episode_id": "EP-015",
+    "hosts": [
+      "C2388"
+    ],
+    "red_team_events": 2,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U20@DOM1",
+    "day": 12,
+    "episode_id": "EP-016",
+    "hosts": [
+      "C368"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U218@DOM1",
+    "day": 12,
+    "episode_id": "EP-017",
+    "hosts": [
+      "C1710",
+      "C1936",
+      "C2079",
+      "C2388",
+      "C3288",
+      "C5653",
+      "C92"
+    ],
+    "red_team_events": 9,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U2231@DOM1",
+    "day": 12,
+    "episode_id": "EP-018",
+    "hosts": [
+      "C1432",
+      "C1438",
+      "C3249",
+      "C5618"
+    ],
+    "red_team_events": 5,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U2575@DOM1",
+    "day": 12,
+    "episode_id": "EP-019",
+    "hosts": [
+      "C1438",
+      "C2519",
+      "C5618"
+    ],
+    "red_team_events": 3,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U3005@DOM1",
+    "day": 12,
+    "episode_id": "EP-020",
+    "hosts": [
+      "C1319",
+      "C1737",
+      "C1936",
+      "C1944",
+      "C2012",
+      "C2079",
+      "C246",
+      "C2604",
+      "C3303",
+      "C3629",
+      "C3635",
+      "C423",
+      "C477",
+      "C506",
+      "C687",
+      "C8209",
+      "C849",
+      "C965"
+    ],
+    "red_team_events": 24,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U3277@C2519",
+    "day": 12,
+    "episode_id": "EP-021",
+    "hosts": [
+      "C2519"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U342@DOM1",
+    "day": 12,
+    "episode_id": "EP-022",
+    "hosts": [
+      "C2519"
+    ],
+    "red_team_events": 4,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U3486@DOM1",
+    "day": 12,
+    "episode_id": "EP-023",
+    "hosts": [
+      "C457",
+      "C467"
+    ],
+    "red_team_events": 2,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C22409"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U3635@DOM1",
+    "day": 12,
+    "episode_id": "EP-024",
+    "hosts": [
+      "C1438",
+      "C8209"
+    ],
+    "red_team_events": 3,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U4112@DOM1",
+    "day": 12,
+    "episode_id": "EP-025",
+    "hosts": [
+      "C1438"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U415@DOM1",
+    "day": 12,
+    "episode_id": "EP-026",
+    "hosts": [
+      "C1570",
+      "C1906",
+      "C3173",
+      "C486"
+    ],
+    "red_team_events": 4,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U4448@DOM1",
+    "day": 12,
+    "episode_id": "EP-027",
+    "hosts": [
+      "C1224",
+      "C1438",
+      "C22275"
+    ],
+    "red_team_events": 6,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U453@DOM1",
+    "day": 12,
+    "episode_id": "EP-028",
+    "hosts": [
+      "C2388"
+    ],
+    "red_team_events": 2,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U5254@DOM1",
+    "day": 12,
+    "episode_id": "EP-029",
+    "hosts": [
+      "C1438"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U6691@DOM1",
+    "day": 12,
+    "episode_id": "EP-030",
+    "hosts": [
+      "C1936",
+      "C2079"
+    ],
+    "red_team_events": 2,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U66@DOM1",
+    "day": 12,
+    "episode_id": "EP-031",
+    "hosts": [
+      "C1006",
+      "C1015",
+      "C102",
+      "C1042",
+      "C1085",
+      "C1096",
+      "C1191",
+      "C1482",
+      "C1737",
+      "C1936",
+      "C1944",
+      "C1961",
+      "C1964",
+      "C2012",
+      "C2013",
+      "C2079",
+      "C22174",
+      "C22176",
+      "C2254",
+      "C2388",
+      "C243",
+      "C3019",
+      "C3288",
+      "C3380",
+      "C3610",
+      "C3635",
+      "C368",
+      "C3755",
+      "C3758",
+      "C3813",
+      "C3888",
+      "C398",
+      "C4106",
+      "C423",
+      "C429",
+      "C4403",
+      "C452",
+      "C4610",
+      "C506",
+      "C5111",
+      "C5343",
+      "C5439",
+      "C553",
+      "C5653",
+      "C626",
+      "C798",
+      "C849",
+      "C881",
+      "C92"
+    ],
+    "red_team_events": 69,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U6764@DOM1",
+    "day": 12,
+    "episode_id": "EP-032",
+    "hosts": [
+      "C3019"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U7004@C2519",
+    "day": 12,
+    "episode_id": "EP-033",
+    "hosts": [
+      "C2519"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U737@DOM1",
+    "day": 12,
+    "episode_id": "EP-034",
+    "hosts": [
+      "C586"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C19932"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U7507@DOM1",
+    "day": 12,
+    "episode_id": "EP-035",
+    "hosts": [
+      "C1015",
+      "C16401",
+      "C4773",
+      "C486"
+    ],
+    "red_team_events": 8,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U7761@C2519",
+    "day": 12,
+    "episode_id": "EP-036",
+    "hosts": [
+      "C2519"
+    ],
+    "red_team_events": 2,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U78@DOM1",
+    "day": 12,
+    "episode_id": "EP-037",
+    "hosts": [
+      "C1581"
+    ],
+    "red_team_events": 2,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U8601@DOM1",
+    "day": 12,
+    "episode_id": "EP-038",
+    "hosts": [
+      "C20819",
+      "C636"
+    ],
+    "red_team_events": 4,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U9263@DOM1",
+    "day": 12,
+    "episode_id": "EP-039",
+    "hosts": [
+      "C1015"
+    ],
+    "red_team_events": 4,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U1025@DOM1",
+    "day": 13,
+    "episode_id": "EP-040",
+    "hosts": [
+      "C1046",
+      "C338",
+      "C3597"
+    ],
+    "red_team_events": 6,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U1133@DOM1",
+    "day": 13,
+    "episode_id": "EP-041",
+    "hosts": [
+      "C1936",
+      "C2079"
+    ],
+    "red_team_events": 3,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U1569@DOM1",
+    "day": 13,
+    "episode_id": "EP-042",
+    "hosts": [
+      "C1632"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U1581@DOM1",
+    "day": 13,
+    "episode_id": "EP-043",
+    "hosts": [
+      "C1006",
+      "C115"
+    ],
+    "red_team_events": 2,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U1653@DOM1",
+    "day": 13,
+    "episode_id": "EP-044",
+    "hosts": [
+      "C754"
+    ],
+    "red_team_events": 9,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C22409"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U24@DOM1",
+    "day": 13,
+    "episode_id": "EP-045",
+    "hosts": [
+      "C1581",
+      "C2378",
+      "C3491",
+      "C4934"
+    ],
+    "red_team_events": 4,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U2575@DOM1",
+    "day": 13,
+    "episode_id": "EP-046",
+    "hosts": [
+      "C10",
+      "C8751"
+    ],
+    "red_team_events": 2,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U2758@DOM1",
+    "day": 13,
+    "episode_id": "EP-047",
+    "hosts": [
+      "C10405"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U3005@DOM1",
+    "day": 13,
+    "episode_id": "EP-048",
+    "hosts": [
+      "C1302",
+      "C1710",
+      "C1810",
+      "C1887",
+      "C52",
+      "C78"
+    ],
+    "red_team_events": 7,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U3549@DOM1",
+    "day": 13,
+    "episode_id": "EP-049",
+    "hosts": [
+      "C457",
+      "C528",
+      "C529",
+      "C586",
+      "C625"
+    ],
+    "red_team_events": 7,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U3635@DOM1",
+    "day": 13,
+    "episode_id": "EP-050",
+    "hosts": [
+      "C22766",
+      "C8209"
+    ],
+    "red_team_events": 2,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U4448@DOM1",
+    "day": 13,
+    "episode_id": "EP-051",
+    "hosts": [
+      "C9006"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U655@DOM1",
+    "day": 13,
+    "episode_id": "EP-052",
+    "hosts": [
+      "C1710",
+      "C3037"
+    ],
+    "red_team_events": 2,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U66@DOM1",
+    "day": 13,
+    "episode_id": "EP-053",
+    "hosts": [
+      "C1509",
+      "C155",
+      "C1710",
+      "C2079",
+      "C2388",
+      "C3037",
+      "C3170",
+      "C3610",
+      "C3758",
+      "C423",
+      "C429",
+      "C92"
+    ],
+    "red_team_events": 14,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U737@C10",
+    "day": 13,
+    "episode_id": "EP-054",
+    "hosts": [
+      "C10"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U737@DOM1",
+    "day": 13,
+    "episode_id": "EP-055",
+    "hosts": [
+      "C3491",
+      "C385",
+      "C625"
+    ],
+    "red_team_events": 3,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693",
+      "C19932"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U7507@DOM1",
+    "day": 13,
+    "episode_id": "EP-056",
+    "hosts": [
+      "C1015"
+    ],
+    "red_team_events": 2,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U8170@DOM1",
+    "day": 13,
+    "episode_id": "EP-057",
+    "hosts": [
+      "C313"
+    ],
+    "red_team_events": 2,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U86@C10",
+    "day": 13,
+    "episode_id": "EP-058",
+    "hosts": [
+      "C10"
+    ],
+    "red_team_events": 3,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U86@DOM1",
+    "day": 13,
+    "episode_id": "EP-059",
+    "hosts": [
+      "C395"
+    ],
+    "red_team_events": 5,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U9263@DOM1",
+    "day": 13,
+    "episode_id": "EP-060",
+    "hosts": [
+      "C1015",
+      "C828"
+    ],
+    "red_team_events": 3,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U9407@DOM1",
+    "day": 13,
+    "episode_id": "EP-061",
+    "hosts": [
+      "C96"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U1106@DOM1",
+    "day": 14,
+    "episode_id": "EP-062",
+    "hosts": [
+      "C21919",
+      "C4554"
+    ],
+    "red_team_events": 2,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U114@DOM1",
+    "day": 14,
+    "episode_id": "EP-063",
+    "hosts": [
+      "C1710",
+      "C2388",
+      "C3610"
+    ],
+    "red_team_events": 4,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U1506@DOM1",
+    "day": 14,
+    "episode_id": "EP-064",
+    "hosts": [
+      "C2388",
+      "C3610",
+      "C423",
+      "C92"
+    ],
+    "red_team_events": 4,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U227@DOM1",
+    "day": 14,
+    "episode_id": "EP-065",
+    "hosts": [
+      "C177"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U3206@DOM1",
+    "day": 14,
+    "episode_id": "EP-066",
+    "hosts": [
+      "C8585"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U3549@DOM1",
+    "day": 14,
+    "episode_id": "EP-067",
+    "hosts": [
+      "C1887",
+      "C457",
+      "C586"
+    ],
+    "red_team_events": 6,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U3575@DOM1",
+    "day": 14,
+    "episode_id": "EP-068",
+    "hosts": [
+      "C5030"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U7594@DOM1",
+    "day": 14,
+    "episode_id": "EP-069",
+    "hosts": [
+      "C16563"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U8168@C19038",
+    "day": 14,
+    "episode_id": "EP-070",
+    "hosts": [
+      "C19038"
+    ],
+    "red_team_events": 3,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U8170@DOM1",
+    "day": 14,
+    "episode_id": "EP-071",
+    "hosts": [
+      "C313"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U825@DOM1",
+    "day": 14,
+    "episode_id": "EP-072",
+    "hosts": [
+      "C2669"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U8777@DOM1",
+    "day": 14,
+    "episode_id": "EP-073",
+    "hosts": [
+      "C1710"
+    ],
+    "red_team_events": 1,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  },
+  {
+    "account": "U8946@DOM1",
+    "day": 14,
+    "episode_id": "EP-074",
+    "hosts": [
+      "C19038"
+    ],
+    "red_team_events": 9,
+    "scenario": "lanl_red_team",
+    "source_computers": [
+      "C17693"
+    ],
+    "synthetic": false,
+    "unmatched_red_team_events": 0
+  }
+]

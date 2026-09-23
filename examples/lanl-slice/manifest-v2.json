@@ -1,0 +1,33 @@
+{
+  "attack_records": 307,
+  "benign_records": 629600,
+  "citation": "A. D. Kent, Los Alamos National Laboratory, 2015, doi:10.17021/1179829",
+  "counts": {
+    "window_lines": 60783588,
+    "window_logons": 25772906
+  },
+  "episodes": 74,
+  "records": 629907,
+  "red_team_sources": [
+    "C17693",
+    "C19932",
+    "C22409"
+  ],
+  "sample_per_mille": 20,
+  "seed": 20261115,
+  "sha256": {
+    "episodes.json": "bcf6c09ef435bc017cc06592b8044a8c190cb2df0a4a43be528cd216e1e31e7a",
+    "labels.jsonl": "8fa3936f1c0fe90af57c52cae2fd2fd197fa2898439d14dd7e05146dee15b50b",
+    "records.jsonl": "0292d8f5d36473cfd54497a33f05b64c33bbdaa33f819d1198e1518d2140ab5e"
+  },
+  "slice_version": 2,
+  "slicer": "app.evaluation.lanl",
+  "source": "LANL Comprehensive, Multi-Source Cyber-Security Events (CC0)",
+  "synthetic": false,
+  "unmatched_red_team_events": 2,
+  "window": {
+    "days": 3,
+    "first_day": 12,
+    "red_team_events": 325
+  }
+}
