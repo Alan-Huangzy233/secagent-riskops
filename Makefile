@@ -7,7 +7,7 @@ help:
 	@echo "  demo      Run the end-to-end walking-skeleton flow on a sample alert"
 	@echo "  run       Start the FastAPI dev server on :8000"
 	@echo "  audit     Run the public-repository secret/PII audit"
-	@echo "  clean     Remove caches and local run artifacts"
+	@echo "  clean     Remove generated Python/pytest caches; preserve private records and runtime data"
 
 install:
 	python3 -m pip install -e .[dev]
@@ -25,4 +25,5 @@ audit:
 	python3 scripts/public_repo_audit.py --history --fail-on high
 
 clean:
-	rm -rf .pytest_cache **/__pycache__ .local-audit runtime-data
+	rm -rf -- .pytest_cache
+	find backend scripts -type d -name __pycache__ -prune -exec rm -rf -- {} +
