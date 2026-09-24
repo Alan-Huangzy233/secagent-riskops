@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SecAgent RiskOps — one synthetic week, replayed</title>
+<link rel="stylesheet" href="/demo/static/demo.css">
+<script src="/demo/static/demo.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <h1>SecAgent RiskOps</h1>
+    <p class="tagline">Alert reduction with a measured miss rate: one labelled synthetic week, replayed.</p>
+  </div>
+  <p class="notice" id="notice">Synthetic data (seed <span id="seed">…</span>, addresses in 198.18.0.0/15). Nothing on this page touches a real system.</p>
+</header>
+
+<main>
+  <section class="controls" aria-label="Replay controls">
+    <button id="play" type="button" class="primary">▶ Replay the week</button>
+    <button id="skip" type="button">Skip to end</button>
+    <div class="speed" role="group" aria-label="Speed">
+      <button type="button" data-speed="1" class="on">1×</button>
+      <button type="button" data-speed="2">2×</button>
+      <button type="button" data-speed="4">4×</button>
+    </div>
+    <label class="truth-toggle"><input type="checkbox" id="truth" checked> Show ground truth</label>
+    <span class="clock" id="clock" aria-live="off">—</span>
+  </section>
+
+  <section class="funnel" aria-label="What happened to the alerts">
+    <div class="stage"><span class="num" id="n-lines">0</span><span class="label">sshd log lines</span></div>
+    <div class="arrow">→</div>
+    <div class="stage"><span class="num" id="n-alerts">0</span><span class="label">alerts raised by the detection rules</span></div>
+    <div class="arrow">→</div>
+    <div class="stage"><span class="num" id="n-incidents">0</span><span class="label">incidents after dedup and correlation</span></div>
+    <div class="arrow">→</div>
+    <div class="stage hot"><span class="num" id="n-surfaced">0</span><span class="label">surfaced to an analyst (score ≥ <span id="threshold">25</span>)</span></div>
+    <div class="versus" id="versus" hidden>
+      <p><strong id="caught">—</strong> attacks caught · miss rate <strong id="miss">—</strong> · precision <strong id="precision">—</strong></p>
+      <p class="muted">SIEM-style tuple dedup leaves <strong id="b1">—</strong> incidents and misses <span id="b1-miss">—</span> at the same bar.</p>
+    </div>
+  </section>
+
+  <section class="activity" aria-label="Alerts per hour">
+    <svg id="chart" viewBox="0 0 1000 120" preserveAspectRatio="none" role="img" aria-label="Alerts raised per hour, with surfaced incidents marked"></svg>
+    <div class="ticker" id="ticker" aria-hidden="true"><div>raw sshd lines stream here during the replay (one in every 250 shown)</div></div>
+  </section>
+
+  <div class="columns">
+    <section class="list" aria-label="Surfaced incidents">
+      <h2>Surfaced incidents <span class="count" id="list-count">0</span></h2>
+      <p class="hint" id="list-hint">Press “Replay the week”. Incidents appear when their last alert arrives.</p>
+      <ol id="incidents"></ol>
+    </section>
+
+    <section class="detail" id="detail" aria-live="polite">
+      <div class="placeholder" id="placeholder">
+        <h2>How to read this page</h2>
+        <ol>
+          <li>Fixed detection rules run every <span id="tick">300</span> s over the sshd logs and raise alerts; an attack that keeps going keeps raising them.</li>
+          <li>Alerts about the same thing are merged into incidents, and each incident gets an explainable score from what its logs show.</li>
+          <li>Only incidents at or above the threshold reach an analyst. Claude then reads each one and proposes escalate, dismiss or abstain; it cannot act.</li>
+          <li>A fixed playbook turns a guessed password into a plan. The policy engine decides, an operator approves, and a typed executor runs it on a lab copy, verifies it and rolls back if the check fails.</li>
+        </ol>
+        <p>Select an incident to see why it was surfaced, what Claude said, and what happens when you respond.</p>
+      </div>
+      <div id="incident" hidden></div>
+    </section>
+  </div>
+
+  <section class="missed" id="missed" hidden aria-label="What it missed">
+    <h2>What it missed</h2>
+    <p id="missed-summary"></p>
+    <table>
+      <thead><tr><th>Scenario</th><th class="num">Attacks</th><th class="num">Raised an alert</th><th class="num">Caught (τ = 0.5)</th></tr></thead>
+      <tbody id="scenarios"></tbody>
+    </table>
+    <p class="muted" id="missed-note"></p>
+  </section>
+</main>
+
+<footer>
+  <p>Every number on this page comes from <code>docs/eval/web-demo-synthetic-7d.json</code>, built by the same pipeline as the evaluation and reproduced byte for byte in CI. Method, baselines and limits: <code>EVALUATION.md</code>. Safety behaviours: <code>docs/safety-demo.md</code>.</p>
+</footer>
+</body>
+</html>

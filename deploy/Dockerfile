@@ -19,7 +19,7 @@ RUN pip install -r deploy/requirements.lock \
 COPY LICENSE ./
 COPY backend/app backend/app
 COPY examples examples
-COPY docs/eval/triage-tape-synthetic-7d.jsonl docs/eval/
+COPY docs/eval/triage-tape-synthetic-7d.jsonl docs/eval/web-demo-synthetic-7d.json docs/eval/
 
 USER riskops
 CMD ["python", "-m", "app.demo"]
