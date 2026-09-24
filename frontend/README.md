@@ -3,6 +3,11 @@
 Browser console for SecAgent RiskOps. Planned in `v0.2.5 Web Console`; not yet
 implemented — this directory currently holds no application code.
 
+What runs in a browser today is the read-only web demo at `/demo`. It is plain
+HTML, CSS and JavaScript with no build step, in `backend/app/webdemo/static/`,
+and is served by the API. See [docs/web-demo.md](../docs/web-demo.md). The
+console described below is a separate, later piece of work.
+
 ## Stack
 
 - Vite + React + TypeScript

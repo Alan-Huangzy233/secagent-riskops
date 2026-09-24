@@ -40,6 +40,17 @@ jobs:
           PYTHONPATH=backend python -m app.safety_demo --check examples/safety-demo/audit-timeline.jsonl
           PYTHONPATH=backend python -m app.audit_timeline verify examples/safety-demo/audit-timeline.jsonl
 
+      - name: Web demo renders and its buttons work (headless Chrome)
+        run: |
+          PYTHONPATH=backend python -m uvicorn app.api.app:app --host 127.0.0.1 --port 8000 &
+          for attempt in $(seq 30); do curl --silent --fail http://127.0.0.1:8000/health && break; sleep 1; done
+          google-chrome --headless=new --no-sandbox --disable-gpu --virtual-time-budget=10000 --dump-dom \
+            "http://127.0.0.1:8000/demo?at=end&respond=approve#INC-A0003598" > web-demo.html
+          grep --quiet 'id="n-surfaced">50<' web-demo.html
+          grep --quiet "APPROVED by security-operator" web-demo.html
+          grep --quiet "Plan AP-0001 ends as: rolled back" web-demo.html
+          grep --quiet "Chain intact" web-demo.html
+
       - name: Published numbers match docs/eval
         run: PYTHONPATH=backend python -m app.evaluation.report --check
 
@@ -62,6 +73,10 @@ jobs:
           docker compose up --detach --wait api
           curl --fail --silent --show-error http://127.0.0.1:8000/health
           curl --fail --silent --show-error --request POST http://127.0.0.1:8000/flows/run
+          curl --fail --silent --show-error --output /dev/null http://127.0.0.1:8000/demo
+          curl --fail --silent --show-error --output /dev/null http://127.0.0.1:8000/demo/snapshot.json
+          curl --fail --silent --show-error --request POST --header 'Content-Type: application/json' \
+            --data '{"approve": true}' http://127.0.0.1:8000/demo/incidents/INC-A0003598/respond | grep --quiet '"status":"rolled_back"'
 
       - name: Stop
         if: always()
@@ -93,3 +108,6 @@ jobs:
         run: |
           python -m app.evaluation.triage --data runtime-data/eval/synthetic-7d --tape docs/eval/triage-tape-synthetic-7d.jsonl --out docs/eval/triage-synthetic-7d.json
           git diff --exit-code docs/eval/triage-synthetic-7d.json
+
+      - name: Rebuild the web demo's data byte for byte
+        run: python -m app.webdemo.snapshot --data runtime-data/eval/synthetic-7d --check docs/eval/web-demo-synthetic-7d.json

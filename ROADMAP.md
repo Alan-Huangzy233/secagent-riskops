@@ -29,7 +29,7 @@ GRC or knowledge UI, PostgreSQL.
 | v0.1.9 Assessment Authorization and Rules of Engagement | Partly implemented: hash-bound scope, fail-closed policy gates, blank and ambiguous scope refused; the rest is planned |
 | v0.2 AI SOC Inbox | Reduction pipeline implemented in the skeleton and measured under `v0.3.0-demo`; inbox UI and daily briefing planned, not implemented |
 | v0.2.4 Approval Service and Local Authentication | Partly implemented: one operator's approval, bound to the plan and scope hashes; approval requests, approver authentication and a second approver planned |
-| v0.2.5 Web Console | Planned, not implemented |
+| v0.2.5 Web Console | A read-only demo page replays the synthetic week (`/demo`, no build step); the console itself is planned, not implemented |
 | v0.3 GRC Bridge | Planned, not implemented beyond a fixed control mapping; to be renumbered after `v0.3.0-demo` |
 | v0.4 Controlled Remediation | Policy engine, ActionPlan and one typed executor (`harden_ssh_access`) on lab copies with independent verification and automatic, verified rollback; executors on real hosts planned |
 | v0.5 Knowledge Loop | Planned, not implemented |

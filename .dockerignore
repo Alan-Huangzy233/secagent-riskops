@@ -6,5 +6,6 @@
 !backend/app
 !examples
 !docs/eval/triage-tape-synthetic-7d.jsonl
+!docs/eval/web-demo-synthetic-7d.json
 **/__pycache__
 **/*.pyc

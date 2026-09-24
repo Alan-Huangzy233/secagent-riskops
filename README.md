@@ -17,13 +17,32 @@ git clone https://github.com/Alan-Huangzy233/secagent-riskops && cd secagent-ris
 docker compose up
 ```
 
+Then open <http://127.0.0.1:8000/>.
+
 ## What the demo shows today
 
-`docker compose up` runs the demo once and then serves the API at
-<http://127.0.0.1:8000/docs>. Without Docker, `make install && make demo` does the
-same with Python 3.11+ in a project virtual environment.
+**In the browser** (<http://127.0.0.1:8000/> after `docker compose up`, or
+`make install && make run` without Docker) the labelled synthetic week is
+replayed:
 
-The demo rebuilds one labelled synthetic day from its seed, checks it byte for
+- sshd log lines stream in, and the detection rules raise alerts;
+- alerts merge into incidents, and each incident's score is built up reason by
+  reason against the threshold;
+- the 50 surfaced incidents appear as their last alert arrives.
+
+Open an incident to see its raw log lines, the score breakdown, and Claude's
+recorded verdict with the lines it cited. Then respond:
+
+- the policy engine refuses the plan until it is approved;
+- the approved plan runs on a lab copy of the host, is verified, and on web-02
+  is rolled back automatically;
+- the audit trail is shown and can be downloaded and verified.
+
+The page ends with what was missed and why. Its numbers come from a snapshot
+that CI rebuilds byte for byte; the buttons run the real policy engine and
+executor. See [docs/web-demo.md](./docs/web-demo.md).
+
+**In the terminal**, `make demo` (also run once by `docker compose up`) rebuilds one labelled synthetic day from its seed, checks it byte for
 byte against the published manifest, raises alerts with the production rules,
 reduces them, and ends with the before/after comparison against SIEM-style tuple
 dedup, plus the reasons behind the highest-scoring incidents. It takes about ten
@@ -82,10 +101,11 @@ raw logs ─► detection rules ─► alerts ─► dedup ─► correlate ─�
 |---|---|
 | Alert reduction: dedup, correlation, explainable score, measured in [EVALUATION.md](./EVALUATION.md) | Approval service with a second approver and authenticated approvers |
 | Model triage (`claude-opus-5`) with a hard budget, recorded and replayable, measured in EVALUATION.md | Typed executors on real hosts (SSH, GitHub); only lab copies today |
-| SSH/auth detection rules: burst, slow scan, multiple accounts, cross-source, success after failures | Web console (SOC inbox); `frontend/` is a placeholder |
+| SSH/auth detection rules: burst, slow scan, multiple accounts, cross-source, success after failures | Web console (SOC inbox, approval queue); `frontend/` is a placeholder |
 | Evidence-grounded triage agent and skeptic gate | |
 | Fail-closed policy engine that refuses blank and ambiguous scope; hash-bound scope; approvals bound to the plan hash | |
 | Typed `harden_ssh_access` executor on lab copies: independent verification, automatic verified rollback | |
+| Read-only web demo: replay of the synthetic week, incident detail, response on lab copies | |
 | Hash-chained audit log, evidence vault, replay | GRC evidence and risk register (only a fixed control mapping exists) |
 | Field pilot: persistent ingestion, read-only console, manual block/unblock with verification, encrypted off-host recovery packages | Knowledge base, external intelligence ingestion, authorized scanning, PostgreSQL |
 

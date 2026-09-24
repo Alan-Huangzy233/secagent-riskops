@@ -1,6 +1,7 @@
 # `docker compose up` builds the image, runs the pipeline demo once and serves
-# the API at http://127.0.0.1:8000/docs. `docker compose run --rm safety` runs
-# the safety demo. No API key or external service is used.
+# the web demo at http://127.0.0.1:8000/ (API docs at /docs).
+# `docker compose run --rm safety` runs the safety demo in the terminal.
+# No API key or external service is used.
 x-image: &image
   build:
     context: .
