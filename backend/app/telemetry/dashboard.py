@@ -199,7 +199,11 @@ async function executeControl(){
 }
 const issueKinds={coverage_start:'覆盖起点：更早的日志不在采集范围',cursor_lost:'采集游标丢失，从近期窗口重新开始',retention_gap:'来源日志已轮转，旧游标失效',cursor_reset:'游标重置，但恢复窗口覆盖了已收日志，没有缺失',silence:'一段时间没有批次到达（采集器或中控 API 未运行）',source_error:'来源读取失败，等待重试',catching_up:'积压追赶中',delivery_delay:'批次在采集器本地排队后才送达',message_truncated:'超长日志消息被截断',restore:'从恢复包还原的时间点'};
 const issueCategories={gap:'缺口',delay:'延迟',notice:'提示'};
-function completeness(c){if(!c)return ['尚无记录','muted'];const since=c.coverage_start?`自 ${when(c.coverage_start)}${c.coverage_note?'（按首批估计）':''} 起`:'覆盖起点未知';if(!c.gaps_since_coverage)return [`完整：${since}无缺口`,'online'];const g=c.last_gap;return [`${since}有 ${c.gaps_since_coverage} 处缺口；最近一处 ${g?when(g.started_at)+' 至 '+when(g.ended_at):''}`,'error'];}
+function completeness(c){if(!c)return ['尚无记录','muted'];
+ // A source collected before tracking began: only the time since tracking is known to be complete.
+ const since=c.coverage_note?`自 ${when(c.tracking_since)} 开始记录以来`:c.coverage_start?`自覆盖起点 ${when(c.coverage_start)} 以来`:'覆盖起点未知，';
+ const earlier=c.coverage_note&&c.coverage_start?`；覆盖起点约 ${when(c.coverage_start)}，此前未记录缺口`:'';
+ if(!c.gaps_since_coverage)return [`完整：${since}无缺口${earlier}`,'online'];const g=c.last_gap;return [`${since}有 ${c.gaps_since_coverage} 处缺口；最近一处 ${g?when(g.started_at)+' 至 '+when(g.ended_at):''}${earlier}`,'error'];}
 function lateness(c){if(!c)return ['—','muted'];const open=c.open||[];if(open.includes('source_error'))return ['来源读取失败，日志留在来源等待重试','error'];if(open.includes('catching_up')||!c.caught_up)return ['追赶中：还有积压','offline'];const lag=Number(c.last_delivery_lag_seconds);return [`已追上${Number.isFinite(lag)&&lag>=60?`（最近一批晚到 ${Math.round(lag)} 秒）`:''}`,'online'];}
 let collectionPage=1,collectionPages=1,collectionRequestId=0;
 async function loadCollection(page=collectionPage){const requestId=++collectionRequestId;const query=new URLSearchParams({limit:'20',page:String(page)});if(currentSource)query.set('source_id',currentSource);
