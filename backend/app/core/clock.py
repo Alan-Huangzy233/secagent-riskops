@@ -6,7 +6,7 @@ re-execution reproduces byte-identical evidence and IDs.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Protocol
 
 
@@ -31,6 +31,22 @@ class FixedClock:
 
     def now(self) -> datetime:
         return self._moment
+
+
+class SteppingClock:
+    """A deterministic clock that moves forward a fixed step on every reading.
+
+    Used where a run should read as a timeline but still reproduce exactly.
+    """
+
+    def __init__(self, start: datetime, step: timedelta = timedelta(seconds=1)) -> None:
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+        self._next, self._step = start, step
+
+    def now(self) -> datetime:
+        moment, self._next = self._next, self._next + self._step
+        return moment
 
 
 def isoformat(moment: datetime) -> str:

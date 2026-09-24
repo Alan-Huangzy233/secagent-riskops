@@ -14,6 +14,8 @@ class ReasonCode(StrEnum):
     # Fail-closed authorization gates, in evaluation order.
     SCOPE_NOT_APPROVED = "SCOPE_NOT_APPROVED"
     SCOPE_UNBOUND = "SCOPE_UNBOUND"  # missing/blank policy hash
+    SCOPE_EMPTY = "SCOPE_EMPTY"  # no actor or no target
+    SCOPE_AMBIGUOUS = "SCOPE_AMBIGUOUS"  # an entry or the window can be read more than one way
     SCOPE_WINDOW_INVALID = "SCOPE_WINDOW_INVALID"  # no decision time / before valid_from
     SCOPE_EXPIRED = "SCOPE_EXPIRED"
     ACTOR_NOT_PERMITTED = "ACTOR_NOT_PERMITTED"

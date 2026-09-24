@@ -1,0 +1,28 @@
+# Lab copy of bastion-01 (synthetic). Debian 12 layout, as provisioned in 2023.
+
+Include /etc/ssh/sshd_config.d/*.conf
+
+Port 22
+HostKey /etc/ssh/ssh_host_ed25519_key
+
+LoginGraceTime 30
+PermitRootLogin yes
+MaxAuthTries 6
+
+#PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+
+# Left on after the 2023 migration; operators were meant to switch to keys.
+PasswordAuthentication yes
+PermitEmptyPasswords no
+KbdInteractiveAuthentication no
+
+UsePAM yes
+X11Forwarding no
+PrintMotd no
+AcceptEnv LANG LC_*
+Subsystem sftp /usr/lib/openssh/sftp-server
+
+Match User backup
+    ForceCommand internal-sftp
+    AllowTcpForwarding no

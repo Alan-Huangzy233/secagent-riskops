@@ -1,0 +1,282 @@
+{
+  "accounts": [
+    {
+      "account": "jonas",
+      "failed_records": 185,
+      "sshd_marked_invalid": false,
+      "successful_logins": 1
+    }
+  ],
+  "accounts_listed": 1,
+  "alerts": 5,
+  "distinct_accounts_tried": 1,
+  "duration_minutes": 9.4,
+  "failed_records": 185,
+  "first_seen": "2026-01-06T00:05:30Z",
+  "hosts": [
+    "bastion-01"
+  ],
+  "incident_id": "INC-A0004561",
+  "last_seen": "2026-01-06T00:14:56Z",
+  "record_sample": [
+    {
+      "account": "jonas",
+      "event_id": "E0023417",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:05:30Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023418",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:05:33Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023419",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:05:34Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023420",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:05:36Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023421",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:05:38Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023422",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:05:38Z",
+      "type": "preauth_abort"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023430",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:05:51Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023431",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:05:52Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023432",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:05:56Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023433",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:05:56Z",
+      "type": "preauth_abort"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023439",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:06:08Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023440",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:06:10Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023441",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:06:12Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023442",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:06:12Z",
+      "type": "preauth_abort"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023443",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:06:21Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023754",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:14:10Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023755",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:14:14Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023756",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:14:14Z",
+      "type": "preauth_abort"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023757",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:14:18Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023758",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:14:20Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023759",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:14:21Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023760",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:14:22Z",
+      "type": "preauth_abort"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023763",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:14:30Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023764",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:14:32Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023765",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:14:34Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023766",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:14:37Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023767",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:14:37Z",
+      "type": "preauth_abort"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023768",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:14:47Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023770",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:14:49Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "jonas",
+      "event_id": "E0023774",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "time": "2026-01-06T00:14:56Z",
+      "type": "auth_success"
+    }
+  ],
+  "records_in_incident": 186,
+  "rules_fired": [
+    "burst",
+    "slow_scan",
+    "success_after_failures"
+  ],
+  "sources": [
+    "198.19.74.248"
+  ],
+  "successful_logins": [
+    {
+      "account": "jonas",
+      "event_id": "E0023774",
+      "host": "bastion-01",
+      "source": "198.19.74.248",
+      "source_had_logged_in_as_account_before": false,
+      "time": "2026-01-06T00:14:56Z"
+    }
+  ]
+}

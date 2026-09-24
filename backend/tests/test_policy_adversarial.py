@@ -12,7 +12,7 @@ import pytest
 
 from app.authorization import make_scope
 from app.core.clock import FixedClock
-from app.policy.engine import PolicyEngine
+from app.policy.engine import PolicyEngine, scope_problems
 from app.policy.reason_codes import ReasonCode
 from app.schemas.enums import AutonomyLevel, PolicyEffect, RiskLevel
 from app.schemas.models import ActionRequest, AssessmentScope
@@ -82,7 +82,7 @@ def test_missing_decision_time_fails_closed(engine):
 
 
 def test_expired_scope_denied(engine):
-    d = engine.evaluate(_request(), _scope(valid_until="2026-07-01T00:00:00Z"))
+    d = engine.evaluate(_request(), _scope(valid_from="2026-06-01T00:00:00Z", valid_until="2026-07-01T00:00:00Z"))
     assert d.reason_code == ReasonCode.SCOPE_EXPIRED
 
 
@@ -134,3 +134,65 @@ def test_decision_binds_the_policy_hash(engine):
     scope = _scope()
     d = engine.evaluate(_request(), scope)
     assert d.policy_hash == scope.policy_hash
+
+
+# --------------------------------------------------------------------------- #
+# Blank and ambiguous scope (README: "fails closed; never unrestricted access")
+# --------------------------------------------------------------------------- #
+def test_a_blank_scope_is_refused_as_empty_even_when_marked_approved(engine):
+    blank = make_scope("SCOPE-BLANK", autonomy_level=AutonomyLevel.EXECUTE_AFTER_APPROVAL, approved=True)
+    assert engine.evaluate(_request(), blank).reason_code == ReasonCode.SCOPE_EMPTY
+    assert engine.evaluate(_request(), _scope(target_allowlist=())).reason_code == ReasonCode.SCOPE_EMPTY
+    assert engine.evaluate(_request(), _scope(allowed_actors=())).reason_code == ReasonCode.SCOPE_EMPTY
+
+
+@pytest.mark.parametrize("request_overrides, scope_overrides", [
+    ({"target": ""}, {"target_allowlist": ("",)}),  # blank target matched a blank entry
+    ({"actor": ""}, {"allowed_actors": ("",)}),  # blank actor matched a blank entry
+    ({"target": "*"}, {"target_allowlist": ("*",)}),  # bare wildcard
+    ({"target": "web-01."}, {"target_allowlist": ("*.",)}),  # wildcard over nothing
+    ({"target": "anything.internal"}, {"target_allowlist": ("*.internal",)}),  # a whole top-level zone
+    ({"target": "web-01"}, {"target_allowlist": ("web-*",)}),  # glob in the middle
+    ({"target": "10.0.0.5"}, {"target_allowlist": ("10.0.0.0/8",)}),  # a range read as a name
+    ({"target": " web-01"}, {"target_allowlist": (" web-01",)}),  # padding
+    ({"target": "Web-01"}, {"target_allowlist": ("Web-01",)}),  # case: host names compare case-blind
+    ({"actor": "*"}, {"allowed_actors": ("*",)}),
+    ({}, {"valid_from": "yesterday"}),  # text, not a time
+    ({}, {"valid_until": "2026-12-31T23:59:59"}),  # a time without a zone
+    ({}, {"valid_from": "2026-07-06T21:15:00Z", "valid_until": "2026-07-06T21:15:00Z"}),  # zero length
+    ({}, {"valid_from": "2026-12-31T00:00:00Z", "valid_until": "2026-01-01T00:00:00Z"}),  # inverted
+])
+def test_an_ambiguous_scope_fails_closed(engine, request_overrides, scope_overrides):
+    """Before the scope was checked on its own, most of these were allowed;
+    the rest were denied for the wrong reason."""
+    d = engine.evaluate(_request(**request_overrides), _scope(**scope_overrides))
+    assert d.effect == PolicyEffect.DENY
+    assert d.reason_code == ReasonCode.SCOPE_AMBIGUOUS
+
+
+def test_one_bad_entry_poisons_the_whole_scope(engine):
+    d = engine.evaluate(_request(target="web-01"), _scope(target_allowlist=("web-01", "*.internal")))
+    assert d.reason_code == ReasonCode.SCOPE_AMBIGUOUS
+
+
+def test_a_decision_time_that_is_not_a_time_fails_closed(engine):
+    assert engine.evaluate(_request(at="yesterday"), _scope()).reason_code == ReasonCode.SCOPE_WINDOW_INVALID
+    assert engine.evaluate(_request(at="2026-07-06T21:15:00"), _scope()).reason_code == ReasonCode.SCOPE_WINDOW_INVALID
+
+
+def test_times_are_compared_as_instants_not_as_text(engine):
+    # 23:15 at +02:00 is 21:15Z, inside a window ending 21:30Z.
+    d = engine.evaluate(_request(at="2026-07-06T23:15:00+02:00"), _scope(valid_until="2026-07-06T21:30:00Z"))
+    assert d.effect == PolicyEffect.ALLOW
+
+
+@pytest.mark.parametrize("target", ["", ".example.internal", "a..example.internal", "web-01 ", "WEB-01"])
+def test_a_malformed_target_never_matches(engine, target):
+    assert engine.evaluate(_request(target=target), _scope()).reason_code == ReasonCode.TARGET_NOT_IN_SCOPE
+
+
+def test_scope_problems_say_what_is_wrong():
+    problems = scope_problems(_scope(target_allowlist=("web-01", "*.internal"), valid_from="soon"))
+    assert any("'*.internal'" in problem for problem in problems)
+    assert any("valid_from 'soon'" in problem for problem in problems)
+    assert scope_problems(_scope()) == []

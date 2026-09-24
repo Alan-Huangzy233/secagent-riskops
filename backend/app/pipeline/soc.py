@@ -33,6 +33,11 @@ def _run_triage_agent(svc: Services, group: AlertGroup) -> tuple[AgentRun, Triag
         finished_at=finished,
     )
     svc.repo.save("agent_runs", run.agent_run_id, run)
+    svc.audit.record("agent.run", agent.name, subject_ref=run.agent_run_id,
+                     payload={"agent_version": agent.version, "input_refs": run.input_refs,
+                              "disposition": result.output["disposition"], "confidence": result.confidence,
+                              "evidence_ids": result.evidence_ids,
+                              "recommended_action_types": result.output.get("recommended_action_types", [])})
 
     recommendation = TriageRecommendation(
         disposition=Disposition(result.output["disposition"]),

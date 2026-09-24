@@ -55,15 +55,23 @@ class AuditLog:
 
     def verify_chain(self) -> bool:
         """Recompute every entry hash and confirm the chain is intact."""
-        prev = GENESIS
-        for event in self._events:
-            body = event.model_dump(exclude={"entry_hash"})
-            body["prev_hash"] = prev
-            expected = content_hash(canonical_json(body).encode("utf-8"))
-            if expected != event.entry_hash or event.prev_hash != prev:
-                return False
-            prev = event.entry_hash
-        return True
+        return first_break([event.model_dump() for event in self._events]) is None
+
+
+def first_break(rows: list[dict[str, Any]]) -> int | None:
+    """Index of the first event whose hash or link does not hold; None if the chain is intact.
+
+    Works on plain dicts, so an exported chain can be checked without the
+    process that wrote it.
+    """
+    prev = GENESIS
+    for index, row in enumerate(rows):
+        body = {key: value for key, value in row.items() if key != "entry_hash"}
+        expected = content_hash(canonical_json({**body, "prev_hash": prev}).encode("utf-8"))
+        if expected != row.get("entry_hash") or row.get("prev_hash") != prev:
+            return index
+        prev = row["entry_hash"]
+    return None
 
 
 def _iso(clock: Clock) -> str:

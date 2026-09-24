@@ -34,6 +34,12 @@ jobs:
       - name: Run the reduction demo (smoke)
         run: PYTHONPATH=backend python -m app.evaluation.demo
 
+      - name: Safety demo reproduces the published audit timeline
+        run: |
+          PYTHONPATH=backend python -m app.safety_demo
+          PYTHONPATH=backend python -m app.safety_demo --check examples/safety-demo/audit-timeline.jsonl
+          PYTHONPATH=backend python -m app.audit_timeline verify examples/safety-demo/audit-timeline.jsonl
+
       - name: Published numbers match docs/eval
         run: PYTHONPATH=backend python -m app.evaluation.report --check
 
@@ -47,6 +53,9 @@ jobs:
 
       - name: Run the demo in the container
         run: docker compose run --rm demo
+
+      - name: Run the safety demo in the container
+        run: docker compose run --rm safety
 
       - name: API becomes healthy
         run: |

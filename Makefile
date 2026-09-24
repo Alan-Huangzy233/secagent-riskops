@@ -1,4 +1,4 @@
-.PHONY: help install lint test demo flow dataset evaluate triage report run audit clean
+.PHONY: help install lint test demo flow safety dataset evaluate triage report run audit clean
 
 # Everything runs from a project virtual environment, so `make install` works on
 # systems whose Python refuses global installs (PEP 668).
@@ -13,6 +13,7 @@ help:
 	@echo "  test      Run the test suite"
 	@echo "  demo      Reduce one labelled synthetic day and print the before/after comparison"
 	@echo "  flow      Run the walking-skeleton flow: triage, incident, policy-gated remediation plan"
+	@echo "  safety    Scope refusals, an approved change verified on a lab host, an automatic rollback, the audit timeline"
 	@echo "  dataset   Rebuild the synthetic evaluation datasets and verify them against the published manifests"
 	@echo "  evaluate  Run the evaluation on the 7-day synthetic set and write docs/eval/results-synthetic-7d.json"
 	@echo "  triage    Replay the recorded model triage of the 7-day set (no API key, no cost)"
@@ -36,6 +37,9 @@ demo:
 
 flow:
 	$(BIN)/python -m app.demo
+
+safety:
+	$(BIN)/python -m app.safety_demo --export runtime-data/safety/audit-timeline.jsonl
 
 EVAL_DATA ?= runtime-data/eval
 
