@@ -28,6 +28,9 @@ FIXTURE_CREDENTIALS = {
     "backend/tests/test_manual_control.py": frozenset({
         "operator-control-tests-only",
     }),
+    "backend/tests/test_collection_integrity.py": frozenset({
+        "integrity-test-password-1234567890",
+    }),
 }
 # These are unquoted references in existing test function calls, not literals.
 CODE_REFERENCES = {

@@ -21,6 +21,7 @@ import ssl
 import subprocess
 import sys
 import threading
+import time
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
@@ -31,6 +32,10 @@ MAX_BATCH_BYTES = 1_000_000  # API limit is 1 MiB; leave room for schema changes
 MAX_EXPORT_BYTES = 4 * 1024 * 1024
 MAX_MESSAGE_BYTES = 4096
 MAX_RECORDS = 200
+# The exporter stops at about 3 MiB (journal_export.MAX_OUTPUT_BYTES) and does
+# not say so; an export this close to that size may have been cut short.
+EXPORT_PAGE_BYTES = 3 * 1024 * 1024 - 4096 - 65536 - 1024
+MORE_WAITING = ("page_full", "batch_limited")
 SOURCE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
 
 
@@ -79,6 +84,9 @@ def load_config(path: Path) -> dict[str, Any]:
             ("ssh_timeout_seconds", 20, 1, 120),
             ("http_timeout_seconds", 10, 1, 120),
             ("max_spool_bytes", 16 * 1024 * 1024, 1024, 1024 * 1024 * 1024),
+            # Bounded catch-up: after a full page, read more in the same run.
+            ("max_pages_per_run", 5, 1, 50),
+            ("max_seconds_per_source", 20, 1, 300),
         ):
             value = config.setdefault(key, default)
             if type(value) is not int or not minimum <= value <= maximum:
@@ -333,7 +341,11 @@ def read_json(path: Path, code: str) -> dict:
 def build_pending(source: dict, cursor: str | None, fetch: Callable, timeout: int) -> dict:
     source_error = None
     try:
-        records, next_cursor, reports = parse_export(fetch(source, cursor, timeout), cursor)
+        data = fetch(source, cursor, timeout)
+        records, next_cursor, reports = parse_export(data, cursor)
+        if len(records) >= MAX_RECORDS or len(data) >= EXPORT_PAGE_BYTES:
+            reports.append(report("page_full", "The export filled a whole page; more records are probably "
+                                  "waiting and will be read next, so this source is catching up."))
     except CollectorError as exc:
         source_error = str(exc)
         records, next_cursor = [], cursor
@@ -350,8 +362,8 @@ def build_pending(source: dict, cursor: str | None, fetch: Callable, timeout: in
     return {"version": 1, "body": body, "next_cursor": next_cursor, "source_error": source_error}
 
 
-def collect_source(config: dict, source: dict, fetch: Callable = ssh_export,
-                   send: Callable = post_batch) -> dict:
+def collect_page(config: dict, source: dict, fetch: Callable = ssh_export,
+                 send: Callable = post_batch) -> dict:
     directory = Path(config["state_dir"])
     sid = source["id"]
     state_path = directory / (sid + ".state.json")
@@ -391,8 +403,36 @@ def collect_source(config: dict, source: dict, fetch: Callable = ssh_export,
     atomic_write(state_path, {"cursor": next_cursor, "last_ack_at": utc_now()})
     pending_path.unlink()
     fsync_directory(directory)
+    codes = [item.get("code") for item in body.get("reports", []) if isinstance(item, dict)]
     return {"source_id": sid, "status": "source_error" if pending.get("source_error") else "acknowledged",
-            "code": pending.get("source_error"), "records": len(body["records"])}
+            "code": pending.get("source_error"), "records": len(body["records"]),
+            "report_codes": codes, "more": not pending.get("source_error") and any(c in MORE_WAITING for c in codes)}
+
+
+def collect_source(config: dict, source: dict, fetch: Callable = ssh_export,
+                   send: Callable = post_batch, clock: Callable[[], float] = time.monotonic) -> dict:
+    """Collect one page, then keep going while pages come back full, within the run's bounds.
+
+    Every page is its own spool -> durable ACK -> cursor commit, so stopping
+    anywhere (a limit, an error, a crash) loses nothing.
+    """
+    started = clock()
+    page = collect_page(config, source, fetch, send)
+    pages, records, codes = 1, page["records"], list(page["report_codes"])
+    status, code = page["status"], page["code"]
+    while (page["more"] and pages < config["max_pages_per_run"]
+           and clock() - started < config["max_seconds_per_source"]):
+        try:
+            page = collect_page(config, source, fetch, send)
+        except CollectorError as exc:
+            status, code, page = "error", str(exc), {"more": True}
+            break
+        pages += 1
+        records += page["records"]
+        codes += page["report_codes"]
+        status, code = page["status"], page["code"]
+    return {"source_id": source["id"], "status": status, "code": code, "records": records, "pages": pages,
+            "caught_up": not page["more"], "report_codes": sorted(set(codes))}
 
 
 def run_once(config: dict, fetch: Callable = ssh_export, send: Callable = post_batch) -> list[dict]:

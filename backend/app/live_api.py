@@ -218,7 +218,12 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
             connection_status = "never_seen"
             if last_seen:
                 age = (now - datetime.fromisoformat(last_seen.replace("Z", "+00:00"))).total_seconds()
-                connection_status = "offline" if age > cfg.heartbeat_timeout_seconds else ("error" if row.get("last_error") else "online")
+                # "error" means the source cannot be read right now; a report
+                # about coverage or truncation does not make a source unhealthy.
+                failing = "source_error" in ((row.get("collection") or {}).get("open") or [])
+                if row.get("collection") is None:
+                    failing = bool(row.get("last_error"))
+                connection_status = "offline" if age > cfg.heartbeat_timeout_seconds else ("error" if failing else "online")
             row["connection_status"] = connection_status
             sources.append(row)
             for total, counter in (("events", "event_count"), ("incidents", "incident_count"),
@@ -252,6 +257,12 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
         except (ValueError, OverflowError, TypeError):
             raise HTTPException(422, "查询参数无效，请检查 IP、时间范围和查询快照") from None
         return filters
+
+    @application.get("/api/collection-issues", dependencies=[Depends(operator)])
+    def collection_issues(request: Request, source_id: str | None = Query(None, max_length=64),
+                          page: int = Query(1, ge=1, le=1_000_000_000), limit: int = Query(50, ge=1, le=200)):
+        """Collection gaps and delays per source, newest first; nothing is ever overwritten."""
+        return request.app.state.store.paginate_collection_issues(source_filter(request, source_id), limit, page)
 
     @application.get("/api/events", dependencies=[Depends(operator)])
     def events(request: Request, source_id: str | None = Query(None, max_length=64),
@@ -419,7 +430,9 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
         error = "\n".join(errors)[:2048] or None
         try:
             result = await run_in_threadpool(request.app.state.store.ingest, source.id, source.hostname,
-                                            batch.batch_id, [record.model_dump() for record in batch.records], error=error)
+                                            batch.batch_id, [record.model_dump() for record in batch.records], error=error,
+                                            reports=[report.model_dump() for report in batch.reports],
+                                            collected_at=batch.collected_at)
         except ValueError:
             raise HTTPException(422, "Invalid telemetry batch") from None
         except Exception:

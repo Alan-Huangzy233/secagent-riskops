@@ -332,7 +332,10 @@ def restore_plan(components: list[dict]) -> dict:
                 'File ownership and mode are not carried in the package: recreate them from the '
                 'deployment record after restoring.',
                 'Reference components record where a pointer aimed; the release itself is rebuilt '
-                'from the repository, not from this package.']}
+                'from the repository, not from this package.',
+                'After the restored telemetry database is back in service and the API has started on it '
+                'once, run `recovery_package.py mark-restored <database> <package>` so the console shows '
+                'the restore point in its collection history.']}
 
 
 def shared_group(name: str, encrypted: bool) -> int:
@@ -786,6 +789,40 @@ def list_packages(args: argparse.Namespace) -> int:
     return 0
 
 
+def mark_restored(args: argparse.Namespace) -> int:
+    """Record a restore point in a telemetry database that is back in service.
+
+    Everything between the snapshot and now was collected into the database
+    that was replaced. The collector resumes from the restored cursors, so those
+    records come back from the source journals if they still hold them; if not,
+    the collector reports a retention gap on its own. This row makes the restore
+    itself visible in the collection history, one per source.
+    """
+    manifest = read_manifest(args.package)
+    captured = [component['captured_at'] for component in manifest['components']
+                if component['kind'] == 'sqlite' and component.get('captured_at')]
+    if not captured:
+        raise PackageError('the package records no database snapshot time')
+    snapshot, now = min(captured), utc_now()
+    detail = (f"restored from recovery package {manifest['backup_id']} (snapshot {snapshot}); records collected "
+              'after the snapshot are read again from the source journals where they still exist, and any '
+              'the journals no longer hold appear as a retention gap.')
+    with closing(sqlite3.connect(args.database)) as database:
+        present = {row[0] for row in database.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if not {'collection_issues', 'sources'} <= present:
+            raise PackageError('this database has no collection history yet; start the API on it once, '
+                               'which creates the tables, then run this again')
+        sources = [row[0] for row in database.execute('SELECT source_id FROM sources ORDER BY source_id')]
+        with database:
+            database.executemany(
+                'INSERT INTO collection_issues(source_id,kind,category,started_at,ended_at,detail,first_batch_id,'
+                'last_batch_id,batches,opened_at,updated_at) VALUES(?,?,?,?,?,?,NULL,NULL,0,?,?)',
+                [(source, 'restore', 'notice', snapshot, now, detail, now, now) for source in sources])
+    print(json.dumps({'backup_id': manifest['backup_id'], 'snapshot': snapshot, 'marked_at': now,
+                      'sources': sources}, indent=2, sort_keys=True))
+    return 0
+
+
 def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--zstd-binary', default='zstd')
@@ -833,6 +870,12 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
                         help='distinct pulling peers that must have confirmed a copy')
     pruner.add_argument('--apply', action='store_true', help='delete; without it the run only reports')
     pruner.set_defaults(handler=prune)
+
+    marker = commands.add_parser('mark-restored',
+                                 help='record a restore point in a telemetry database that is back in service')
+    marker.add_argument('database', type=Path)
+    marker.add_argument('package', type=Path)
+    marker.set_defaults(handler=mark_restored)
     return parser.parse_args(argv)
 
 

@@ -81,6 +81,25 @@ cursor only after durable acknowledgement. Keep its state directory across
 restarts. Initial collection covers the recent ten-minute window; unavailable
 journal cursors produce a gap report, not a promise of complete history.
 
+When a page comes back full (200 records, or an export cut short near its size
+limit) the collector reads further pages in the same run, up to
+`max_pages_per_run` (default 5) and `max_seconds_per_source` (default 20). Each
+page is still spooled and durably acknowledged on its own.
+
+The API keeps a per-source collection history (`/api/collection-issues`). It
+separates **gaps**, where records may be missing, from **delays**, where records
+arrive late but are not lost:
+
+- Gaps: the coverage start, a lost cursor, a rotated journal. The interval runs
+  from the last record already collected to the start of the recovery window;
+  if the window overlaps what was collected, it is a notice, not a gap.
+- Delays: an unreadable source, no batch for five minutes, a batch that waited
+  in the spool, a backlog.
+
+Gaps are never overwritten. After putting a restored database back into service,
+`recovery_package.py mark-restored <database> <package>` records the restore
+point.
+
 ## Optional enrichment and maintenance
 
 - `RISKOPS_GEOIP_DIRECTORY` selects offline DB-IP City/ASN databases. Use

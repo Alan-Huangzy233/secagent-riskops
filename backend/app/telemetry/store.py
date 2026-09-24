@@ -18,8 +18,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-from .sshd_parse import FAILURE_KINDS, parse_sshd
+from . import collection
 from .detection import MAX_WINDOW_SECONDS, RuleMatch, detect_matches
+from .sshd_parse import FAILURE_KINDS, parse_sshd
 
 
 _WINDOW_SECONDS = 300
@@ -241,6 +242,7 @@ class TelemetryStore:
                 CREATE INDEX IF NOT EXISTS incident_triage_log_incident
                     ON incident_triage_log(incident_id, seq);
             """)
+            db.executescript(collection.SCHEMA)
         # Additive migration: old IDs, receipts and raw evidence remain intact.
         with self._connection(write=True) as db:
             if not db.execute("SELECT 1 FROM maintenance WHERE name='detection_metadata_v1'").fetchone():
@@ -277,7 +279,11 @@ class TelemetryStore:
             return False
 
     def ingest(self, source_id: str, hostname: str, batch_id: str,
-               records: list[dict[str, Any]], error: str | None = None) -> dict[str, Any]:
+               records: list[dict[str, Any]], error: str | None = None, *,
+               reports: list[dict[str, Any]] | None = None, collected_at: str | None = None) -> dict[str, Any]:
+        """Commit one batch. ``reports`` and ``collected_at`` feed collection
+        integrity; they are not part of the batch's idempotency hash, so a batch
+        replayed from an older collector's spool is still recognised."""
         source_id = _bounded_text(source_id, "source_id", 128)
         hostname = _bounded_text(hostname, "hostname", 255)
         batch_id = _bounded_text(batch_id, "batch_id", 256)
@@ -298,6 +304,7 @@ class TelemetryStore:
                                  (source_id, batch_id)).fetchone()
             if receipt and receipt["payload_hash"] != payload_hash:
                 raise ValueError("batch_id was already used for different content")
+            previous = db.execute("SELECT * FROM sources WHERE source_id=?", (source_id,)).fetchone()
             db.execute("""INSERT INTO sources(source_id,hostname,first_seen,last_seen,last_error,status)
                 VALUES(?,?,?,?,?,?) ON CONFLICT(source_id) DO UPDATE SET
                 hostname=excluded.hostname,last_seen=excluded.last_seen,
@@ -348,6 +355,10 @@ class TelemetryStore:
                       "replayed_batch": False}
             db.execute("INSERT INTO batches VALUES(?,?,?,?,?,?)",
                        (source_id, batch_id, payload_hash, received_at, len(records), _json(result)))
+            collection.record_batch(db, source_id=source_id, batch_id=batch_id, received_at=received_at,
+                                    previous=previous, reports=reports or [],
+                                    record_times=[record["timestamp"] for record in normalized],
+                                    collected_at=collected_at)
             day = received_at[:10]
             last_cleanup = db.execute("SELECT value FROM maintenance WHERE name='last_cleanup'").fetchone()
             if not last_cleanup or last_cleanup[0] != day:
@@ -819,7 +830,16 @@ class TelemetryStore:
         where, params = TelemetryStore._incident_filter(row["source_id"])
         incidents = db.execute(f"SELECT count(*) FROM incidents WHERE status!='merged' {where}", params).fetchone()[0]
         return {**dict(row), "event_count": counts[0], "ssh_failure_count": counts[1],
-                "ssh_success_count": counts[2], "incident_count": incidents}
+                "ssh_success_count": counts[2], "incident_count": incidents,
+                "collection": collection.summary(db, row["source_id"])}
+
+    def paginate_collection_issues(self, source_id: str | None = None, limit: int = 50,
+                                   page: int = 1) -> dict[str, Any]:
+        """Gaps and delays, newest first; the history is append-only."""
+        self._page_number(limit, page)
+        with self._connection() as db:
+            total, items = collection.issues(db, source_id, limit, (page - 1) * limit)
+            return {"items": items, **self._pagination(total, limit, page)}
 
     def get_source(self, source_id: str) -> dict[str, Any] | None:
         with self._connection() as db:

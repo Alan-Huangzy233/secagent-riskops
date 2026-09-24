@@ -118,3 +118,50 @@ process.stdout.write(JSON.stringify(output));
     assert rows[1][3]["text"] == "失败日志：3 条"
     assert rows[1][4]["text"] == "登录失败（旧版记录）"
     assert rendered["emptyColumns"] == 6
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node is optional for the dashboard rendering check")
+def test_sources_show_online_completeness_and_delay_separately():
+    """A source tracked since the start, one tracked only since an upgrade, and one with a gap and a failing read."""
+    collection = {"tracking_since": "2026-09-24T13:00:00Z", "coverage_start": "2026-09-09T03:28:00Z",
+                  "coverage_note": None, "gaps_since_coverage": 0, "last_gap": None, "open": [], "caught_up": True,
+                  "last_delivery_lag_seconds": 3.0}
+    sources = [
+        {"source_id": "a", "hostname": "host-a", "connection_status": "online", "collection": collection},
+        {"source_id": "b", "hostname": "host-b", "connection_status": "online",
+         "collection": {**collection, "coverage_note": "estimated from the first batch; tracking started later"}},
+        {"source_id": "c", "hostname": "host-c", "connection_status": "error",
+         "collection": {**collection, "gaps_since_coverage": 1, "open": ["source_error"], "caught_up": False,
+                        "last_gap": {"started_at": "2026-09-20T01:00:00Z", "ended_at": "2026-09-20T02:00:00Z"}}},
+        {"source_id": "d", "hostname": "host-d", "connection_status": "online"},
+    ]
+    runner = r"""
+const vm=require('node:vm'),fs=require('node:fs');
+const input=JSON.parse(fs.readFileSync(0,'utf8'));
+class Element{
+ constructor(tag){this.tag=tag;this.children=[];this.textContent='';this.title='';this.className='';this.dataset={};}
+ append(...nodes){this.children.push(...nodes);}
+ replaceChildren(...nodes){this.children=nodes;}
+ setAttribute(){} removeAttribute(){} addEventListener(){} scrollIntoView(){}
+}
+const nodes=new Map();
+const document={getElementById(id){if(!nodes.has(id))nodes.set(id,new Element('node'));return nodes.get(id);},createElement(tag){return new Element(tag);}};
+const context={document,localStorage:{getItem(){return null;}},input};
+vm.createContext(context);
+vm.runInContext(input.script.replace(/refresh\(\);\s*$/,''),context);
+vm.runInContext("renderSummary({totals:{events:0,ssh_failures:0,ssh_successes:0,incidents:0},generated_at:'2026-09-24T13:00:00Z',retention_days:14,sources:input.sources})",context);
+const rows=nodes.get('sources').children.map(row=>row.children.map(cell=>({text:cell.textContent,cls:cell.className})));
+process.stdout.write(JSON.stringify(rows));
+"""
+    result = subprocess.run([shutil.which("node"), "-e", runner],
+                            input=json.dumps({"script": _SCRIPT, "sources": sources}),
+                            capture_output=True, text=True, encoding="utf-8", check=True, timeout=10)
+    rows = json.loads(result.stdout)
+    assert all(len(row) == 7 for row in rows)
+    tracked, upgraded, broken, legacy = rows
+    assert tracked[3]["text"].startswith("完整：自覆盖起点") and tracked[3]["cls"] == "online"
+    assert tracked[4]["text"] == "已追上"
+    assert "开始记录以来无缺口" in upgraded[3]["text"] and "此前未记录缺口" in upgraded[3]["text"]
+    assert "有 1 处缺口" in broken[3]["text"] and broken[3]["cls"] == "error"
+    assert broken[4]["text"].startswith("来源读取失败") and broken[2]["text"] == "采集异常"
+    assert legacy[3]["text"] == "尚无记录"
