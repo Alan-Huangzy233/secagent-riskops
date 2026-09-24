@@ -1,0 +1,282 @@
+{
+  "accounts": [
+    {
+      "account": "pavel",
+      "failed_records": 74,
+      "sshd_marked_invalid": false,
+      "successful_logins": 1
+    }
+  ],
+  "accounts_listed": 1,
+  "alerts": 3,
+  "distinct_accounts_tried": 1,
+  "duration_minutes": 3.5,
+  "failed_records": 74,
+  "first_seen": "2026-01-05T19:10:13Z",
+  "hosts": [
+    "web-02"
+  ],
+  "incident_id": "INC-A0003598",
+  "last_seen": "2026-01-05T19:13:44Z",
+  "record_sample": [
+    {
+      "account": "pavel",
+      "event_id": "E0018840",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:10:13Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018843",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:10:15Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018845",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:10:18Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018846",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:10:21Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018850",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:10:24Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018851",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:10:25Z",
+      "type": "preauth_abort"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018854",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:10:31Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018856",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:10:34Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018857",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:10:35Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018858",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:10:39Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018859",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:10:40Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018860",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:10:41Z",
+      "type": "preauth_abort"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018863",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:10:48Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018865",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:10:52Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018868",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:10:53Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018933",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:13:07Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018935",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:13:09Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018936",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:13:09Z",
+      "type": "preauth_abort"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018939",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:13:15Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018942",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:13:15Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018943",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:13:16Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018944",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:13:18Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018945",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:13:18Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018947",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:13:19Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018948",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:13:19Z",
+      "type": "preauth_abort"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018953",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:13:31Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018954",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:13:32Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018955",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:13:33Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018956",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:13:35Z",
+      "type": "auth_failure"
+    },
+    {
+      "account": "pavel",
+      "event_id": "E0018962",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "time": "2026-01-05T19:13:44Z",
+      "type": "auth_success"
+    }
+  ],
+  "records_in_incident": 75,
+  "rules_fired": [
+    "burst",
+    "slow_scan",
+    "success_after_failures"
+  ],
+  "sources": [
+    "198.18.77.144"
+  ],
+  "successful_logins": [
+    {
+      "account": "pavel",
+      "event_id": "E0018962",
+      "host": "web-02",
+      "source": "198.18.77.144",
+      "source_had_logged_in_as_account_before": false,
+      "time": "2026-01-05T19:13:44Z"
+    }
+  ]
+}

@@ -181,10 +181,18 @@ class ActionPlan(BaseModel):
 
 
 class Approval(BaseModel):
+    """A recorded decision on one exact plan under one exact scope.
+
+    ``plan_hash`` binds it to the plan's content: editing the plan afterwards
+    leaves it without an approval. There is one approver; a second-approver
+    rule is planned, not implemented.
+    """
+
     approval_id: str
     subject_ref: str  # action_plan_id
     decision: str  # approved / rejected
     approver: str
+    plan_hash: str
     policy_hash: str
     decided_at: str
 

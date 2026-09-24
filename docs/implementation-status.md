@@ -4,7 +4,7 @@ The other documents in this repository describe the **target design**. This
 page records what is **actually implemented in code** so the two are never
 confused.
 
-Last updated for: `v0.2` — MVP walking skeleton plus an independent SSH/auth telemetry pilot.
+Last updated for: `v0.3.0-demo` (in progress) — walking skeleton, measured alert reduction, model triage and the safety behaviours, plus an independent SSH/auth telemetry pilot.
 
 ## Implemented (runnable, tested)
 
@@ -21,8 +21,13 @@ Criteria* in the [Project Charter](./project-charter.md):
 | Deterministic, evidence-grounded triage agent + skeptic gate | `backend/app/agents/triage.py`, `backend/app/pipeline/soc.py` |
 | Incident creation with ATT&CK techniques | `backend/app/pipeline/soc.py` |
 | GRC control mapping (NIST 800-53 subset) + risk candidate | `backend/app/pipeline/grc.py` |
-| Typed action catalog + ActionPlan (created, never executed) | `backend/app/tools/registry.py`, `backend/app/pipeline/remediation.py` |
-| **Deterministic, fail-closed policy engine + stable reason codes** | `backend/app/policy/engine.py` |
+| Typed action catalog + ActionPlan | `backend/app/tools/registry.py`, `backend/app/pipeline/remediation.py` |
+| **Deterministic, fail-closed policy engine + stable reason codes**; blank scope (`SCOPE_EMPTY`) and ambiguous entries or windows (`SCOPE_AMBIGUOUS`) refused before any request is compared; times compared as instants | `backend/app/policy/engine.py` |
+| Approval recorded by one permitted operator, bound to the plan hash and the scope's policy hash; a later rejection or any edit to the plan withdraws it; no second-approver rule yet | `backend/app/pipeline/remediation.py` |
+| Typed `harden_ssh_access` executor confined to marked lab copies: smallest in-place edit, byte-for-byte backup, atomic write; verification re-reads the host with sshd's precedence (first value, includes in place, `Match` overrides); a failed check rolls back automatically and the rollback is verified | `backend/app/tools/harden_ssh.py`, `backend/app/tools/sshd_config.py` |
+| Audit timeline export: agent call, tool calls, plans, policy decisions, approvals, execution, verification and rollback as one hash-chained JSON Lines file, verified from the file alone | `backend/app/audit_timeline.py`, `backend/app/storage/audit_log.py` |
+| Safety demo on two recorded model escalations; its exported timeline reproduces byte for byte in CI | `backend/app/safety_demo.py`, `examples/safety-demo/`, [safety-demo.md](./safety-demo.md) |
+| Model triage (`claude-opus-5`) of surfaced incidents: structured verdicts, hard budget, every call recorded and replayed offline in CI | `backend/app/agents/model_triage.py`, `backend/app/evaluation/triage.py` |
 | Immutable, hash-bound assessment scope | `backend/app/authorization.py` |
 | Replay from retained evidence | `backend/app/replay.py` |
 | FastAPI surface + SQLite persistence | `backend/app/api/app.py`, `backend/app/storage/repository.py` |
@@ -81,17 +86,21 @@ These are documented in `docs/` but have **no code** yet:
 - Curated knowledge intake (upload/parse/review) — `curated-knowledge-intake.md`
 - Full Rules-of-Engagement UI and natural-language scope parsing — `assessment-authorization-and-rules-of-engagement.md`
 - Knowledge lifecycle (candidate → reviewed → active) — `grc-workflow.md`, product docs
-- Approval service and full product identity/role management — `v0.2.4`, `remediation-workflow.md`; the isolated telemetry pilot has Basic/source-token authentication only
-- Real typed executors (GitHub/SSH), verification, rollback — `v0.4`, `remediation-workflow.md`; the pilot's fixed nft block helper is a single-purpose operator control, not the typed executor / verification / rollback chain
+- Approval requests, approver authentication, a second-approver rule and full product identity/role management — `v0.2.4`, `remediation-workflow.md`; today one operator's approval is recorded and bound to the plan hash, and the isolated telemetry pilot has Basic/source-token authentication only
+- Typed executors on real hosts (GitHub/SSH) — `v0.4`, `remediation-workflow.md`; the one typed executor runs on lab copies only, and the pilot's fixed nft block helper is a single-purpose operator control, not the typed executor / verification / rollback chain
 - Full product frontend UI — `v0.2.5`, `frontend/README.md`; the isolated telemetry pilot has a self-contained page with read views, search and single-operator manual blocking
-- Real model-provider integration behind the agent seam
+- Model triage inside the walking-skeleton flow; it runs on the evaluation's surfaced incidents and in the safety demo (replayed), not behind the `AgentContract` seam
 - PostgreSQL + Alembic migrations (SQLite is the current stand-in) — `v0.2.4`
 
 ## Known limitations of the skeleton
 
-- The triage "agent" is deterministic rule logic standing in for a model, so the
-  pipeline is reproducible without a provider. The `ModelProvider` seam exists
-  for the real integration.
+- The walking skeleton's triage agent is deterministic rule logic, so that flow
+  is reproducible without a provider. Model triage is measured separately on
+  the reduction pipeline's incidents and replayed from recordings.
+- The typed executor edits only the file it owns and never reloads a daemon; a
+  drop-in that overrides it is caught by verification and rolled back, not
+  fixed. Verification does not evaluate `Match` criteria: any conditional
+  value that weakens a planned setting fails the check.
 - The evidence vault keeps blobs in memory for the process lifetime; durable
   blob storage is a follow-up. Replay therefore runs within a live `Services`.
 - The control library, ATT&CK map, and asset registry are small hard-coded

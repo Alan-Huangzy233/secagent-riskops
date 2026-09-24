@@ -10,7 +10,7 @@ a much smaller set of incidents, reported with episode-level precision, recall,
 - Pure dedup / correlate / score stages with unit tests
 - Baselines, metrics and `make evaluate` with byte-identical reruns
 - Model-backed triage with an offline fallback; agreement, abstention, cost and latency
-- Visible safety behaviours: second-person approval, execute-and-rollback in a sandbox, fail-closed scope, exported audit timeline
+- Visible safety behaviours (`make safety`): execute-and-rollback on a lab copy, fail-closed scope, exported audit timeline; second-person approval deferred while there is one operator, whose approval is bound to the plan hash
 - `docker compose up` with no API key
 
 Nothing else below is in scope for this milestone. Not planned for it: real SIEM
@@ -26,12 +26,12 @@ GRC or knowledge UI, PostgreSQL.
 | v0.1.6 External Intelligence Ingestion | Planned, not implemented (design only) |
 | v0.1.7 Authorized Security Validation | Planned, not implemented (design only) |
 | v0.1.8 Curated Knowledge Intake | Planned, not implemented (design only) |
-| v0.1.9 Assessment Authorization and Rules of Engagement | Partly implemented: hash-bound scope and fail-closed policy gates; the rest is planned |
+| v0.1.9 Assessment Authorization and Rules of Engagement | Partly implemented: hash-bound scope, fail-closed policy gates, blank and ambiguous scope refused; the rest is planned |
 | v0.2 AI SOC Inbox | Reduction pipeline implemented in the skeleton and measured under `v0.3.0-demo`; inbox UI and daily briefing planned, not implemented |
-| v0.2.4 Approval Service and Local Authentication | Planned, not implemented (a minimal second-approver path is part of `v0.3.0-demo`) |
+| v0.2.4 Approval Service and Local Authentication | Partly implemented: one operator's approval, bound to the plan and scope hashes; approval requests, approver authentication and a second approver planned |
 | v0.2.5 Web Console | Planned, not implemented |
 | v0.3 GRC Bridge | Planned, not implemented beyond a fixed control mapping; to be renumbered after `v0.3.0-demo` |
-| v0.4 Controlled Remediation | Policy engine and ActionPlan implemented; executors, verification and rollback planned, not implemented |
+| v0.4 Controlled Remediation | Policy engine, ActionPlan and one typed executor (`harden_ssh_access`) on lab copies with independent verification and automatic, verified rollback; executors on real hosts planned |
 | v0.5 Knowledge Loop | Planned, not implemented |
 | v1.0 End-to-End Demo | Planned, not implemented |
 

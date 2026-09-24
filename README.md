@@ -30,6 +30,24 @@ dedup, plus the reasons behind the highest-scoring incidents. It takes about ten
 seconds. `make evaluate` runs the full seven-day evaluation behind the numbers
 above.
 
+`make safety` (or `docker compose run --rm safety`) takes two incidents Claude
+escalated, both passwords guessed, from the recorded run and shows the safety
+behaviours in under a second, with no API key:
+
+- **Blank and ambiguous scopes are refused.** A blank scope, `*`, `*.internal`,
+  `10.0.0.0/8` or a window of "end of November" each deny with a reason code.
+  So do a plan with no approval and a plan edited after it was approved.
+- **An approved change runs on a lab copy of the host and is checked there.**
+  `harden_ssh_access` edits `sshd_config`, and the settings sshd would actually
+  use are read back and shown before and after.
+- **A failed check rolls the change back by itself.** On the second host a
+  cloud-init drop-in still turns password logins on. Verification catches it,
+  the file is restored byte for byte, and the restore is checked too.
+- **One audit timeline.** The agent call, tool calls, policy decisions,
+  approvals, execution, verification and rollback are exported as one
+  hash-chained file. It is checked from the file alone, and changing the
+  approver's name is caught. See [docs/safety-demo.md](./docs/safety-demo.md).
+
 `make flow` runs the walking skeleton past the incident: a remediation plan is
 drafted and an **independent policy engine denies execution** because no
 approval exists; the hash-chained audit log is verified and the run is replayed
@@ -44,14 +62,17 @@ raw logs ─► detection rules ─► alerts ─► dedup ─► correlate ─�
 ```
 
 - **Deterministic before AI.** Fixed rules turn logs into alerts; grouping and
-  scoring are deterministic. Triage is currently a rule-based, evidence-grounded
-  agent behind a model-agnostic contract; model-backed triage is being added for
-  the evaluation, with an offline fallback so nothing needs an API key.
+  scoring are deterministic. Claude (`claude-opus-5`) then judges each surfaced
+  incident from a dossier of the logs, never from the score. It can escalate,
+  dismiss or abstain and cannot act. Every call is recorded, so the published
+  results replay without an API key.
 - **AI proposes, policy decides, executors act.** The policy engine
   (`backend/app/policy/engine.py`) is a fixed sequence of deny-first gates:
   blank or ambiguous scope, an unbound policy hash, an expired window, an
   unlisted actor or target, or a medium/high-risk action without an approval
-  record is refused with a stable reason code.
+  bound to the exact plan is refused with a stable reason code. A typed executor
+  runs only after an ALLOW. Its result is verified by re-reading the target, and
+  a failed verification is rolled back automatically.
 - **Everything is auditable and replayable.** Evidence is content-addressed, the
   audit log is hash-chained, and a run can be replayed from retained evidence.
 
@@ -59,10 +80,12 @@ raw logs ─► detection rules ─► alerts ─► dedup ─► correlate ─�
 
 | Implemented and tested | Planned, not implemented |
 |---|---|
-| Alert reduction: dedup, correlation, explainable score, measured in [EVALUATION.md](./EVALUATION.md) | Model-backed triage (in progress for `v0.3.0-demo`) |
-| SSH/auth detection rules: burst, slow scan, multiple accounts, cross-source, success after failures | Approval service with a second approver |
-| Evidence-grounded triage agent and skeptic gate | Typed remediation executors with verification and rollback |
-| Fail-closed policy engine, hash-bound assessment scope | Web console (SOC inbox); `frontend/` is a placeholder |
+| Alert reduction: dedup, correlation, explainable score, measured in [EVALUATION.md](./EVALUATION.md) | Approval service with a second approver and authenticated approvers |
+| Model triage (`claude-opus-5`) with a hard budget, recorded and replayable, measured in EVALUATION.md | Typed executors on real hosts (SSH, GitHub); only lab copies today |
+| SSH/auth detection rules: burst, slow scan, multiple accounts, cross-source, success after failures | Web console (SOC inbox); `frontend/` is a placeholder |
+| Evidence-grounded triage agent and skeptic gate | |
+| Fail-closed policy engine that refuses blank and ambiguous scope; hash-bound scope; approvals bound to the plan hash | |
+| Typed `harden_ssh_access` executor on lab copies: independent verification, automatic verified rollback | |
 | Hash-chained audit log, evidence vault, replay | GRC evidence and risk register (only a fixed control mapping exists) |
 | Field pilot: persistent ingestion, read-only console, manual block/unblock with verification, encrypted off-host recovery packages | Knowledge base, external intelligence ingestion, authorized scanning, PostgreSQL |
 
@@ -84,9 +107,10 @@ and databases stay outside this repository.
 ## Safety boundaries
 
 - Authorized environments only; it must not be used against systems without explicit permission.
-- Blank or ambiguous scope fails closed; it never means unrestricted access.
+- Blank or ambiguous scope fails closed (`SCOPE_EMPTY`, `SCOPE_AMBIGUOUS`); it never means unrestricted access.
 - No unrestricted shell; actions are typed and policy-gated.
-- Medium- and high-risk actions require an approval record.
+- Medium- and high-risk actions require an approval record bound to the exact plan. Today one operator
+  approves; a second-approver rule is planned.
 
 See [SECURITY.md](./SECURITY.md), [capability boundaries](./docs/capability-boundaries.md),
 [autonomy levels](./docs/autonomy-levels.md) and the [threat model](./docs/threat-model.md).
