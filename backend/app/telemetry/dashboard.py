@@ -197,6 +197,16 @@ async function executeControl(){
  try{const job=await controlPost('/api/controls/execute',{plan_id:plan.plan_id});invalidatePlan();renderJob(job);text('control-status','任务已提交，正在读取执行结果…');await watchJob(job.id||job.job_id);}
  catch(error){invalidatePlan();text('control-status',error.message+' 请先刷新操作记录核实是否已建立任务，再决定是否重新预览。');await loadControls();}finally{controlBusy=false;controlState();}
 }
+const issueKinds={coverage_start:'覆盖起点：更早的日志不在采集范围',cursor_lost:'采集游标丢失，从近期窗口重新开始',retention_gap:'来源日志已轮转，旧游标失效',cursor_reset:'游标重置，但恢复窗口覆盖了已收日志，没有缺失',silence:'一段时间没有批次到达（采集器或中控 API 未运行）',source_error:'来源读取失败，等待重试',catching_up:'积压追赶中',delivery_delay:'批次在采集器本地排队后才送达',message_truncated:'超长日志消息被截断',restore:'从恢复包还原的时间点'};
+const issueCategories={gap:'缺口',delay:'延迟',notice:'提示'};
+function completeness(c){if(!c)return ['尚无记录','muted'];const since=c.coverage_start?`自 ${when(c.coverage_start)}${c.coverage_note?'（按首批估计）':''} 起`:'覆盖起点未知';if(!c.gaps_since_coverage)return [`完整：${since}无缺口`,'online'];const g=c.last_gap;return [`${since}有 ${c.gaps_since_coverage} 处缺口；最近一处 ${g?when(g.started_at)+' 至 '+when(g.ended_at):''}`,'error'];}
+function lateness(c){if(!c)return ['—','muted'];const open=c.open||[];if(open.includes('source_error'))return ['来源读取失败，日志留在来源等待重试','error'];if(open.includes('catching_up')||!c.caught_up)return ['追赶中：还有积压','offline'];const lag=Number(c.last_delivery_lag_seconds);return [`已追上${Number.isFinite(lag)&&lag>=60?`（最近一批晚到 ${Math.round(lag)} 秒）`:''}`,'online'];}
+let collectionPage=1,collectionPages=1,collectionRequestId=0;
+async function loadCollection(page=collectionPage){const requestId=++collectionRequestId;const query=new URLSearchParams({limit:'20',page:String(page)});if(currentSource)query.set('source_id',currentSource);
+ try{const data=await get('/api/collection-issues?'+query);if(requestId!==collectionRequestId)return;collectionPage=data.page;collectionPages=data.total_pages;const rows=$('collection-rows');rows.replaceChildren();
+  for(const issue of data.items){const tr=document.createElement('tr');cell(tr,when(issue.opened_at));cell(tr,issue.source_id);cell(tr,issueCategories[issue.category]||issue.category).className=issue.category==='gap'?'error':issue.category==='delay'?'offline':'muted';const kind=cell(tr,issueKinds[issue.kind]||issue.kind);kind.title=issue.detail||'';cell(tr,issue.started_at||issue.ended_at?`${issue.started_at?when(issue.started_at):'此前'} 至 ${issue.ended_at?when(issue.ended_at):'现在'}`:'—');cell(tr,issue.batches);cell(tr,issue.ended_at||issue.category!=='delay'?'已结束':'进行中');rows.append(tr);}
+  if(!data.items.length)empty(rows,7,'没有缺口或延迟记录。');text('collection-page',`第 ${collectionPage} / ${collectionPages} 页，共 ${data.total} 条`);text('collection-status','');$('collection-prev').disabled=collectionPage<=1;$('collection-next').disabled=collectionPage>=collectionPages;}
+ catch(error){if(requestId===collectionRequestId)text('collection-status',`${error.message} 已保留上次读取的采集记录。`);}}
 function renderSummary(data){
  text('event-total',data.totals.events);text('failure-total',data.totals.ssh_failures);text('success-total',data.totals.ssh_successes);
  if(data.triage_counts)renderTriageCounts(data.triage_counts);else text('incident-total',data.totals.incidents);
@@ -204,8 +214,8 @@ function renderSummary(data){
  const rowsKey=JSON.stringify(data.sources);
  if(rowsKey!==sourceRowsKey){const rows=$('sources');rows.replaceChildren();
  const labels={online:'在线',offline:'心跳超时',error:'采集异常',never_seen:'未连接'};
- for(const source of data.sources){const tr=document.createElement('tr');cell(tr,source.hostname);cell(tr,source.source_id);const state=cell(tr,labels[source.connection_status]||'未知');state.className=source.connection_status;cell(tr,when(source.last_seen));cell(tr,when(source.last_event_at));cell(tr,source.last_error||'无');rows.append(tr);}
- if(!data.sources.length)empty(rows,6,'尚未配置来源。');sourceRowsKey=rowsKey;}
+ for(const source of data.sources){const tr=document.createElement('tr');cell(tr,source.hostname);cell(tr,source.source_id);const state=cell(tr,labels[source.connection_status]||'未知');state.className=source.connection_status;const [integrity,integrityClass]=completeness(source.collection);cell(tr,integrity).className=integrityClass;const [delay,delayClass]=lateness(source.collection);cell(tr,delay).className=delayClass;cell(tr,when(source.last_seen));cell(tr,when(source.last_event_at));rows.append(tr);}
+ if(!data.sources.length)empty(rows,7,'尚未配置来源。');sourceRowsKey=rowsKey;}
  const selector=$('source-filter');const ids=JSON.stringify(data.sources.map(s=>[s.source_id,s.hostname]));
  if(selector.dataset.ids!==ids){selector.replaceChildren();const all=document.createElement('option');all.value='';all.textContent='全部来源';selector.append(all);for(const s of data.sources){const option=document.createElement('option');option.value=s.source_id;option.textContent=`${s.hostname} (${s.source_id})`;selector.append(option);}selector.value=currentSource;selector.dataset.ids=ids;}
 }
@@ -299,7 +309,7 @@ function scheduleAutoRefresh(){
  autoRefreshTimer=setTimeout(()=>{autoRefreshTimer=null;if(document.hidden||isBusy()){scheduleAutoRefresh();return;}refresh();},minutes*60000);
 }
 async function refresh(){
- loadControls();
+ loadControls();loadCollection();
  const requestId=++refreshRequestId;if(summaryController)summaryController.abort();summaryController=new AbortController();
  const controller=summaryController,source=currentSource;refreshRunning=true;summaryPending=true;updateRefreshButton();text('error','');
  const views=[beginList('event',pages.event.page),beginList('incident',pages.incident.page)];
@@ -313,6 +323,8 @@ async function refresh(){
  finally{for(const view of views)finishList(view);if(requestId===refreshRequestId){refreshRunning=false;summaryPending=false;updateRefreshButton();scheduleAutoRefresh();}}
 }
 $('refresh').addEventListener('click',refresh);
+$('collection-prev').addEventListener('click',()=>loadCollection(Math.max(1,collectionPage-1)));
+$('collection-next').addEventListener('click',()=>loadCollection(Math.min(collectionPages,collectionPage+1)));
 $('refresh-interval').addEventListener('change',()=>{try{localStorage.setItem('riskops-refresh-minutes',$('refresh-interval').value);}catch{}scheduleAutoRefresh();});
 $('ip-form').addEventListener('submit',event=>{event.preventDefault();lookupIp($('ip-input').value);});
 $('abuseipdb-check').addEventListener('click',lookupAbuse);
@@ -320,7 +332,7 @@ $('incident-control-open').addEventListener('click',()=>$('control-section').scr
 $('incident-triage').addEventListener('change',()=>{const value=$('incident-triage').value;incidentTriage=triageFilters.includes(value)?value:'pending';saveView();loadList('incident',1);});
 $('ip-show-events').addEventListener('click',()=>{const ip=$('ip-input').value.trim();if(ip)queryLogsForIP(ip);else text('ip-status','请先输入要查日志的 IP。');});
 $('ip-add-control').addEventListener('click',()=>{$('control-ip').value=$('ip-input').value.trim();$('control-section').scrollIntoView({behavior:'smooth',block:'start'});});
-$('source-filter').addEventListener('change',()=>{currentSource=$('source-filter').value;eventSnapshot=null;if(summaryController)summaryController.abort();++refreshRequestId;refreshRunning=false;summaryPending=false;clearDetails();for(const kind of ['event','incident']){pages[kind].totalPages=null;pages[kind].total=0;text(kind+'-updated','');loadList(kind,1);}if(controlsData){$('control-sources').dataset.key='';renderControlSources(controlsData.sources||[]);}saveView();scheduleAutoRefresh();});
+$('source-filter').addEventListener('change',()=>{currentSource=$('source-filter').value;eventSnapshot=null;if(summaryController)summaryController.abort();++refreshRequestId;refreshRunning=false;summaryPending=false;clearDetails();for(const kind of ['event','incident']){pages[kind].totalPages=null;pages[kind].total=0;text(kind+'-updated','');loadList(kind,1);}if(controlsData){$('control-sources').dataset.key='';renderControlSources(controlsData.sources||[]);}loadCollection(1);saveView();scheduleAutoRefresh();});
 $('search-form').addEventListener('submit',event=>{event.preventDefault();const next={};for(const key of ['ip','username','event_type','q','start','end']){const value=$('search-'+key).value.trim();if(!value)continue;if(key==='start'||key==='end'){const date=new Date(value);if(Number.isNaN(date.valueOf())){text('event-status','请输入有效的起止时间。');return;}next[key]=date.toISOString();}else next[key]=value;}if(next.start&&next.end&&next.start>next.end){text('event-status','开始时间不能晚于结束时间。');return;}eventFilters=next;eventSnapshot=null;saveView();loadList('event',1);});
 $('search-clear').addEventListener('click',()=>{eventFilters={};eventSnapshot=null;setFilterInputs();saveView();loadList('event',1);});
 $('event-latest').addEventListener('click',()=>{eventSnapshot=null;saveView();loadList('event',1);});
@@ -347,7 +359,8 @@ DASHBOARD_HTML = """<!doctype html>
 <body><h1>SecAgent RiskOps · 实时日志</h1><p>查看已接入服务器的心跳、系统日志和 SSH 认证告警，核对证据后手动执行封禁或解封。</p>
 <div class="toolbar"><label for="source-filter">日志来源</label><select id="source-filter"><option value="">全部来源</option></select><button id="refresh" type="button">刷新数据</button><label for="refresh-interval">自动刷新</label><select id="refresh-interval" aria-describedby="refresh-help"><option value="0">关闭（手动刷新）</option><option value="1">每 1 分钟</option><option value="5">每 5 分钟</option><option value="15">每 15 分钟</option></select><small id="updated">正在读取</small></div><p id="refresh-help">默认手动刷新，保留当前来源、筛选、页码与已打开的详情。日志查询固定在本次快照；点击“获取最新日志”重新查询并回到第一页。自动刷新仅在页面可见且没有读取任务时运行。</p><div id="error" role="status"></div>
 <div class="cards"><div class="card">保留期内日志<div class="number" id="event-total">—</div></div><div class="card">待处理告警<div class="number" id="incident-total">—</div><small id="incident-triage-summary"></small></div><div class="card">SSH 认证异常日志<div class="number" id="failure-total">—</div></div><div class="card">SSH 成功日志<div class="number" id="success-total">—</div></div></div>
-<section><h2>来源状态</h2><p>来源 ID（source_id）是跨日志关联使用的稳定资产 ID，服务器一栏显示配置名称。在线表示近期收到采集器心跳；心跳超时不代表已确认入侵。</p><div class="table-wrap"><table><thead><tr><th>服务器</th><th>来源 ID</th><th>状态</th><th>最后心跳</th><th>最新日志时间</th><th>采集异常</th></tr></thead><tbody id="sources"></tbody></table></div></section>
+<section><h2>来源状态</h2><p>来源 ID（source_id）是跨日志关联使用的稳定资产 ID，服务器一栏显示配置名称。三件事分开看：<b>在线</b>只表示近期收到采集器心跳；<b>采集完整性</b>表示自覆盖起点以来有没有可能丢失日志的缺口；<b>延迟 / 追赶</b>表示日志是否已经全部收到，晚到的日志仍在来源上，不算丢失。心跳超时不代表已确认入侵；原始日志保留期到期删除是保留策略，不算缺口。</p><div class="table-wrap"><table><thead><tr><th>服务器</th><th>来源 ID</th><th>在线</th><th>采集完整性</th><th>延迟 / 追赶</th><th>最后心跳</th><th>最新日志时间</th></tr></thead><tbody id="sources"></tbody></table></div></section>
+<section id="collection-section"><h2>采集记录</h2><p>每一次缺口（日志可能已丢失）和延迟（日志晚到）都单独记录，恢复正常后不会被覆盖或删除。缺口的时间区间内可能缺少日志；延迟只说明当时日志晚到了。</p><div class="table-wrap"><table><thead><tr><th>记录时间</th><th>来源 ID</th><th>类别</th><th>类型</th><th>区间</th><th>批次</th><th>状态</th></tr></thead><tbody id="collection-rows"></tbody></table></div><div class="pager"><button id="collection-prev" type="button">上一页</button><span id="collection-page"></span><button id="collection-next" type="button">下一页</button></div><p id="collection-status" class="list-status muted" role="status" aria-live="polite"></p></section>
 <section id="ip-query-section" aria-busy="false"><h2>IP 属地查询</h2><p id="ip-help">输入 IPv4 / IPv6 地址，或点击下方日志中的来源 IP。属地查询使用离线库，不会自动发送 IP 给第三方；属地仅供参考，不能确定实际使用者位置。</p>
 <form id="ip-form" class="ip-form"><label for="ip-input">IP 地址</label><input id="ip-input" name="ip" type="text" required maxlength="128" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="ip-help" placeholder="例如 8.8.8.8 或 2001:4860:4860::8888"><button id="ip-query-button" type="submit">查询属地</button></form>
 <div class="actions"><button id="ip-show-events" type="button">查看此 IP 的日志</button><button id="ip-add-control" type="button">为此 IP 选择封禁来源</button></div>

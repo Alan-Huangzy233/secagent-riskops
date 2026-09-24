@@ -70,12 +70,13 @@ Run it: `make install && make test && make demo`.
 | 告警处置状态（待处理 / 已知晓 / 已处理）：受限的人工转换、封禁核实后自动标为已处理、新证据自动回到待处理、合并保留较低状态、处置记录与按状态筛选计数 | `backend/app/telemetry/store.py`, `backend/app/live_api.py`, `backend/app/telemetry/dashboard.py`, `docs/ssh-detection.md` |
 | 恢复包：先游标后快照的一致捕获、SHA-256 与 schema 指纹清单、zstd 压缩、gpg 指纹加密与清单签名、原子发布、摘要校验 / 深度校验 / 隔离目录恢复演练 | `scripts/recovery_package.py`, `deploy/recovery-package.example.json` |
 | 备份节点主动拉取：固定命令只允许列出 / 取用清单内文件 / 按自身节点名回执，不接受路径、不开 shell；拉取端逐文件校验后才发布副本并回执；本地轮换只删除"已有独立副本确认且超出保留代数"的包 | `scripts/backup_export.py`, `scripts/pull_recovery_packages.py`, `scripts/recovery_package.py` |
+| 采集完整性：按来源持久记录缺口（覆盖起点、游标丢失、来源日志轮转；区间只算到恢复窗口起点，窗口与已收日志重叠时不算缺口）和延迟（来源读取失败、5 分钟无批次、批次在本地排队、积压追赶），缺口永不覆盖；满页时同一轮有界多页追赶；控制台把在线、采集完整性、延迟 / 追赶分列显示，另有采集记录；恢复包还原后可写入恢复点 | `backend/app/telemetry/collection.py`, `scripts/telemetry_collector.py`, `backend/app/telemetry/dashboard.py`, `scripts/recovery_package.py` |
 
 试点仅覆盖进入部署者指定 journal 过滤范围的 SSH/auth 日志，不提供全网络活动可见性，
 也不调用模型。封禁只在单个操作员预览并勾选确认后执行，规则命中不会自动封禁；
 封禁只作用于目标本机入站（不过滤转发流量），是单操作员手动控制，不是完整的角色 / 审批体系。raw events 默认保留 14 天，receipts 和事件证据不会自动
-随之清除；首次覆盖窗口、日志轮转、每来源每轮 200 条、消息截断、最新错误覆盖
-历史缺口等限制请结合部署环境自行记录。来源状态“在线”只表示近期收到心跳。
+随之清除。首次覆盖窗口、日志轮转、积压追赶和消息截断会作为缺口、延迟或提示写入采集记录，
+不会被后续批次覆盖；来源状态“在线”只表示近期收到心跳，完整性与延迟分列显示。
 本仓库不保存任何特定环境的地址、凭证、日志或部署交接记录。
 
 ## Not yet implemented (design only)
