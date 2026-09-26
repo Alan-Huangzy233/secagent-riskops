@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-from . import collection
+from . import collection, scoring
 from .detection import MAX_WINDOW_SECONDS, RuleMatch, detect_matches
 from .sshd_parse import FAILURE_KINDS, parse_sshd
 
@@ -46,7 +46,11 @@ TRIAGE_TRANSITIONS = {"pending": {"acknowledged", "resolved"},
                       "resolved": {"pending"}}
 _TRIAGE_RANK = {state: rank for rank, state in enumerate(TRIAGE_STATES)}
 _TRIAGE_STATE = "coalesce(incident_triage.state,'pending')"
-_INCIDENT_FROM = "FROM incidents LEFT JOIN incident_triage ON incident_triage.incident_id=incidents.incident_id"
+_INCIDENT_FROM = ("FROM incidents LEFT JOIN incident_triage ON incident_triage.incident_id=incidents.incident_id "
+                  "LEFT JOIN incident_scores ON incident_scores.incident_id=incidents.incident_id "
+                  f"AND incident_scores.version='{scoring.VERSION}' "
+                  "AND incident_scores.evidence_count=(SELECT evidence_count FROM incident_details "
+                  "WHERE incident_details.incident_id=incidents.incident_id)")
 
 
 def _compatible_evidence_kind(old: str, new: str) -> bool:
@@ -243,6 +247,7 @@ class TelemetryStore:
                     ON incident_triage_log(incident_id, seq);
             """)
             db.executescript(collection.SCHEMA)
+            db.executescript(scoring.SCHEMA)
         # Additive migration: old IDs, receipts and raw evidence remain intact.
         with self._connection(write=True) as db:
             if not db.execute("SELECT 1 FROM maintenance WHERE name='detection_metadata_v1'").fetchone():
@@ -439,6 +444,24 @@ class TelemetryStore:
         db.execute("""UPDATE incidents SET failure_count=?,first_ts=?,last_ts=?,first_seen=?,last_seen=?
             WHERE incident_id=?""", (stats[3], stats[1], stats[2],
             _iso(datetime.fromtimestamp(stats[1], timezone.utc)), _iso(datetime.fromtimestamp(stats[2], timezone.utc)), incident_id))
+        scoring.refresh(db, incident_id)
+
+    def backfill_scores(self, limit: int = 100) -> dict[str, Any]:
+        """One bounded transaction, repeatable between live batches.
+
+        Startup and GET requests never rescan historical evidence. An incident
+        without evidence remains visibly unscored instead of receiving a zero.
+        """
+        self._page(limit, 0)
+        with self._connection(write=True) as db:
+            rows = db.execute(f"""SELECT incidents.incident_id {_INCIDENT_FROM}
+                WHERE incidents.status!='merged' AND incident_scores.incident_id IS NULL
+                AND EXISTS (SELECT 1 FROM incident_evidence
+                    WHERE incident_evidence.incident_id=incidents.incident_id)
+                ORDER BY incidents.last_ts DESC,incidents.incident_id LIMIT ?""", (limit,)).fetchall()
+            for row in rows:
+                scoring.refresh(db, row[0])
+        return {"scored": len(rows), "limit": limit, "version": scoring.VERSION}
 
     def _apply_match(self, db: sqlite3.Connection, match: RuleMatch, now: str) -> str:
         evidence = match.evidence
@@ -638,14 +661,16 @@ class TelemetryStore:
 
     def _incidents(self, db: sqlite3.Connection, source_id: str | None,
                    limit: int, offset: int, *, include_evidence: bool = True,
-                   incident_id: str | None = None, triage: str | None = None) -> list[dict[str, Any]]:
-        where, params = self._incident_filter(source_id, triage)
+                   incident_id: str | None = None, triage: str | None = None,
+                   focus: str = "all", sort: str = "recent") -> list[dict[str, Any]]:
+        where, params = self._incident_filter(source_id, triage, focus)
+        order = self._incident_order(sort)
         if incident_id is not None:
             where += " AND incidents.incident_id=?"
             params += (incident_id,)
         rows = db.execute(f"""SELECT incidents.*,{_TRIAGE_STATE} AS triage_status,
             incident_triage.state_at AS triage_updated_at {_INCIDENT_FROM}
-            WHERE incidents.status!='merged' {where} ORDER BY incidents.last_ts DESC,incidents.incident_id LIMIT ? OFFSET ?""",
+            WHERE incidents.status!='merged' {where} ORDER BY {order} LIMIT ? OFFSET ?""",
             (*params, limit, offset)).fetchall()
         result = []
         for row in rows:
@@ -657,6 +682,7 @@ class TelemetryStore:
             count = detail["evidence_count"] if detail else row["failure_count"]
             usernames = json.loads(detail["usernames_json"]) if detail else []
             result.append({**dict(row), "peer_ip": row["src_ip"],
+                           "assessment": scoring.read(db, row["incident_id"]),
                            "severity": "high" if any(rule["rule_id"] == "success_after_failures" for rule in rules) else "medium",
                            "source_ids": [source["source_id"] for source in sources] or [row["source_id"]],
                            "hostnames": [source["hostname"] for source in sources] or [row["hostname"]],
@@ -671,7 +697,8 @@ class TelemetryStore:
         return result
 
     @staticmethod
-    def _incident_filter(source_id: str | None, triage: str | None = None) -> tuple[str, tuple]:
+    def _incident_filter(source_id: str | None, triage: str | None = None,
+                         focus: str = "all") -> tuple[str, tuple]:
         where, params = "", ()
         if source_id is not None:
             where += " AND (incidents.source_id=? OR incidents.incident_id IN (SELECT incident_id FROM incident_sources WHERE source_id=?))"
@@ -681,7 +708,37 @@ class TelemetryStore:
                 raise ValueError("triage must be pending, acknowledged, resolved or all")
             where += f" AND {_TRIAGE_STATE}=?"
             params += (triage,)
+        if focus not in ("all", "attention", "low", "unscored"):
+            raise ValueError("focus must be all, attention, low or unscored")
+        if focus == "attention":
+            # Unknown is never silently treated as low risk.
+            where += " AND (incident_scores.surfaced=1 OR incident_scores.incident_id IS NULL)"
+        elif focus == "low":
+            where += " AND incident_scores.surfaced=0"
+        elif focus == "unscored":
+            where += " AND incident_scores.incident_id IS NULL"
         return where, params
+
+    @staticmethod
+    def _incident_order(sort: str) -> str:
+        if sort not in ("recent", "score"):
+            raise ValueError("sort must be recent or score")
+        recent = "incidents.last_ts DESC,incidents.incident_id"
+        # Unscored history stays visible until explicitly backfilled.
+        return ("(incident_scores.incident_id IS NULL) DESC,incident_scores.score DESC," + recent
+                if sort == "score" else recent)
+
+    def _score_counts(self, db: sqlite3.Connection, source_id: str | None,
+                      triage: str | None) -> dict[str, int]:
+        where, params = self._incident_filter(source_id, triage)
+        counts = {"attention": 0, "low": 0, "unscored": 0, "total": 0}
+        for state, count in db.execute(f"""SELECT CASE
+            WHEN incident_scores.incident_id IS NULL THEN 'unscored'
+            WHEN incident_scores.surfaced=1 THEN 'attention' ELSE 'low' END AS bucket,count(*)
+            {_INCIDENT_FROM} WHERE incidents.status!='merged' {where} GROUP BY bucket""", params):
+            counts[state] = count
+        counts["total"] = counts["attention"] + counts["low"] + counts["unscored"]
+        return counts
 
     def count_incidents(self) -> int:
         with self._connection() as db:
@@ -798,22 +855,23 @@ class TelemetryStore:
                     "incident_id": canonical, "requested_incident_id": incident_id}
 
     def list_incidents(self, source_id: str | None = None, limit: int = 100, offset: int = 0,
-                       triage: str | None = None) -> list[dict[str, Any]]:
+                       triage: str | None = None, *, focus: str = "all", sort: str = "recent") -> list[dict[str, Any]]:
         self._page(limit, offset)
         with self._connection() as db:
-            return self._incidents(db, source_id, limit, offset, triage=triage)
+            return self._incidents(db, source_id, limit, offset, triage=triage, focus=focus, sort=sort)
 
     def paginate_incidents(self, source_id: str | None = None, limit: int = 100,
                            page: int = 1, *, include_evidence: bool = True,
-                           triage: str | None = None) -> dict[str, Any]:
+                           triage: str | None = None, focus: str = "all", sort: str = "recent") -> dict[str, Any]:
         self._page_number(limit, page)
-        where, params = self._incident_filter(source_id, triage)
+        where, params = self._incident_filter(source_id, triage, focus)
         with self._connection() as db:
             total = db.execute(f"SELECT count(*) {_INCIDENT_FROM} WHERE incidents.status!='merged' {where}", params).fetchone()[0]
             pagination = self._pagination(total, limit, page)
             return {"items": self._incidents(db, source_id, limit, pagination["offset"],
-                                             include_evidence=include_evidence, triage=triage),
-                    **pagination, "triage": triage or "all", "triage_counts": self._triage_counts(db, source_id)}
+                                             include_evidence=include_evidence, triage=triage, focus=focus, sort=sort),
+                    **pagination, "triage": triage or "all", "triage_counts": self._triage_counts(db, source_id),
+                    "focus": focus, "sort": sort, "score_counts": self._score_counts(db, source_id, triage)}
 
     def list_sources(self, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
         self._page(limit, offset)

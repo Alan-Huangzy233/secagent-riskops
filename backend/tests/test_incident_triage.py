@@ -360,7 +360,7 @@ def test_dashboard_filters_by_state_renders_badges_and_reloads_after_triage_or_b
     run_dashboard(r"""
 assert.equal(incidentTriage,'pending');
 assert.equal(sourceQuery(2,'source-a','incident').get('triage'),'pending');
-incidentTriage='resolved';assert.equal(sourceQuery(1,'','incident').get('triage'),'resolved');assert.equal(listKey('incident'),'resolved');incidentTriage='pending';
+incidentTriage='resolved';assert.equal(sourceQuery(1,'','incident').get('triage'),'resolved');assert.deepEqual(JSON.parse(listKey('incident')),['resolved','all','score']);incidentTriage='pending';
 const incident={incident_id:'SSH-1',source_id:'source-a',source_ids:['source-a'],src_ip:'192.0.2.7',status:'open',triage_status:'pending'};
 renderIncidents([incident,{...incident,incident_id:'SSH-2',triage_status:'resolved',triage_updated_at:'2026-09-16T12:00:00Z'}]);
 const first=$('incidents').children[0].children[5],second=$('incidents').children[1].children[5];
