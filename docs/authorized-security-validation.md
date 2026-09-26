@@ -143,3 +143,11 @@ ToolCall / Evidence / Finding
 12. Validation output should feed SOC, GRC, remediation, and knowledge workflows.
 
 See [Assessment Authorization and Rules of Engagement](./assessment-authorization-and-rules-of-engagement.md) for the full preflight, policy compilation, and runtime enforcement design.
+
+## Long-term knowledge reuse
+
+After authorized assessment/pentest and finding verification mature, selected
+findings may seed [reviewed training labs](./finding-derived-training-labs.md).
+Suitability and permission for teaching/distribution are reviewed separately;
+lab copies use synthetic data and a separate isolated scope. This future
+extension does not change the validation layer's current no-exploit defaults.
