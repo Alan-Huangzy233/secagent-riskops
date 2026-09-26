@@ -34,6 +34,7 @@ GRC or knowledge UI, PostgreSQL.
 | v0.4 Controlled Remediation | Policy engine, ActionPlan and one typed executor (`harden_ssh_access`) on lab copies with independent verification and automatic, verified rollback; executors on real hosts planned |
 | v0.5 Knowledge Loop | Planned, not implemented |
 | v1.0 End-to-End Demo | Planned, not implemented |
+| Finding-derived Training Labs (long term) | Exploratory, not implemented; depends on mature authorized validation/pentest, knowledge review and isolated training infrastructure |
 
 > **Reading note.** Entries below are grouped by theme, not strict chronological
 > order — the `v0.1.6`–`v0.1.9` sections are early increments that were appended
@@ -276,3 +277,22 @@ Deliverables:
 - Runtime checks for DNS, redirects, discovered services, credentials, and every target-facing tool call
 - Scope extension, revocation, expiration, and emergency-stop workflows
 - Stable policy decision reason codes and audit events
+
+## Long-term direction: Finding-derived Training Labs
+
+Explore turning selected, confirmed findings from authorized pentests into
+sanitised, reproducible training environments for other users. This follows
+mature assessment and knowledge workflows; it has no committed milestone/date.
+
+- Reconstruct the failure mechanism with synthetic services and data; retain
+  private provenance and separately review permission to distribute the lesson.
+- Provide a vulnerable and repaired variant, learning objectives, expected
+  evidence and verified grading, with human review before distribution.
+- Support discovery, SOC detection/investigation, repair and retest practice;
+  link lessons to GRC control gaps and training evidence without treating a lab
+  result as proof of production remediation or compliance.
+- Start with one manually authored internal exercise, then a small template
+  library; admit external learners only after instance isolation, reset,
+  access controls and resource limits are validated.
+
+See [Finding-derived Training Labs](./docs/finding-derived-training-labs.md).
