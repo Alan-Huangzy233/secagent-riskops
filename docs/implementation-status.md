@@ -94,6 +94,16 @@ These are documented in `docs/` but have **no code** yet:
 - Model triage inside the walking-skeleton flow; it runs on the evaluation's surfaced incidents and in the safety demo (replayed), not behind the `AgentContract` seam
 - PostgreSQL + Alembic migrations (SQLite is the current stand-in) — `v0.2.4`
 
+## Live incident scoring (implemented; deployment is separate)
+
+The telemetry pilot now persists an explainable score for changed incidents,
+reusing the shared reduction weights while retaining its existing evidence-based
+correlation and stable incident IDs. The Chinese console supports score ordering,
+attention/low/unscored filters and counts. Historical scores are filled by an
+explicit bounded maintenance command, not at startup. Scores never dismiss or
+block an incident. See [live-incident-scoring.md](./live-incident-scoring.md) for
+production differences, API parameters and deployment/backfill instructions.
+
 ## Known limitations of the skeleton
 
 - The walking skeleton's triage agent is deterministic rule logic, so that flow

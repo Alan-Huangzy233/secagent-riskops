@@ -39,7 +39,7 @@ class IncidentTable(HTMLParser):
 def test_detection_table_has_rules_sources_and_record_count_explanation():
     table = IncidentTable()
     table.feed(DASHBOARD_HTML)
-    assert table.headers == ["最近发生", "关联服务器 / 来源", "来源 IP", "日志 / 账号统计", "命中规则", "状态"]
+    assert table.headers == ["最近发生", "关联服务器 / 来源", "来源 IP", "日志 / 账号统计", "评分 / 命中规则", "状态"]
     assert "不等于独立连接或攻击次数" in DASHBOARD_HTML
     assert "不会自动封禁" in DASHBOARD_HTML
     for field in ("source_ids", "hostnames", "rules", "success_count", "username_count", "usernames"):
@@ -113,7 +113,7 @@ process.stdout.write(JSON.stringify(output));
     assert hostile_name in rows[0][3]["title"]
     assert rows[0][4]["text"] == "跨服务器尝试、慢速扫描"
     assert hostile_name in rows[0][4]["title"]
-    assert rows[0][4]["tags"] == []
+    assert rows[0][4]["tags"] == ["div"]  # The explicit unscored status, never a log-supplied tag.
     assert "host-c" in rows[1][1]["text"] and "source-c" in rows[1][1]["text"]
     assert rows[1][3]["text"] == "失败日志：3 条"
     assert rows[1][4]["text"] == "登录失败（旧版记录）"

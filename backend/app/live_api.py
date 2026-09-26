@@ -282,11 +282,13 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
     def incidents(request: Request, source_id: str | None = Query(None, max_length=64),
                   limit: int = Query(100, ge=1, le=200), offset: int = Query(0, ge=0),
                   page: int | None = Query(None, ge=1, le=1_000_000_000),
-                  include_evidence: bool = Query(True), triage: str | None = Depends(triage_filter)):
+                  include_evidence: bool = Query(True), triage: str | None = Depends(triage_filter),
+                  focus: Literal["all", "attention", "low", "unscored"] = "all",
+                  sort: Literal["recent", "score"] = "recent"):
         if page is not None:
             return request.app.state.store.paginate_incidents(source_id=source_filter(request, source_id), limit=limit, page=page,
-                                                              include_evidence=include_evidence, triage=triage)
-        return request.app.state.store.list_incidents(source_id=source_filter(request, source_id), limit=limit, offset=offset, triage=triage)
+                                                              include_evidence=include_evidence, triage=triage, focus=focus, sort=sort)
+        return request.app.state.store.list_incidents(source_id=source_filter(request, source_id), limit=limit, offset=offset, triage=triage, focus=focus, sort=sort)
 
     @application.get("/api/dashboard", dependencies=[Depends(operator)])
     def dashboard_snapshot(request: Request, source_id: str | None = Query(None, max_length=64),
@@ -294,7 +296,9 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
                            incident_page: int = Query(1, ge=1, le=1_000_000_000),
                            limit: int = Query(50, ge=1, le=200),
                            filters: dict = Depends(search_filters),
-                           incident_triage: str | None = Query(None, max_length=16)):
+                           incident_triage: str | None = Query(None, max_length=16),
+                           incident_focus: Literal["all", "attention", "low", "unscored"] = "all",
+                           incident_sort: Literal["recent", "score"] = "recent"):
         # One authenticated HTTP request avoids three expensive password checks
         # when the operator returns after the short verification cache expires.
         selected = source_filter(request, source_id)
@@ -302,7 +306,8 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
         return {"summary": summary(request),
                 "events": store.paginate_events(source_id=selected, limit=limit, page=event_page, **filters),
                 "incidents": store.paginate_incidents(source_id=selected, limit=limit, page=incident_page,
-                                                      include_evidence=False, triage=triage_filter(incident_triage))}
+                                                      include_evidence=False, triage=triage_filter(incident_triage),
+                                                      focus=incident_focus, sort=incident_sort)}
 
     @application.get("/api/incidents/{incident_id}", dependencies=[Depends(operator)])
     def incident_detail(request: Request, incident_id: str):

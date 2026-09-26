@@ -13,6 +13,7 @@ button{cursor:pointer}button:disabled{opacity:.45;cursor:default}.toolbar{displa
 .table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;text-align:left;font-size:13px}th{color:#a9bacd;font-weight:500}td,th{border-bottom:1px solid #263a53;padding:11px 9px;vertical-align:top}td{max-width:480px;overflow-wrap:anywhere}tr.selectable{cursor:pointer}tr.selectable:hover{background:#1a2d46}
 .online{color:#68dfa8}.offline,.error{color:#ffba85}.never_seen{color:#a9bacd}#error{color:#ffc49c;min-height:24px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.7 ui-monospace,monospace;max-height:480px;overflow:auto}.pager{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:14px}.page-jump{display:flex;gap:8px;align-items:center}.page-jump input{width:86px}.list-status{min-height:20px;font-size:13px;margin-bottom:0}.muted{color:#a9bacd}
 .ip-form{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.ip-form input{flex:1;min-width:220px;font:inherit}.ip-link{padding:0;border:0;background:none;color:#8ac7ff;text-align:left;font:inherit;overflow-wrap:anywhere}.ip-link:hover{text-decoration:underline}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #8ac7ff;outline-offset:3px}a{color:#8ac7ff}.ip-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin:18px 0}.ip-fields dt{color:#a9bacd;font-size:13px;margin-bottom:6px}.ip-fields dd{margin:0;overflow-wrap:anywhere}#ip-status{min-height:24px;margin-bottom:0}
+#incident-section table{min-width:1020px}
 .incident-value{white-space:pre-line}
 .triage{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}.triage-pending{background:#7a2e1d;color:#ffd9c7}.triage-acknowledged{background:#6b5314;color:#ffe9a8}.triage-resolved{background:#1d4d37;color:#b3f0d2}.row-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.row-actions button{padding:4px 8px;font-size:12px}#triage-note{min-width:220px;flex:1}.card small{display:block;margin-top:6px}.triage-time{display:block;font-size:12px;margin-top:4px}
 .search-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.search-fields label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:#a9bacd}.search-fields input,.search-fields select{min-width:0;width:100%}.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}.selection{display:flex;gap:8px;align-items:center}.selection input{width:18px;height:18px}.danger{border-color:#d69673;color:#ffd2b6}.control-targets{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.control-targets label{display:flex;gap:6px;align-items:center}.control-targets input{width:18px;height:18px}fieldset{border:1px solid #37516d;border-radius:6px;margin:14px 0}textarea{background:#172941;color:#e7edf5;border:1px solid #37516d;border-radius:6px;width:100%;padding:10px;font:inherit}#control-plan{border-left:3px solid #d69673;padding-left:14px}#evidence-view table{font-size:12px}
@@ -27,7 +28,8 @@ let sourceRowsKey=null, autoRefreshTimer=null, refreshRunning=false;
 let ipRequestId=0, ipController=null, abuseRequestId=0, abuseController=null, abuseIP=null;
 let eventFilters={},eventSnapshot=null,detailRequestId=0,detailController=null,detailIncident=null,evidencePage=1,evidenceTotalPages=1;
 let controlsData=null,controlBusy=false,controlPlan=null,controlRevision=0,controlPollTimer=null,controlPollId=0,controlReadId=0;
-let incidentTriage='pending',triageBusy=false;
+let incidentTriage='pending',incidentFocus='all',incidentSort='score',triageBusy=false;
+const scoreFilters=['all','attention','low','unscored'],scoreSorts=['score','recent'];
 const triageLabels={pending:'待处理',acknowledged:'已知晓',resolved:'已处理'},triageFilters=['pending','acknowledged','resolved','all'];
 const triageActions={pending:[['acknowledged','标为已知晓'],['resolved','标为已处理']],acknowledged:[['resolved','标为已处理'],['pending','退回待处理']],resolved:[['pending','重新打开']]};
 const selectedTargets=new Map(),channelLabels={ssh:'SSH 端口',tcp:'全部 TCP（包含 SSH）',udp:'全部 UDP'};
@@ -44,8 +46,8 @@ function empty(tbody,span,message){const tr=document.createElement('tr');const t
 async function get(path,signal){const response=await fetch(path,{credentials:'same-origin',cache:'no-store',signal});if(!response.ok)throw new Error(response.status===401?'登录已失效，请刷新页面重新登录。':`读取失败（${response.status}）。请检查中控服务。`);return response.json();}
 function details(record,title){clearDetails();text('detail-title',title);text('detail',JSON.stringify(record,null,2));$('detail-section').scrollIntoView({behavior:'smooth',block:'nearest'});}
 function filterKey(){return JSON.stringify({filters:eventFilters,snapshot:eventSnapshot});}
-function listKey(kind){return kind==='event'?filterKey():incidentTriage;}
-function saveView(){try{sessionStorage.setItem('riskops-view',JSON.stringify({source:currentSource,filters:eventFilters,snapshot:eventSnapshot,eventPage:pages.event.page,incidentPage:pages.incident.page,incidentTriage}));}catch{}}
+function listKey(kind){return kind==='event'?filterKey():JSON.stringify([incidentTriage,incidentFocus,incidentSort]);}
+function saveView(){try{sessionStorage.setItem('riskops-view',JSON.stringify({source:currentSource,filters:eventFilters,snapshot:eventSnapshot,eventPage:pages.event.page,incidentPage:pages.incident.page,incidentTriage,incidentFocus,incidentSort}));}catch{}}
 function setFilterInputs(){for(const key of ['ip','username','event_type','q','start','end']){let value=eventFilters[key]||'';if(value&&(key==='start'||key==='end')){const d=new Date(value);if(!Number.isNaN(d.valueOf())){const local=new Date(d.valueOf()-d.getTimezoneOffset()*60000);value=local.toISOString().slice(0,16);}}$('search-'+key).value=value;}}
 function queryLogsForIP(ip){eventFilters={...eventFilters,ip:String(ip)};eventSnapshot=null;setFilterInputs();saveView();loadList('event',1);$('event-section').scrollIntoView({behavior:'smooth',block:'start'});}
 async function showIncident(incident){
@@ -120,7 +122,7 @@ async function lookupIp(value){
  }catch(error){if(requestId!==ipRequestId||error.name==='AbortError')return;text('ip-status',error instanceof TypeError?'无法连接属地查询服务，请检查网络后重试。':error.message);$('ip-status').className='error';}
  finally{if(requestId===ipRequestId){$('ip-query-section').setAttribute('aria-busy','false');text('ip-query-button','查询属地');}}
 }
-function sourceQuery(page,source,kind='incident'){const query=new URLSearchParams({limit:String(pageSize),page:String(page)});if(source)query.set('source_id',source);if(kind==='event')appendEventQuery(query);else{query.set('include_evidence','false');query.set('triage',incidentTriage);}return query;}
+function sourceQuery(page,source,kind='incident'){const query=new URLSearchParams({limit:String(pageSize),page:String(page)});if(source)query.set('source_id',source);if(kind==='event')appendEventQuery(query);else{query.set('include_evidence','false');query.set('triage',incidentTriage);query.set('focus',incidentFocus);query.set('sort',incidentSort);}return query;}
 function appendEventQuery(query){for(const [key,value] of Object.entries(eventFilters))if(value)query.set(key,value);if(eventSnapshot!==null)query.set('snapshot',String(eventSnapshot));}
 function targetKey(target){return JSON.stringify([target.source_id,target.ip]);}
 function incidentTargets(incident){const ip=incident.src_ip||incident.peer_ip;if(!ip)return [];const sources=currentSource?[currentSource]:(Array.isArray(incident.source_ids)&&incident.source_ids.length?incident.source_ids:[incident.source_id]);return [...new Set(sources.filter(Boolean))].map(source_id=>({source_id,ip:String(ip)}));}
@@ -237,6 +239,28 @@ function incidentSources(incident){
 function incidentRules(incident){
  return Array.isArray(incident.rules)?incident.rules.filter(rule=>rule&&typeof rule==='object'):[];
 }
+function scoreReason(reason){
+ return String(reason)
+  .replace(/login succeeded after failed attempts/,'多次失败后登录成功')
+  .replace(/attempts against (\\d+) existing non-root account\\(s\\)/,'尝试 $1 个非 root 有效账号')
+  .replace(/activity on (\\d+) hosts/,'涉及 $1 台服务器')
+  .replace(/persisted for ([\\d.]+) h/,'持续 $1 小时')
+  .replace(/(\\d+) failed-authentication records/,'$1 条认证失败日志');
+}
+function renderAssessment(parent,assessment){
+ const box=document.createElement('div');box.className='incident-value';
+ if(!assessment||assessment.status!=='scored'||!Number.isFinite(assessment.score)){
+  box.textContent='尚未评分 · 保留待核查';parent.append(box);return;
+ }
+ const title=document.createElement('strong');title.textContent=`${assessment.score} 分 · ${assessment.priority||'低分'} · ${assessment.surfaced?'优先核查':'低于关注线'}`;box.append(title);
+ const reasons=Array.isArray(assessment.reasons)?assessment.reasons:[];
+ const detail=document.createElement('details'),summary=document.createElement('summary');summary.textContent='评分原因';detail.addEventListener('click',event=>event.stopPropagation());detail.addEventListener('keydown',event=>event.stopPropagation());detail.append(summary);
+ const body=document.createElement('div');body.textContent=reasons.length?reasons.map(scoreReason).join('\\n'):'未命中加分项；低分不代表安全。';detail.append(body);box.append(detail);parent.append(box);
+}
+function renderScoreCounts(counts){
+ if(!counts){text('incident-score-counts','');return;}
+ text('incident-score-counts',`当前来源 / 处置状态：优先核查 ${counts.attention??0} · 低分 ${counts.low??0} · 未评分 ${counts.unscored??0} · 合计 ${counts.total??0}`);
+}
 function renderIncidents(data){
  const rows=$('incidents');rows.replaceChildren();
  for(const incident of data){
@@ -249,11 +273,12 @@ function renderIncidents(data){
   if(Array.isArray(incident.usernames)&&incident.usernames.length)countCell.title=`涉及账号：${incident.usernames.join('、')}`;
   const rules=incidentRules(incident),ruleCell=cell(tr,rules.length?rules.map(rule=>detectionRuleLabels[rule.rule_id]||rule.rule_id||'未知规则').join('、'):'登录失败（旧版记录）');
   ruleCell.title=rules.map(rule=>[rule.reason,rule.window_seconds?`窗口 ${rule.window_seconds} 秒`:null,rule.rule_version?`版本 ${rule.rule_version}`:null].filter(Boolean).join(' · ')).join('\\n');
+  renderAssessment(ruleCell,incident.assessment);
   const state=triageLabels[incident.triage_status]?incident.triage_status:'pending',statusCell=cell(tr,''),badge=document.createElement('span');badge.className='triage triage-'+state;badge.textContent=triageLabels[state];statusCell.append(badge);
   if(incident.triage_updated_at){const stamp=document.createElement('small');stamp.className='muted triage-time';stamp.textContent=`更新于 ${when(incident.triage_updated_at)}`;statusCell.append(stamp);}
   appendIncidentSelection(statusCell,incident);appendTriageActions(statusCell,incident,state);tr.addEventListener('click',()=>showIncident(incident));tr.addEventListener('keydown',e=>{if(e.target===tr&&e.key==='Enter')showIncident(incident);});rows.append(tr);
  }
- if(!data.length)empty(rows,6,incidentTriage==='all'?'尚未发现达到阈值的 SSH 认证告警。':`没有${triageLabels[incidentTriage]||''}状态的告警；可切换处置状态查看其他告警。`);
+ if(!data.length)empty(rows,6,incidentFocus!=='all'?'当前评分筛选没有匹配事件；可切换全部查看。':incidentTriage==='all'?'尚未发现达到阈值的 SSH 认证告警。':`没有${triageLabels[incidentTriage]||''}状态的告警；可切换处置状态查看其他告警。`);
 }
 function updatePager(kind){
  const state=pages[kind];$(kind+'-prev').disabled=state.page<=1;$(kind+'-next').disabled=state.totalPages===null||state.page>=state.totalPages;
@@ -280,7 +305,7 @@ async function acceptList(view,data){
   const itemsKey=JSON.stringify(data.items),unchanged=sameView&&previous.page===data.page&&previous.itemsKey===itemsKey;
   state.page=data.page;if(!unchanged){if(kind==='event')renderEvents(data.items);else renderIncidents(data.items);}
   if(kind==='event'&&data.snapshot!==undefined)eventSnapshot=data.snapshot;
-  if(kind==='incident'&&data.triage_counts)renderTriageCounts(data.triage_counts);
+  if(kind==='incident'){if(data.triage_counts)renderTriageCounts(data.triage_counts);renderScoreCounts(data.score_counts);}
   state.displayed={source,page:state.page,queryKey:listKey(kind),total:state.total,totalPages:state.totalPages,items:data.items,itemsKey,updatedAt:new Date().toISOString(),elapsed:duration(started)};state.visible=state.displayed;saveView();
   updatePager(kind);text(kind+'-updated',`更新于 ${when(state.displayed.updatedAt)} · 用时 ${state.displayed.elapsed}`);text(kind+'-status',unchanged?'已是最新，内容无变化。':'');
 }
@@ -317,7 +342,7 @@ async function refresh(){
  const requestId=++refreshRequestId;if(summaryController)summaryController.abort();summaryController=new AbortController();
  const controller=summaryController,source=currentSource;refreshRunning=true;summaryPending=true;updateRefreshButton();text('error','');
  const views=[beginList('event',pages.event.page),beginList('incident',pages.incident.page)];
- const query=new URLSearchParams({limit:String(pageSize),event_page:String(views[0].page),incident_page:String(views[1].page),incident_triage:incidentTriage});if(source)query.set('source_id',source);appendEventQuery(query);
+ const query=new URLSearchParams({limit:String(pageSize),event_page:String(views[0].page),incident_page:String(views[1].page),incident_triage:incidentTriage,incident_focus:incidentFocus,incident_sort:incidentSort});if(source)query.set('source_id',source);appendEventQuery(query);
  try{
   const data=await get('/api/dashboard?'+query,controller.signal);if(requestId!==refreshRequestId||source!==currentSource)return;
   if(!data||!data.summary||!data.events||!data.incidents)throw new Error('概览数据返回异常，请刷新重试。');
@@ -333,6 +358,7 @@ $('refresh-interval').addEventListener('change',()=>{try{localStorage.setItem('r
 $('ip-form').addEventListener('submit',event=>{event.preventDefault();lookupIp($('ip-input').value);});
 $('abuseipdb-check').addEventListener('click',lookupAbuse);
 $('incident-control-open').addEventListener('click',()=>$('control-section').scrollIntoView({behavior:'smooth',block:'start'}));
+for(const [id,values,apply] of [['incident-focus',scoreFilters,v=>incidentFocus=v],['incident-sort',scoreSorts,v=>incidentSort=v]])$(id).addEventListener('change',()=>{const value=$(id).value;if(!values.includes(value))return;apply(value);saveView();loadList('incident',1);});
 $('incident-triage').addEventListener('change',()=>{const value=$('incident-triage').value;incidentTriage=triageFilters.includes(value)?value:'pending';saveView();loadList('incident',1);});
 $('ip-show-events').addEventListener('click',()=>{const ip=$('ip-input').value.trim();if(ip)queryLogsForIP(ip);else text('ip-status','请先输入要查日志的 IP。');});
 $('ip-add-control').addEventListener('click',()=>{$('control-ip').value=$('ip-input').value.trim();$('control-section').scrollIntoView({behavior:'smooth',block:'start'});});
@@ -353,8 +379,8 @@ for(const kind of ['event','incident']){
  $(kind+'-jump-form').addEventListener('submit',event=>{event.preventDefault();navigate(kind,$(kind+'-jump').value);});
 }
 try{const saved=localStorage.getItem('riskops-refresh-minutes');if(['0','1','5','15'].includes(saved))$('refresh-interval').value=saved;}catch{}
-try{const saved=JSON.parse(sessionStorage.getItem('riskops-view')||'null');if(saved&&typeof saved==='object'){currentSource=typeof saved.source==='string'?saved.source:'';if(saved.filters&&typeof saved.filters==='object')for(const key of ['ip','username','event_type','q','start','end'])if(typeof saved.filters[key]==='string')eventFilters[key]=saved.filters[key];eventSnapshot=typeof saved.snapshot==='string'?saved.snapshot:null;if(triageFilters.includes(saved.incidentTriage))incidentTriage=saved.incidentTriage;for(const kind of ['event','incident'])if(Number.isSafeInteger(saved[kind+'Page'])&&saved[kind+'Page']>0)pages[kind].page=saved[kind+'Page'];setFilterInputs();}}catch{}
-$('incident-triage').value=incidentTriage;
+try{const saved=JSON.parse(sessionStorage.getItem('riskops-view')||'null');if(saved&&typeof saved==='object'){currentSource=typeof saved.source==='string'?saved.source:'';if(saved.filters&&typeof saved.filters==='object')for(const key of ['ip','username','event_type','q','start','end'])if(typeof saved.filters[key]==='string')eventFilters[key]=saved.filters[key];eventSnapshot=typeof saved.snapshot==='string'?saved.snapshot:null;if(triageFilters.includes(saved.incidentTriage))incidentTriage=saved.incidentTriage;if(scoreFilters.includes(saved.incidentFocus))incidentFocus=saved.incidentFocus;if(scoreSorts.includes(saved.incidentSort))incidentSort=saved.incidentSort;for(const kind of ['event','incident'])if(Number.isSafeInteger(saved[kind+'Page'])&&saved[kind+'Page']>0)pages[kind].page=saved[kind+'Page'];setFilterInputs();}}catch{}
+$('incident-triage').value=incidentTriage;$('incident-focus').value=incidentFocus;$('incident-sort').value=incidentSort;
 refresh();
 """
 
@@ -374,7 +400,7 @@ DASHBOARD_HTML = """<!doctype html>
 <p><a id="abuseipdb-link" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" hidden>在 AbuseIPDB 查看完整报告 ↗</a></p><p><small>外部风险查询：仅在点击按钮或报告入口时向 AbuseIPDB 发送所选公网 IP，不发送 SSH 原始日志或账号。评分仅供核查，0 分不代表确认安全。</small></p>
 <div id="ip-result" hidden><dl class="ip-fields"><div><dt>IP 地址</dt><dd id="ip-address">—</dd></div><div><dt>地址类型</dt><dd id="ip-type">—</dd></div><div><dt>国家 / 地区</dt><dd id="ip-country">—</dd></div><div><dt>省份 / 城市</dt><dd id="ip-region">—</dd></div><div><dt>网络组织</dt><dd id="ip-network">—</dd></div><div><dt>ASN</dt><dd id="ip-asn">—</dd></div><div><dt>属地库版本</dt><dd id="ip-database-release">—</dd></div><div><dt>数据库更新时间</dt><dd id="ip-database-updated">—</dd></div></dl><p>数据库状态：<span id="ip-database-status" class="muted">—</span></p></div>
 <p><small>属地数据：<a href="https://db-ip.com" target="_blank" rel="noopener noreferrer">DB-IP Lite</a>（CC BY 4.0）。部分地址可能缺少城市或网络组织信息。</small></p></section>
-<section id="incident-section" aria-busy="false"><h2>SSH 认证告警</h2><p>检测短时密集失败、慢速扫描、多账号尝试、跨服务器尝试及多次失败后成功。失败日志包括认证失败、无效账号和认证前断开，不等于独立连接或攻击次数。相同来源 IP 可能由不同使用者共享，命中规则需要人工核查，不会自动封禁。</p><p>告警保存在中控，刷新不会删除；来源一栏列出全部关联服务器与来源 ID。点击查看命中原因、账号和原始证据，或点击来源 IP 查询属地。</p><p>处置状态：待处理表示尚未处理；已知晓表示已有人知悉但未采取措施；已处理表示已封禁或人工确认处理完毕。封禁在全部关联来源核实生效后会自动标为已处理；已处理的 IP 若再次出现新证据会自动回到待处理。每次变更都写入处置记录，可在详情中查看。</p><div class="actions"><label for="incident-triage">处置状态</label><select id="incident-triage"><option value="pending" selected>待处理</option><option value="acknowledged">已知晓</option><option value="resolved">已处理</option><option value="all">全部</option></select><span id="incident-triage-counts" class="muted"></span><label for="triage-note">处置备注（可选）</label><input id="triage-note" type="text" maxlength="300" placeholder="写入处置记录，例如：已确认为内部扫描" autocomplete="off"><button id="incident-control-open" type="button">查看已选目标与封禁预览（0）</button></div><p id="triage-status" class="list-status muted" role="status" aria-live="polite"></p><p><small id="incident-updated"></small></p><div class="table-wrap"><table><thead><tr><th>最近发生</th><th>关联服务器 / 来源</th><th>来源 IP</th><th>日志 / 账号统计</th><th>命中规则</th><th>状态</th></tr></thead><tbody id="incidents"></tbody></table></div><div class="pager"><button id="incident-prev" type="button">上一页</button><span id="incident-page"></span><button id="incident-next" type="button">下一页</button><form id="incident-jump-form" class="page-jump" novalidate><label for="incident-jump">跳至</label><input id="incident-jump" type="number" min="1" step="1" value="1" aria-label="SSH 认证告警页码" aria-describedby="incident-status"><span>页</span><button id="incident-jump-button" type="submit">跳转</button></form></div><p id="incident-status" class="list-status muted" role="status" aria-live="polite"></p></section>
+<section id="incident-section" aria-busy="false"><h2>SSH 认证告警</h2><p>检测短时密集失败、慢速扫描、多账号尝试、跨服务器尝试及多次失败后成功。失败日志包括认证失败、无效账号和认证前断开，不等于独立连接或攻击次数。相同来源 IP 可能由不同使用者共享，命中规则需要人工核查，不会自动封禁。</p><p>告警保存在中控，刷新不会删除；来源一栏列出全部关联服务器与来源 ID。点击查看命中原因、账号和原始证据，或点击来源 IP 查询属地。</p><p>处置状态：待处理表示尚未处理；已知晓表示已有人知悉但未采取措施；已处理表示已封禁或人工确认处理完毕。封禁在全部关联来源核实生效后会自动标为已处理；已处理的 IP 若再次出现新证据会自动回到待处理。每次变更都写入处置记录，可在详情中查看。</p><div class="actions"><label for="incident-triage">处置状态</label><select id="incident-triage"><option value="pending" selected>待处理</option><option value="acknowledged">已知晓</option><option value="resolved">已处理</option><option value="all">全部</option></select><span id="incident-triage-counts" class="muted"></span><label for="incident-focus">评分筛选</label><select id="incident-focus"><option value="all" selected>全部事件</option><option value="attention">优先核查 + 未评分</option><option value="low">低分事件</option><option value="unscored">尚未评分</option></select><label for="incident-sort">排序</label><select id="incident-sort"><option value="score" selected>分数从高到低（未评分在前）</option><option value="recent">最近发生</option></select><label for="triage-note">处置备注（可选）</label><input id="triage-note" type="text" maxlength="300" placeholder="写入处置记录，例如：已确认为内部扫描" autocomplete="off"><button id="incident-control-open" type="button">查看已选目标与封禁预览（0）</button></div><p>评分由日志证据计算，25 分起建议优先核查；P1 ≥ 60、P2 ≥ 40、P3 ≥ 25。默认显示全部待处理事件，低分仍保留且不自动结案。未评分事件优先显示；既往登录不自动减分。评分不代表攻击概率。</p><p id="incident-score-counts" class="muted" role="status"></p><p id="triage-status" class="list-status muted" role="status" aria-live="polite"></p><p><small id="incident-updated"></small></p><div class="table-wrap"><table><thead><tr><th>最近发生</th><th>关联服务器 / 来源</th><th>来源 IP</th><th>日志 / 账号统计</th><th>评分 / 命中规则</th><th>状态</th></tr></thead><tbody id="incidents"></tbody></table></div><div class="pager"><button id="incident-prev" type="button">上一页</button><span id="incident-page"></span><button id="incident-next" type="button">下一页</button><form id="incident-jump-form" class="page-jump" novalidate><label for="incident-jump">跳至</label><input id="incident-jump" type="number" min="1" step="1" value="1" aria-label="SSH 认证告警页码" aria-describedby="incident-status"><span>页</span><button id="incident-jump-button" type="submit">跳转</button></form></div><p id="incident-status" class="list-status muted" role="status" aria-live="polite"></p></section>
 <section id="event-section" aria-busy="false"><h2>已接收日志</h2><p>点击一行查看完整记录，点击来源 IP 查询属地。系统当前采集 SSH 相关日志；这里不代表服务器的全部网络流量。以下条件组合生效，仅筛选日志，不影响上方告警和概览。</p>
 <form id="search-form"><div class="search-fields"><label>来源 IP<input id="search-ip" type="text" maxlength="128" placeholder="完整 IPv4 / IPv6" autocomplete="off"></label><label>账号<input id="search-username" type="text" maxlength="256" placeholder="完整账号名" autocomplete="off"></label><label>事件类型<select id="search-event_type"><option value="">全部类型</option><option value="auth_failure">认证失败</option><option value="invalid_user">无效账号</option><option value="preauth_abort">认证前断开</option><option value="auth_success">认证成功</option><option value="probe">协议探测</option><option value="disconnect">断开连接</option><option value="session_open">会话打开</option><option value="session_close">会话关闭</option><option value="daemon">服务状态</option><option value="other">其他</option></select></label><label>开始时间（本地）<input id="search-start" type="datetime-local"></label><label>结束时间（本地）<input id="search-end" type="datetime-local"></label><label>消息关键字<input id="search-q" type="text" maxlength="256" placeholder="原始消息包含" autocomplete="off"></label></div><div class="actions"><button type="submit">查询日志</button><button id="search-clear" type="button">清空条件</button><button id="event-latest" type="button">获取最新日志</button></div></form><p><small id="event-updated"></small></p><div class="table-wrap"><table><thead><tr><th>日志时间</th><th>来源</th><th>类型</th><th>来源 IP</th><th>原始消息</th></tr></thead><tbody id="events"></tbody></table></div><div class="pager"><button id="event-prev" type="button">上一页</button><span id="event-page"></span><button id="event-next" type="button">下一页</button><form id="event-jump-form" class="page-jump" novalidate><label for="event-jump">跳至</label><input id="event-jump" type="number" min="1" step="1" value="1" aria-label="日志页码" aria-describedby="event-status"><span>页</span><button id="event-jump-button" type="submit">跳转</button></form></div><p id="event-status" class="list-status muted" role="status" aria-live="polite"></p></section>
 <section id="detail-section"><h2 id="detail-title">记录详情</h2><pre id="detail">选择上方记录查看详情。</pre><div id="evidence-view" hidden><h3>原始证据时间线</h3><div class="table-wrap"><table><thead><tr><th>时间</th><th>来源</th><th>类型</th><th>IP</th><th>账号</th><th>原始消息</th></tr></thead><tbody id="evidence-rows"></tbody></table></div><div class="pager"><button id="evidence-prev" type="button">上一页证据</button><span id="evidence-page"></span><button id="evidence-next" type="button">下一页证据</button><form id="evidence-jump-form" class="page-jump" novalidate><label for="evidence-jump">跳至</label><input id="evidence-jump" type="number" min="1" step="1" value="1"><span>页</span><button type="submit">跳转</button></form></div><p id="evidence-status" role="status" aria-live="polite"></p></div></section>

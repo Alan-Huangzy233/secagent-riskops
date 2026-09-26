@@ -54,6 +54,7 @@ def test_empty_pages_and_invalid_page_numbers(store, method):
     if method == "paginate_events":
         expected["snapshot"] = "r1:0"
     else:
+        expected.update(focus="all", sort="recent", score_counts={"attention": 0, "low": 0, "unscored": 0, "total": 0})
         expected["triage"] = "all"
         expected["triage_counts"] = {"pending": 0, "acknowledged": 0, "resolved": 0, "total": 0}
     assert query("unknown", limit=50, page=99) == expected

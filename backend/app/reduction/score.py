@@ -61,26 +61,44 @@ def assess(evidence: list[dict], baseline: dict[tuple[str, str], float], *,
     existing = sorted({row["ssh_user"] for row in failures if row["event_type"] == "auth_failure"
                        and row["ssh_user"] and row["ssh_user"] not in invalid and row["ssh_user"] != "root"})
     hosts = {row["source_id"] for row in evidence}
+    return assess_summary(
+        failure_count=len(failures), success_count=len(successes),
+        existing_accounts=len(existing), host_count=len(hosts), span=span,
+        all_successes_known=bool(successes) and all(
+            baseline.get((row["src_ip"], row["ssh_user"]), start) < start for row in successes),
+        threshold=threshold,
+    )
+
+
+def assess_summary(*, failure_count: int, success_count: int, existing_accounts: int,
+                   host_count: int, span: float, all_successes_known: bool = False,
+                   threshold: int = SURFACE_THRESHOLD) -> Assessment:
+    """Same weights for batch evidence and durable SQL aggregates.
+
+    Callers must aggregate complete incident evidence, never a paginated preview.
+    The live adapter deliberately leaves all_successes_known false: a previous
+    login alone is insufficient to trust a source on a partially observed host.
+    """
     score, reasons = 0, []
-    if successes:
+    if success_count:
         score += SUCCESS
         reasons.append(f"+{SUCCESS} login succeeded after failed attempts")
-        if all(baseline.get((row["src_ip"], row["ssh_user"]), start) < start for row in successes):
+        if all_successes_known:
             score += KNOWN_SOURCE
             reasons.append(f"{KNOWN_SOURCE} every success came from a source that had logged in as that user before")
-    if existing:
-        counted = min(len(existing), EXISTING_ACCOUNT_CAP)
+    if existing_accounts:
+        counted = min(existing_accounts, EXISTING_ACCOUNT_CAP)
         score += EXISTING_ACCOUNT * counted
-        reasons.append(f"+{EXISTING_ACCOUNT * counted} attempts against {len(existing)} existing non-root "
+        reasons.append(f"+{EXISTING_ACCOUNT * counted} attempts against {existing_accounts} existing non-root "
                        f"account(s)")
-    if len(hosts) >= 2:
+    if host_count >= 2:
         score += SEVERAL_HOSTS
-        reasons.append(f"+{SEVERAL_HOSTS} activity on {len(hosts)} hosts")
-    if span >= PERSISTENT_SECONDS and len(failures) >= 10:
+        reasons.append(f"+{SEVERAL_HOSTS} activity on {host_count} hosts")
+    if span >= PERSISTENT_SECONDS and failure_count >= 10:
         score += PERSISTENT
         reasons.append(f"+{PERSISTENT} persisted for {span / 3600:.1f} h")
-    if len(failures) >= VOLUME_RECORDS:
+    if failure_count >= VOLUME_RECORDS:
         score += VOLUME
-        reasons.append(f"+{VOLUME} {len(failures)} failed-authentication records")
+        reasons.append(f"+{VOLUME} {failure_count} failed-authentication records")
     priority = next((name for floor, name in PRIORITIES if score >= floor and score >= threshold), None)
     return Assessment(score, priority, score >= threshold, tuple(reasons))
