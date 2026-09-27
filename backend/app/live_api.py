@@ -123,6 +123,11 @@ class TriageRequest(BaseModel):
     note: str | None = Field(default=None, max_length=300)
 
 
+class ReadNotificationsRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+    ids: list[Annotated[StrictInt, Field(ge=1)]] = Field(min_length=1, max_length=100)
+
+
 class TelemetryBatch(BaseModel):
     model_config = {"extra": "forbid"}
     source_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
@@ -172,9 +177,16 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
             application.state.control.block_listener = resolve_blocked
         if control is None:
             application.state.control.start()
+        from .telemetry.notifications import NotificationWorker
+        notification_worker = None
+        if application.state.config.notifications_enabled:
+            notification_worker = NotificationWorker(live_store, application.state.config)
+            notification_worker.start()
         try:
             yield
         finally:
+            if notification_worker:
+                await run_in_threadpool(notification_worker.close)
             if control is None:
                 await run_in_threadpool(application.state.control.close)
             if store is None and hasattr(application.state.store, "close"):
@@ -356,6 +368,22 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
                                            actor=request.app.state.config.operator_username, note=body.note)
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from None
+
+    @application.get("/api/notifications", dependencies=[Depends(operator)])
+    def notification_inbox(request: Request, page: int = Query(1, ge=1, le=1_000_000_000),
+                           limit: int = Query(20, ge=1, le=100), unread: bool = False,
+                           kind: Literal["incident", "collection", "health", "briefing"] | None = None):
+        result = request.app.state.store.list_notifications(page=page, limit=limit, unread=unread, kind=kind)
+        return {**result, "enabled": request.app.state.config.notifications_enabled,
+                "backup_monitor_configured": bool(request.app.state.config.notification_backup_directories)}
+
+    @application.post("/api/notifications/read", dependencies=[Depends(operator_write)])
+    async def read_notifications(request: Request):
+        try:
+            body = ReadNotificationsRequest.model_validate_json(await request.body())
+        except ValidationError:
+            raise HTTPException(422, "需要 1–100 个有效通知 ID") from None
+        return await run_in_threadpool(request.app.state.store.read_notifications, body.ids)
 
     @application.get("/api/controls", dependencies=[Depends(operator)])
     def controls(request: Request):

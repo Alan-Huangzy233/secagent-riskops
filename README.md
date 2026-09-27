@@ -123,6 +123,8 @@ nobody else could re-check them. See [SSH detection rules](./docs/ssh-detection.
 [manual blocking](./docs/manual-blocking.md) and the
 [deployment guide](./deploy/README.md). Deployment credentials, addresses, logs
 and databases stay outside this repository.
+The pilot also has [console notifications and UTC daily briefings](docs/console-notifications.md),
+with a durable local inbox, cooldown, retry and read state; external push is deferred.
 
 ## Safety boundaries
 
