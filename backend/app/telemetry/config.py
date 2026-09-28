@@ -70,6 +70,15 @@ class LiveConfig(BaseModel):
     operator_password_pbkdf2: str = Field(min_length=1, max_length=512, repr=False)
     retention_days: int = Field(default=14, ge=1, le=365)
     heartbeat_timeout_seconds: int = Field(default=300, ge=60, le=3600)
+    notifications_enabled: bool = True
+    notification_backup_directories: tuple[str, ...] = Field(default=(), max_length=8)
+
+    @field_validator("notification_backup_directories")
+    @classmethod
+    def backup_directories(cls, values):
+        if any(not Path(value).is_absolute() for value in values):
+            raise ValueError("backup directories must be absolute paths")
+        return values
 
     @field_validator("database_path")
     @classmethod

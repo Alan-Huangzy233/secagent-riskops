@@ -104,6 +104,16 @@ explicit bounded maintenance command, not at startup. Scores never dismiss or
 block an incident. See [live-incident-scoring.md](./live-incident-scoring.md) for
 production differences, API parameters and deployment/backfill instructions.
 
+## Console notifications (implemented; deployment is separate)
+
+The live pilot has a persistent shared inbox, unread state, coalesced incident
+notifications, collection/capacity/optional local-backup monitoring and UTC daily
+briefings. Background work runs without a browser, resumes after restart and
+retries failed local delivery. Historical log aggregation uses bounded pages
+outside write transactions. The console reports queue/worker status and whether
+backup monitoring is configured. External push and per-user inboxes remain
+future work. See [console-notifications.md](./console-notifications.md).
+
 ## Known limitations of the skeleton
 
 - The walking skeleton's triage agent is deterministic rule logic, so that flow

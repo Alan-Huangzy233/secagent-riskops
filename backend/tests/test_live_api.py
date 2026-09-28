@@ -34,6 +34,7 @@ def config(tmp_path, password_hash):
         sources=[{"id": "server-a", "hostname": "host-a", "token_sha256": hashlib.sha256(TOKEN_A.encode()).hexdigest()},
                  {"id": "server-b", "hostname": "host-b", "token_sha256": hashlib.sha256(TOKEN_B.encode()).hexdigest()}],
         operator_username="operator", operator_password_pbkdf2=password_hash,
+        notifications_enabled=False,
     )
 
 

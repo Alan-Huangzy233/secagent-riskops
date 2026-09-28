@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-from . import collection, scoring
+from . import collection, notifications, scoring
 from .detection import MAX_WINDOW_SECONDS, RuleMatch, detect_matches
 from .sshd_parse import FAILURE_KINDS, parse_sshd
 
@@ -248,6 +248,7 @@ class TelemetryStore:
             """)
             db.executescript(collection.SCHEMA)
             db.executescript(scoring.SCHEMA)
+            db.executescript(notifications.SCHEMA)
         # Additive migration: old IDs, receipts and raw evidence remain intact.
         with self._connection(write=True) as db:
             if not db.execute("SELECT 1 FROM maintenance WHERE name='detection_metadata_v1'").fetchone():
@@ -282,6 +283,37 @@ class TelemetryStore:
                 return db.execute("SELECT count(*) FROM sources").fetchone()[0] >= 0
         except sqlite3.Error:
             return False
+
+    def run_notifications(self, sources, heartbeat_timeout=300, *, now=None, health=(), **kwargs):
+        moment = _now().timestamp() if now is None else now
+        pending = False
+        try:
+            pending = notifications.advance_briefing(self, moment)
+        except sqlite3.Error:
+            # A slow/unavailable historical query must not stall urgent delivery.
+            with self._connection(write=True) as db:
+                notifications._set(db, "briefing_error", "简报汇总暂时失败，将自动重试")
+        with self._connection(write=True) as db:
+            return {**notifications.tick(db, sources, heartbeat_timeout, moment, health=health, **kwargs),
+                    "briefing_pending": pending}
+
+    def list_notifications(self, *, page=1, limit=20, unread=False, kind=None):
+        if isinstance(page, bool) or not isinstance(page, int) or page < 1:
+            raise ValueError("page must be a positive integer")
+        self._page(limit, 0)
+        if kind not in (None, "incident", "collection", "health", "briefing"):
+            raise ValueError("invalid notification kind")
+        with self._connection() as db:
+            return notifications.snapshot(db, page=page, limit=limit, unread=unread, kind=kind)
+
+    def read_notifications(self, ids):
+        if not isinstance(ids, list) or not 1 <= len(ids) <= 100 or any(
+                isinstance(item, bool) or not isinstance(item, int) or item < 1 for item in ids):
+            raise ValueError("expected 1–100 positive notification IDs")
+        with self._connection(write=True) as db:
+            changed = db.execute("UPDATE notification_inbox SET read_at=? WHERE read_at IS NULL AND id IN ("
+                                 + ",".join("?" for _ in ids) + ")", (_now().timestamp(), *ids)).rowcount
+        return {"changed": changed}
 
     def ingest(self, source_id: str, hostname: str, batch_id: str,
                records: list[dict[str, Any]], error: str | None = None, *,
@@ -349,6 +381,7 @@ class TelemetryStore:
             incident_ids = {self._canonical_incident(db, item) for item in incident_ids}
             for incident_id in incident_ids:
                 self._refresh_incident(db, incident_id)
+                notifications.incident(db, incident_id, now.timestamp())
             latest = max((record["timestamp"] for record in normalized), default=None)
             db.execute("""UPDATE sources SET accepted_total=accepted_total+?,
                 duplicate_total=duplicate_total+?, last_event_at=CASE
