@@ -114,6 +114,15 @@ outside write transactions. The console reports queue/worker status and whether
 backup monitoring is configured. External push and per-user inboxes remain
 future work. See [console-notifications.md](./console-notifications.md).
 
+## HTTP detection foundation (offline; not deployed)
+
+Structured HTTP access records can be replayed through three versioned rules:
+sensitive-resource probes, path-traversal attempts and multi-path scans. Findings
+retain their evidence and never claim an exploit or login succeeded. A synthetic
+fixture and CLI report reproduce in CI; a Nginx JSON-format example is provided.
+Live HTTP ingestion, console integration, scoring and notifications are still
+future work. See [web-detection.md](./web-detection.md).
+
 ## Known limitations of the skeleton
 
 - The walking skeleton's triage agent is deterministic rule logic, so that flow
