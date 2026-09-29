@@ -4,7 +4,11 @@ The other documents in this repository describe the **target design**. This
 page records what is **actually implemented in code** so the two are never
 confused.
 
-Last updated for: `v0.3.0-demo` (in progress) — walking skeleton, measured alert reduction, model triage and the safety behaviours, plus an independent SSH/auth telemetry pilot.
+Last reviewed: 2026-09-29. The walking skeleton and measured demo baseline are
+preserved; further demo work is paused. Active development targets the independent
+SSH/auth telemetry pilot. The [production plan](./production-plan.md) tracks
+model comparison and broader detection; planned capabilities are not claims of
+implementation or deployment.
 
 ## Implemented (runnable, tested)
 
