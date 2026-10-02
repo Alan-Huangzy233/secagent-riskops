@@ -1,0 +1,18 @@
+{
+  "provider": "zai",
+  "api_format": "openai-chat",
+  "endpoint": "https://api.z.ai/api/paas/v4/chat/completions",
+  "model": "glm-5.3-flash",
+  "key_name": "ZAI_API_KEY",
+  "thinking": "enabled",
+  "effort": "low",
+  "prices": {
+    "as_of": "2026-10-02",
+    "input": "0.15",
+    "output": "0.50",
+    "cache_read": "0.03",
+    "cache_write": "0.15"
+  },
+  "max_output_tokens": 8192,
+  "max_input_tokens": 65536
+}

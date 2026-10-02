@@ -32,7 +32,7 @@ Criteria* in the [Project Charter](./project-charter.md):
 | Audit timeline export: agent call, tool calls, plans, policy decisions, approvals, execution, verification and rollback as one hash-chained JSON Lines file, verified from the file alone | `backend/app/audit_timeline.py`, `backend/app/storage/audit_log.py` |
 | Safety demo on two recorded model escalations; its exported timeline reproduces byte for byte in CI | `backend/app/safety_demo.py`, `examples/safety-demo/`, [safety-demo.md](./safety-demo.md) |
 | Read-only web demo at `/demo`: a replay of the synthetic week, built from a snapshot that CI rebuilds byte for byte. It shows incident detail, the score breakdown and the recorded model verdicts, and its response buttons run the real policy engine and executor on lab copies. A headless-browser check runs in CI | `backend/app/webdemo/`, `docs/eval/web-demo-synthetic-7d.json`, [web-demo.md](./web-demo.md) |
-| Model triage (`claude-opus-5`) of surfaced incidents: structured verdicts, hard budget, every call recorded and replayed offline in CI | `backend/app/agents/model_triage.py`, `backend/app/evaluation/triage.py` |
+| Configurable model triage: Responses and Chat Completions APIs; shared durable budget; validated synthetic calls and historical Claude replay | `backend/app/agents/triage_api.py`, `backend/app/agents/triage_budget.py`, [usage](model-triage.md) |
 | Immutable, hash-bound assessment scope | `backend/app/authorization.py` |
 | Replay from retained evidence | `backend/app/replay.py` |
 | FastAPI surface + SQLite persistence | `backend/app/api/app.py`, `backend/app/storage/repository.py` |

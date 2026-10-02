@@ -305,7 +305,7 @@ would group a multi-source one.
 
 ### 6.4 AI triage agreement
 
-`backend/app/agents/model_triage.py` gives `claude-opus-5` (effort `medium`) a
+The published recordings below gave `claude-opus-5` (effort `medium`) a
 dossier of each surfaced incident — sources, hosts, timing, the rules that
 fired, per-account attempts and successes, whether sshd marked an account
 invalid, whether a source had logged in cleanly as that account before, and a
@@ -319,7 +319,8 @@ tells the model that account names are attacker-chosen data. A refusal or a
 truncated answer counts as an abstention. The model accepts no temperature, so
 every call is recorded in `docs/eval/triage-tape-*.jsonl`; `make triage`
 replays the recording with no key and no cost, and CI checks the replay byte
-for byte.
+for byte. New comparisons use the [configurable API evaluator](./docs/model-triage.md);
+these historical measurements do not describe the new candidate models.
 
 An incident's truth is `attack` when it holds any attack-labelled alert.
 "Score only" is the status quo: every surfaced incident goes to the analyst.

@@ -1,4 +1,4 @@
-"""Model-backed incident triage: Claude reads an incident and proposes a verdict.
+"""Incident dossiers and versioned recordings for model-backed triage.
 
 The agent proposes; it never suppresses, blocks or executes anything. Its input
 is a dossier of what the logs show about one incident — never the pipeline's
@@ -9,10 +9,6 @@ event ids it relied on.
 Every paid call is recorded (request fingerprint, response, usage, latency) so
 the evaluation can be replayed later without a key or a bill. With no key and
 no recording, callers fall back to the deterministic agent.
-
-The client is pinned to the public API endpoint and is given its key
-explicitly: an ``ANTHROPIC_BASE_URL`` left in the environment by other tooling
-must never redirect a project key.
 """
 from __future__ import annotations
 
@@ -22,18 +18,12 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
-import time
-from typing import Any
 
 from ..telemetry.sshd_parse import FAILURE_KINDS
 
 MODEL = "claude-opus-5"
-API_BASE_URL = "https://api.anthropic.com"
-FALLBACK_BETA = "server-side-fallback-2026-07-01"
 DEFAULT_EFFORT = "medium"
 PROMPT_VERSION = 1
-# USD per million tokens: input, output. Cache writes cost 1.25x input, reads 0.1x.
-PRICES = {"claude-opus-5": (5.0, 25.0), "claude-opus-4-8": (5.0, 25.0)}
 VERDICTS = ("escalate", "dismiss", "abstain")
 SAMPLE_RECORDS = 15
 
@@ -94,11 +84,19 @@ class TriageCall:
     cache_read_input_tokens: int
     usd: float
     latency_seconds: float
+    metadata: dict | None = None
 
     def to_record(self) -> dict:
         record = asdict(self)
         record["evidence_ids"], record["attack_techniques"] = list(self.evidence_ids), list(self.attack_techniques)
+        if self.metadata is None:
+            record.pop("metadata")
         return record
+
+    @classmethod
+    def from_record(cls, record: dict) -> TriageCall:
+        return cls(**{**record, "evidence_ids": tuple(record["evidence_ids"]),
+                      "attack_techniques": tuple(record["attack_techniques"])})
 
 
 def _iso(seconds: float) -> str:
@@ -149,57 +147,6 @@ def fingerprint(case: dict, effort: str = DEFAULT_EFFORT) -> str:
     return hashlib.sha256(material.encode()).hexdigest()
 
 
-def cost(model: str, usage: Any) -> float:
-    price_in, price_out = PRICES.get(model, PRICES[MODEL])
-    written = getattr(usage, "cache_creation_input_tokens", 0) or 0
-    read = getattr(usage, "cache_read_input_tokens", 0) or 0
-    return (usage.input_tokens * price_in + written * price_in * 1.25 + read * price_in * 0.1
-            + usage.output_tokens * price_out) / 1_000_000
-
-
-class ClaudeTriage:
-    """Live triage with a hard spending ceiling."""
-
-    def __init__(self, api_key: str, *, budget_usd: float, effort: str = DEFAULT_EFFORT, client: Any = None,
-                 worst_case_usd: float = 0.25) -> None:
-        if client is None:
-            import anthropic
-            client = anthropic.Anthropic(api_key=api_key, base_url=API_BASE_URL, max_retries=3, timeout=180.0)
-        self.client, self.budget, self.effort, self.worst_case = client, budget_usd, effort, worst_case_usd
-        self.spent = 0.0
-
-    def triage(self, case: dict) -> TriageCall:
-        if self.spent + self.worst_case > self.budget:
-            raise BudgetExceeded(f"spent ${self.spent:.2f}; the next call could pass ${self.budget:.2f}")
-        started = time.perf_counter()
-        response = self.client.beta.messages.create(
-            model=MODEL, max_tokens=8000, betas=[FALLBACK_BETA], fallbacks="default",
-            system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-            output_config={"effort": self.effort, "format": {"type": "json_schema", "schema": SCHEMA}},
-            messages=[{"role": "user", "content": render(case)}],
-        )
-        latency = time.perf_counter() - started
-        usd = cost(response.model, response.usage)
-        self.spent += usd
-        verdict = {"verdict": "abstain", "confidence": "low", "evidence_ids": [], "attack_techniques": [],
-                   "rationale": f"no verdict: stop_reason {response.stop_reason}"}
-        if response.stop_reason not in ("refusal", "max_tokens"):
-            text = next((block.text for block in response.content if block.type == "text"), "")
-            try:
-                verdict = json.loads(text)
-            except json.JSONDecodeError:
-                verdict["rationale"] = "no verdict: response was not valid JSON"
-        return TriageCall(
-            incident_id=case["incident_id"], prompt_sha256=fingerprint(case, self.effort),
-            verdict=verdict["verdict"], confidence=verdict["confidence"], rationale=verdict["rationale"],
-            evidence_ids=tuple(verdict["evidence_ids"]), attack_techniques=tuple(verdict["attack_techniques"]),
-            model=response.model, stop_reason=response.stop_reason,
-            input_tokens=response.usage.input_tokens, output_tokens=response.usage.output_tokens,
-            cache_creation_input_tokens=getattr(response.usage, "cache_creation_input_tokens", 0) or 0,
-            cache_read_input_tokens=getattr(response.usage, "cache_read_input_tokens", 0) or 0,
-            usd=round(usd, 6), latency_seconds=round(latency, 3))
-
-
 class RecordedTriage:
     """Replays calls from a recording; a case never recorded is an error, not a guess."""
 
@@ -210,9 +157,9 @@ class RecordedTriage:
                 record = json.loads(line)
                 self.calls[record["prompt_sha256"]] = record
 
-    def lookup(self, case: dict, effort: str = DEFAULT_EFFORT) -> TriageCall | None:
-        record = self.calls.get(fingerprint(case, effort))
+    def lookup(self, case: dict, effort: str = DEFAULT_EFFORT, *,
+               request_sha256: str | None = None) -> TriageCall | None:
+        record = self.calls.get(request_sha256 or fingerprint(case, effort))
         if record is None:
             return None
-        return TriageCall(**{**record, "evidence_ids": tuple(record["evidence_ids"]),
-                             "attack_techniques": tuple(record["attack_techniques"])})
+        return TriageCall.from_record(record)

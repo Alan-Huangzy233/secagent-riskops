@@ -8,7 +8,9 @@
 
 **Current work:** production AI triage and detection beyond SSH. Further demo
 work is paused; the reproducible baseline below remains available. See the
-[production plan and active issues](./docs/production-plan.md).
+[production plan and active issues](./docs/production-plan.md). The
+[configurable model evaluator](./docs/model-triage.md) supports OpenAI, DeepSeek,
+Z.AI and compatible APIs with a shared evaluation budget.
 
 <!-- generated:readme-results -->
 **Results:** on a labelled synthetic week (seed 20261115), 32,458 raw alerts become **50 incidents surfaced (99.85 % fewer)**; **41 of 60 attacks are caught, miss rate 31.7 % (95 % CI 21.7 %–43.3 %)**, precision 0.82. Tuple dedup keeps 28,716 incidents and misses 96.7 % at the same bar. On real LANL authentication data the rules see only 4 of 74 red-team episodes. Model triage (`claude-opus-5`) then dismisses 5 of 7 false alarms on the synthetic week and 23 of 29 false alarms on LANL without dismissing a single attack, at about $0.025 per incident. The method, baselines and limits are in [EVALUATION.md](./EVALUATION.md).
@@ -104,7 +106,7 @@ raw logs ─► detection rules ─► alerts ─► dedup ─► correlate ─�
 | Implemented and tested | Planned, not implemented |
 |---|---|
 | Alert reduction: dedup, correlation, explainable score, measured in [EVALUATION.md](./EVALUATION.md) | Approval service with a second approver and authenticated approvers |
-| Model triage (`claude-opus-5`) with a hard budget, recorded and replayable, measured in EVALUATION.md | Typed executors on real hosts (SSH, GitHub); only lab copies today |
+| Configurable model triage APIs with a shared budget; historical Claude results recorded and replayable ([guide](./docs/model-triage.md)) | Typed executors on real hosts (SSH, GitHub); only lab copies today |
 | SSH/auth detection rules: burst, slow scan, multiple accounts, cross-source, success after failures | Web console (SOC inbox, approval queue); `frontend/` is a placeholder |
 | Evidence-grounded triage agent and skeptic gate | |
 | Fail-closed policy engine that refuses blank and ambiguous scope; hash-bound scope; approvals bound to the plan hash | |
