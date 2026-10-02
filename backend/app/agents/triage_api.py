@@ -40,7 +40,7 @@ class Prices(BaseModel):
 class APIConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     provider: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$")
-    api_format: Literal["openai-responses", "openai-chat", "anthropic-messages"]
+    api_format: Literal["openai-responses", "openai-chat"]
     endpoint: str
     model: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$")
     key_name: str = Field(pattern=r"^[A-Z][A-Z0-9_]{0,79}$")
@@ -85,18 +85,12 @@ class APIConfig(BaseModel):
                 body["reasoning"] = {"effort": self.effort}
         else:
             body.update(max_tokens=self.max_output_tokens, messages=[{"role": "user", "content": user}])
-            if self.api_format == "anthropic-messages":
-                body["system"] = SYSTEM
-                body["output_config"] = {"format": {"type": "json_schema", "schema": SCHEMA}}
-                if self.effort:
-                    body["output_config"]["effort"] = self.effort
-            else:
-                body["messages"].insert(0, {"role": "system", "content": SYSTEM})
-                body["response_format"] = {"type": "json_object"}
-                if self.thinking:
-                    body["thinking"] = {"type": self.thinking}
-                if self.effort:
-                    body["reasoning_effort"] = self.effort
+            body["messages"].insert(0, {"role": "system", "content": SYSTEM})
+            body["response_format"] = {"type": "json_object"}
+            if self.thinking:
+                body["thinking"] = {"type": self.thinking}
+            if self.effort:
+                body["reasoning_effort"] = self.effort
         if len(json.dumps(body, ensure_ascii=False).encode()) > self.max_input_tokens // 2:
             raise ValueError("request exceeds the configured input byte limit")
         return body
@@ -139,14 +133,7 @@ def normalize(config: APIConfig, payload: dict) -> tuple[str, str, str, dict]:
         raise APIError("unpriced_served_model")
     usage = payload["usage"]
     written = reasoning = 0
-    if config.api_format == "anthropic-messages":
-        inputs, outputs = _count(usage, "input_tokens"), _count(usage, "output_tokens")
-        cached = _count(usage, "cache_read_input_tokens", optional=True)
-        written = _count(usage, "cache_creation_input_tokens", optional=True)
-        stop = payload.get("stop_reason")
-        text = "".join(block["text"] for block in payload["content"] if block.get("type") == "text")
-        accepted = stop == "end_turn"
-    elif config.api_format == "openai-responses":
+    if config.api_format == "openai-responses":
         if payload.get("service_tier", "default") != "default":
             raise APIError("unpriced_service_tier")
         inputs, outputs = _count(usage, "input_tokens"), _count(usage, "output_tokens")
@@ -232,12 +219,7 @@ class APITriage:
     def _send(self, body: dict) -> dict:
         import httpx
 
-        headers = {"Content-Type": "application/json"}
-        key = self._api_key
-        if self.config.api_format == "anthropic-messages":
-            headers.update({"x-api-key": key, "anthropic-version": "2023-06-01"})
-        else:
-            headers["Authorization"] = f"Bearer {self._api_key}"
+        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {self._api_key}"}
         try:
             with httpx.Client(timeout=180, trust_env=False, follow_redirects=False, transport=self.transport) as client:
                 with client.stream("POST", self.config.endpoint, json=body, headers=headers) as response:

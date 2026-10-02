@@ -15,7 +15,7 @@ daily briefings landed in PRs [#112](https://github.com/Alan-Huangzy233/secagent
 External notification transports remain deferred.
 
 The [evaluation runner](model-triage.md) now accepts configurable OpenAI,
-DeepSeek, Z.AI and Anthropic APIs with shared durable budget reservations.
+DeepSeek, Z.AI and compatible APIs with shared durable budget reservations.
 Its live mode accepts only the published synthetic authentication datasets.
 The broader comparison corpus and production background service remain
 unfinished; historical demo results retain their original model attribution.

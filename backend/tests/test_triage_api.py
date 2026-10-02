@@ -41,14 +41,10 @@ def response(config, verdict=None, **overrides):
                  "usage": {"input_tokens": 1000, "output_tokens": 500,
                            "input_tokens_details": {"cached_tokens": 200},
                            "output_tokens_details": {"reasoning_tokens": 100}}}
-    elif config.api_format == "openai-chat":
+    else:
         value = {"model": config.model, "choices": [{"finish_reason": "stop", "message": {"content": text}}],
                  "usage": {"prompt_tokens": 1000, "completion_tokens": 500,
                            "prompt_tokens_details": {"cached_tokens": 200}}}
-    else:
-        value = {"model": config.model, "stop_reason": "end_turn", "content": [{"type": "text", "text": text}],
-                 "usage": {"input_tokens": 800, "output_tokens": 500, "cache_read_input_tokens": 200,
-                           "cache_creation_input_tokens": 50}}
     return {**value, **overrides}
 
 
@@ -76,7 +72,6 @@ def dataset(tmp_path_factory):
 def test_official_profiles_send_their_exact_protocol_and_never_an_environment_endpoint(tmp_path, monkeypatch, name):
     config = profile(name)
     monkeypatch.setenv("OPENAI_BASE_URL", "https://unrelated.example.invalid")
-    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://unrelated.example.invalid")
     monkeypatch.setenv("HTTPS_PROXY", "https://unrelated.example.invalid")
     live, requests = client(tmp_path, config)
     call = live.triage(CASE)
@@ -114,21 +109,6 @@ def test_custom_chat_endpoint_and_model_require_only_a_new_configuration(tmp_pat
     assert live.triage(CASE).model == "another-model"
     assert str(requests[0].url) == config.endpoint
     assert "thinking" not in json.loads(requests[0].content)
-
-
-def test_anthropic_adapter_keeps_schema_without_fallbacks_or_beta_features(tmp_path):
-    config = changed(profile(), provider="anthropic", api_format="anthropic-messages", model="test-claude",
-                     endpoint="https://api.anthropic.com/v1/messages", key_name="ANTHROPIC_API_KEY", effort="medium")
-    live, requests = client(tmp_path, config)
-    call = live.triage(CASE)
-    body = json.loads(requests[0].content)
-    assert body["output_config"] == {"effort": "medium", "format": {"type": "json_schema", "schema": model_triage.SCHEMA}}
-    assert requests[0].headers["x-api-key"] == "test-key-do-not-persist"
-    assert "Authorization" not in requests[0].headers
-    assert "anthropic-beta" not in requests[0].headers
-    assert not ({"fallbacks", "betas"} & body.keys())
-    assert call.cache_creation_input_tokens == 50
-    assert call.usd == 0.000339  # 800*.10 + 200*.01 + 50*.125 + 500*.50, rounded up.
 
 
 def test_cache_usage_and_reasoning_are_not_double_billed(tmp_path):
@@ -282,7 +262,7 @@ def test_a_process_crash_keeps_pending_reservations_and_usage_overrun_halts_spen
     {"endpoint": "https://example.invalid/v1?api_key=secret"},
     {"max_output_tokens": True}, {"max_input_tokens": -1},
     {"thinking": "enabled"}, {"prices": {"input": "NaN"}},
-    {"fallbacks": "default"},
+    {"fallbacks": "default"}, {"api_format": "anthropic-messages"},
 ])
 def test_unsupported_or_unsafe_configuration_is_rejected(update):
     with pytest.raises(ValidationError):

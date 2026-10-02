@@ -2,8 +2,7 @@
 
 The evaluator accepts an explicit API profile instead of a hard-coded Claude
 client. It supports OpenAI Responses, OpenAI-compatible Chat Completions
-(including DeepSeek and Z.AI), and Anthropic Messages. Changing a model,
-endpoint, thinking mode, output limit, or prices requires editing JSON rather
+(including DeepSeek and Z.AI). Changing a model, endpoint, thinking mode, output limit, or prices requires editing JSON rather
 than Python. This is an offline evaluation tool; production AI routing is a
 separate task.
 
@@ -51,18 +50,14 @@ do not supply or redirect keys.
 
 For a different service, copy a profile and set `provider`, `api_format`,
 `endpoint`, `model`, `key_name`, reasoning settings and the complete rate
-card. `api_format` is one of `openai-responses`, `openai-chat`, or
-`anthropic-messages`. Endpoints must be explicit HTTPS URLs without
-credentials or query parameters. The key is sent to that configured endpoint:
+card. `api_format` is either `openai-responses` or `openai-chat`. Endpoints must
+be explicit HTTPS URLs without credentials or query parameters. The key is sent to that configured endpoint:
 use a destination you trust. Only the selected protocol's fields are sent;
 remove `thinking`/`effort` if the service does not support them. Local HTTP
 servers and arbitrary provider-specific extensions are outside this adapter.
 
-For Anthropic use `https://api.anthropic.com/v1/messages`,
-`api_format: "anthropic-messages"`, a currently available model and its prices,
-and `key_name: "ANTHROPIC_API_KEY"`. It uses the current structured-output
-format without automatic fallback models. The historical Claude model ID is
-kept only for old recording replay.
+Claude live API support has been removed. Historical Claude recordings are
+retained solely for reproducible offline demo and evaluation replay.
 
 ## Run a small comparison
 
@@ -169,5 +164,4 @@ Protocol references:
 [DeepSeek thinking mode](https://api-docs.deepseek.com/guides/thinking_mode/),
 [DeepSeek pricing](https://api-docs.deepseek.com/quick_start/pricing),
 [Z.AI Chat Completions](https://docs.z.ai/api-reference/llm/chat-completion),
-[Z.AI pricing](https://docs.z.ai/guides/overview/pricing),
-[Anthropic structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs).
+[Z.AI pricing](https://docs.z.ai/guides/overview/pricing).

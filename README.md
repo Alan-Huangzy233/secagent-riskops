@@ -10,7 +10,7 @@
 work is paused; the reproducible baseline below remains available. See the
 [production plan and active issues](./docs/production-plan.md). The
 [configurable model evaluator](./docs/model-triage.md) supports OpenAI, DeepSeek,
-Z.AI and Anthropic with a shared evaluation budget.
+Z.AI and compatible APIs with a shared evaluation budget.
 
 <!-- generated:readme-results -->
 **Results:** on a labelled synthetic week (seed 20261115), 32,458 raw alerts become **50 incidents surfaced (99.85 % fewer)**; **41 of 60 attacks are caught, miss rate 31.7 % (95 % CI 21.7 %–43.3 %)**, precision 0.82. Tuple dedup keeps 28,716 incidents and misses 96.7 % at the same bar. On real LANL authentication data the rules see only 4 of 74 red-team episodes. Model triage (`claude-opus-5`) then dismisses 5 of 7 false alarms on the synthetic week and 23 of 29 false alarms on LANL without dismissing a single attack, at about $0.025 per incident. The method, baselines and limits are in [EVALUATION.md](./EVALUATION.md).
