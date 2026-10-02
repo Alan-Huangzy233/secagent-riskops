@@ -1,0 +1,17 @@
+{
+  "provider": "openai",
+  "api_format": "openai-responses",
+  "endpoint": "https://api.openai.com/v1/responses",
+  "model": "gpt-6-luna",
+  "key_name": "OPENAI_API_KEY",
+  "effort": "low",
+  "prices": {
+    "as_of": "2026-10-02",
+    "input": "0.10",
+    "output": "0.50",
+    "cache_read": "0.01",
+    "cache_write": "0.125"
+  },
+  "max_output_tokens": 8192,
+  "max_input_tokens": 65536
+}

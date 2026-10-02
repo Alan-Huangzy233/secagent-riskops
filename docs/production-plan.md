@@ -1,6 +1,6 @@
 # Production plan and issue tracking
 
-Updated 2026-09-29. Further demo work is paused while development focuses on the
+Updated 2026-10-02. Further demo work is paused while development focuses on the
 independent telemetry pilot. This is a plan, not a statement that the features
 below are implemented or deployed. See [implementation status](./implementation-status.md).
 Historical issue-seeding files in `docs/process/` are provenance, not a live
@@ -14,9 +14,11 @@ daily briefings landed in PRs [#112](https://github.com/Alan-Huangzy233/secagent
 [#115](https://github.com/Alan-Huangzy233/secagent-riskops/pull/115).
 External notification transports remain deferred.
 
-The demo's model-backed triage is recorded and replayable; its fixed provider
-and process-local budget do not provide a production background service.
-Historical results retain their original model and dataset attribution.
+The [evaluation runner](model-triage.md) now accepts configurable OpenAI,
+DeepSeek, Z.AI and Anthropic APIs with shared durable budget reservations.
+Its live mode accepts only the published synthetic authentication datasets.
+The broader comparison corpus and production background service remain
+unfinished; historical demo results retain their original model attribution.
 
 The offline HTTP parser, three rules and evidence replay are in
 [PR #116](https://github.com/Alan-Huangzy233/secagent-riskops/pull/116), awaiting
