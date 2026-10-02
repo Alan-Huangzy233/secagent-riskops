@@ -1,6 +1,30 @@
 # SecAgent RiskOps Roadmap
 
-## Current focus: `v0.3.0-demo` — measured alert reduction
+## Current focus: production triage and detection coverage
+
+The maintainer has paused further demo work and moved development to the
+independent telemetry pilot. Collection integrity, durable incident scoring,
+console notifications and UTC daily briefings are implemented. Next:
+
+- Compare GPT-6 Luna, DeepSeek Flash and GLM-5.3-Flash on the same labelled,
+  redacted incidents before choosing a production model.
+- Build persistent AI jobs, budgets and evidence validation with offline
+  providers first; introduce real calls through a bounded, manual-trigger pilot.
+- Expand detection in order: Web, network, then Linux host behavior. The HTTP
+  foundation is in [PR #116](https://github.com/Alan-Huangzy233/secagent-riskops/pull/116),
+  awaiting review; live HTTP coverage still needs collection and a real source.
+
+Acceptance criteria and active issues are in the
+[production plan](./docs/production-plan.md). AI advice does not change incident
+disposition or execute actions. Implementation and deployment remain separate,
+with maintainer review before merge and release.
+
+## Demo baseline: `v0.3.0-demo` — further work paused
+
+The runnable baseline below is preserved. Recording, a release tag/notes and an
+independent timed walkthrough remain deferred in
+[issue #105](https://github.com/Alan-Huangzy233/secagent-riskops/issues/105);
+the demo milestone is not claimed fully released.
 
 One claim, backed by numbers a third party can re-run: raw alerts are reduced to
 a much smaller set of incidents, reported with episode-level precision, recall,
