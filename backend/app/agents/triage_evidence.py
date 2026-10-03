@@ -13,7 +13,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 VERSION = 3
-VALIDATOR_VERSION = 1
+VALIDATOR_VERSION = 2
 KINDS = ("authentication_succeeded", "exploitation_confirmed", "source_familiar",
          "source_unfamiliar", "account_owned", "generic_account",
          "activity_authorized", "http_operation_expected")
@@ -259,12 +259,16 @@ def _supports(kind: str, proof: list, observations: list) -> bool:
         "activity_authorized": lambda r: isinstance(r, Authorization),
         "http_operation_expected": lambda r: isinstance(r, ServiceContext),
     }
-    if not all(checks[kind](r) for r in proof):
+    direct = [r for r in proof if checks[kind](r)]
+    # A proof can combine typed context with the observations it explains.
+    # Raw observations alone never become inventory, authorization or history.
+    if not direct or any(not checks[kind](r) and
+                         not isinstance(r, (AuthRecord, HTTPRecord, ExploitRecord)) for r in proof):
         return False
     if kind == "activity_authorized":
-        return all(any(_covers(r, e) for r in proof) for e in observations)
+        return all(any(_covers(r, e) for r in direct) for e in observations)
     if kind == "http_operation_expected":
-        return all(any(_expected(r, e) for r in proof) for e in observations)
+        return all(any(_expected(r, e) for r in direct) for e in observations)
     return True
 
 
@@ -358,12 +362,10 @@ def validate(text: str, case: dict) -> tuple[dict, dict]:
             reject("stale_revision")
         if dossier.evidence_status == "stale" and proposal["verdict"] != "abstain":
             reject("stale_evidence")
-        if proposal["verdict"] != "abstain" and not (cited & {r.event_id for r in events}):
+        if proposal["verdict"] != "abstain" and not (referenced & {r.event_id for r in events}):
             reject("missing_observed_evidence")
         for index, claim in enumerate(proposal["claims"]):
             ids = claim["evidence_ids"]
-            if not set(ids) <= cited:
-                reject("uncited_claim", claim_index=index, evidence_ids=ids)
             if all(i in by_id for i in ids) and not _supports(
                     claim["kind"], [by_id[i] for i in ids], events):
                 reject("unsupported_claim", claim_index=index, claim=claim["kind"], evidence_ids=ids)
@@ -372,7 +374,7 @@ def validate(text: str, case: dict) -> tuple[dict, dict]:
                 reject("incomplete_evidence")
             if proposal["confidence"] == "low":
                 reject("uncertain_dismissal")
-            if not _dismiss_supported(proposal["dismissal_basis"], dossier.evidence, cited, proposal["claims"]):
+            if not _dismiss_supported(proposal["dismissal_basis"], dossier.evidence, referenced, proposal["claims"]):
                 reject("unsupported_dismissal", basis=proposal["dismissal_basis"])
         elif proposal["dismissal_basis"] != "none":
             reject("unexpected_dismissal_basis")
@@ -387,7 +389,8 @@ def validate(text: str, case: dict) -> tuple[dict, dict]:
         messages = {"escalate": "The model recommends analyst review.",
                     "dismiss": "Possible noise; the configured dismissal preconditions are satisfied.",
                     "abstain": "The model could not reach a supported decision; analyst review is required."}
-        verdict = {**proposal, "rationale": messages[proposal["verdict"]] +
+        verdict = {**proposal, "evidence_ids": sorted(referenced),
+                   "rationale": messages[proposal["verdict"]] +
                    " Typed evidence checks passed; the original narrative still requires human review."}
     details = {"validator_version": VALIDATOR_VERSION, "dossier_version": VERSION,
                "dossier_sha256": digest(case), "revision": dossier.revision,

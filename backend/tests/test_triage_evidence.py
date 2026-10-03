@@ -189,7 +189,7 @@ def test_missing_invalid_user_observation_or_mixed_ownership_blocks_generic_nois
 
 @pytest.mark.parametrize("change,reason", [
     ("revision", "stale_revision"), ("invented", "unknown_evidence"),
-    ("context-only", "missing_observed_evidence"), ("uncited", "uncited_claim"),
+    ("context-only", "missing_observed_evidence"),
     ("low", "uncertain_dismissal")])
 def test_reference_version_and_confidence_failures_remain_reviewable(change, reason):
     row = sample("ssh_generic_invalid")
@@ -200,8 +200,6 @@ def test_reference_version_and_confidence_failures_remain_reviewable(change, rea
         value["claims"][0]["evidence_ids"] = ["NONEXISTENT"]
     elif change == "context-only":
         value["evidence_ids"] = value["claims"][0]["evidence_ids"]
-    elif change == "uncited":
-        value["evidence_ids"].remove(value["claims"][0]["evidence_ids"][0])
     else:
         value["confidence"] = "low"
     result, details = judge(row, value)
@@ -344,3 +342,25 @@ def test_cli_rejects_custom_data_and_output_protocol_collisions(tmp_path):
         benchmark.main(args + ["--out", str(tmp_path / "out.json"), "--data", "/private/logs"])
     with pytest.raises(SystemExit):
         benchmark.main(args + ["--out", str(tmp_path / "a.jsonl.protocol.json")])
+
+
+@pytest.mark.parametrize("family", ["http_health_expected", "http_approved_scan", "ssh_familiar_retry"])
+def test_typed_proof_can_include_the_observed_events_it_explains(family):
+    row = sample(family)
+    value = proposal(row)
+    observed = [r["event_id"] for r in row["case"]["evidence"]
+                if r["kind"] in ("http_request", "auth_failure", "auth_success")]
+    for claim in value["claims"]:
+        claim["evidence_ids"] = sorted(set(claim["evidence_ids"] + observed))
+    result, details = judge(row, value)
+    assert result["verdict"] == "dismiss" and details["status"] == "valid"
+
+
+def test_claim_level_citations_need_not_be_duplicated_and_effective_refs_include_both_levels():
+    row = sample("ssh_generic_invalid")
+    value = proposal(row)
+    value["evidence_ids"] = [r["event_id"] for r in row["case"]["evidence"] if r["kind"] != "account_context"]
+    result, details = judge(row, value)
+    assert result["verdict"] == "dismiss" and details["status"] == "valid"
+    assert set(result["evidence_ids"]) == {r["event_id"] for r in row["case"]["evidence"]}
+    assert details["proposal"] == value

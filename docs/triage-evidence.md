@@ -24,7 +24,10 @@ part of #118**. Do not populate trusted context from unauthenticated log text.
 The model returns its verdict, confidence, rationale, evidence references,
 ATT&CK suggestions, exact revision, typed factual claims and a dismissal basis.
 Every reference must exist in this exact dossier. A definitive verdict must
-cite observed events, not just context. Typed success claims require
+cite observed events, not just context. References in the top-level list and
+in typed claims form one evidence set; they do not need to be duplicated.
+Claims may combine direct typed proof with supporting observed events, but
+observed events alone cannot establish trusted context. Typed success claims require
 authentication-success or application-side exploitation-confirmation evidence:
 an HTTP 200/302 or a requested sensitive path is insufficient.
 
