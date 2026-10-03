@@ -152,9 +152,12 @@ rejects `records.jsonl` and caller-declared synthetic manifests. Raw production
 logs and LANL data cannot be sent through this command. Only bounded dossiers
 are sent; ground-truth labels and pipeline scores stay local.
 
-The current corpus covers authentication incidents. HTTP/mixed scenarios,
-a larger blind comparison, production job persistence and final model
-selection remain follow-up work in issues #117, #10 and #118. CI uses fake HTTP
+The original corpus and command above cover authentication incidents. A
+separate [v3 evidence policy and synthetic SSH/HTTP benchmark](triage-evidence.md)
+adds typed context, checked dismissal preconditions, development/holdout
+families and separate proposal/validated metrics. Production job persistence,
+trusted context adapters, broader comparison and final model selection remain
+follow-up work in issues #117, #10 and #118. CI uses fake HTTP
 responses and historical recordings, never paid APIs.
 
 Protocol references:

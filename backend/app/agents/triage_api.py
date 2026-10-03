@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .model_triage import SCHEMA, SYSTEM_PROMPT, TriageCall, render
 from .triage_budget import BudgetLedger, micro_usd
+from . import triage_evidence
 
 FORMAT_VERSION = 2
 SYSTEM = SYSTEM_PROMPT + "\n\nReturn only a JSON object matching this schema:\n" + json.dumps(SCHEMA, sort_keys=True)
@@ -75,17 +76,18 @@ class APIConfig(BaseModel):
         return f"{self.provider}/{self.model}, {mode}, effort {self.effort or 'default'}"
 
     def request(self, case: dict) -> dict:
+        version, system, schema = protocol(case)
         user = render(case)
         body = {"model": self.model}
         if self.api_format == "openai-responses":
-            body.update(input=[{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}],
+            body.update(input=[{"role": "system", "content": system}, {"role": "user", "content": user}],
                         max_output_tokens=self.max_output_tokens, store=False, service_tier="default",
-                        text={"format": {"type": "json_schema", "name": "triage", "strict": True, "schema": SCHEMA}})
+                        text={"format": {"type": "json_schema", "name": "triage", "strict": True, "schema": schema}})
             if self.effort:
                 body["reasoning"] = {"effort": self.effort}
         else:
             body.update(max_tokens=self.max_output_tokens, messages=[{"role": "user", "content": user}])
-            body["messages"].insert(0, {"role": "system", "content": SYSTEM})
+            body["messages"].insert(0, {"role": "system", "content": system})
             body["response_format"] = {"type": "json_object"}
             if self.thinking:
                 body["thinking"] = {"type": self.thinking}
@@ -96,8 +98,10 @@ class APIConfig(BaseModel):
         return body
 
     def fingerprint(self, case: dict) -> str:
-        material = {"format_version": FORMAT_VERSION, "provider": self.provider,
+        material = {"format_version": protocol(case)[0], "provider": self.provider,
                     "api_format": self.api_format, "endpoint": self.endpoint, "request": self.request(case)}
+        if material["format_version"] == triage_evidence.VERSION:
+            material["validator_version"] = triage_evidence.VALIDATOR_VERSION
         return hashlib.sha256(json.dumps(material, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
     def reservation(self) -> int:
@@ -105,6 +109,13 @@ class APIConfig(BaseModel):
         # Token count * USD per million = micro-USD.
         return micro_usd((self.max_input_tokens * input_rate
                           + self.max_output_tokens * self.prices.output) / 1_000_000)
+
+
+def protocol(case: dict) -> tuple[int, str, dict]:
+    if "dossier_version" not in case:
+        return FORMAT_VERSION, SYSTEM, SCHEMA
+    triage_evidence.Dossier.model_validate(case)
+    return triage_evidence.VERSION, triage_evidence.SYSTEM, triage_evidence.SCHEMA
 
 
 def _count(usage: dict, key: str, *, optional: bool = False) -> int:
@@ -245,7 +256,12 @@ class APITriage:
         try:
             payload = self._send(config.request(case))
             served, stop, text, usage = normalize(config, payload)
-            verdict, validation = validate_verdict(text, case)
+            details = None
+            if protocol(case)[0] == triage_evidence.VERSION:
+                verdict, details = triage_evidence.validate(text, case)
+                validation = details["reasons"][0]["code"] if details["reasons"] else "valid"
+            else:
+                verdict, validation = validate_verdict(text, case)
             price = config.prices
             charged = micro_usd((usage["input_tokens"] * price.input + usage["output_tokens"] * price.output
                                  + usage["cache_read_input_tokens"] * price.cache_read
@@ -257,8 +273,9 @@ class APITriage:
                 evidence_ids=tuple(verdict["evidence_ids"]), attack_techniques=tuple(verdict["attack_techniques"]),
                 model=served, stop_reason=stop, **usage, usd=charged / 1_000_000,
                 latency_seconds=round(time.perf_counter() - started, 3),
-                metadata={"format_version": FORMAT_VERSION, "config": config.model_dump(mode="json"),
-                          "validation": validation, "reasoning_tokens": reasoning})
+                metadata={"format_version": protocol(case)[0], "config": config.model_dump(mode="json"),
+                          "validation": validation, "reasoning_tokens": reasoning,
+                          **({"evidence_validation": details} if details is not None else {})})
             self.ledger.complete(call_id, charged, call.to_record())
             return call
         except Exception as error:
