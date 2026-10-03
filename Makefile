@@ -1,4 +1,4 @@
-.PHONY: help install lint test demo flow safety web-snapshot dataset evaluate triage report run audit clean
+.PHONY: help install lint test demo flow safety web-snapshot web-detect dataset evaluate triage report run audit clean
 
 # Everything runs from a project virtual environment, so `make install` works on
 # systems whose Python refuses global installs (PEP 668).
@@ -20,6 +20,7 @@ help:
 	@echo "  report    Refresh the generated numbers in EVALUATION.md and README.md from docs/eval/"
 	@echo "  run       Start the API and the web demo at http://127.0.0.1:8000/"
 	@echo "  web-snapshot  Rebuild docs/eval/web-demo-synthetic-7d.json, the data the web demo replays"
+	@echo "  web-detect  Replay the synthetic HTTP access-log rules offline (no service or AI needed)"
 	@echo "  audit     Run the public-repository secret/PII audit"
 	@echo "  clean     Remove generated Python/pytest caches; preserve private records and runtime data"
 
@@ -61,6 +62,9 @@ report:
 
 web-snapshot: dataset
 	$(BIN)/python -m app.webdemo.snapshot --data $(EVAL_DATA)/synthetic-7d --out docs/eval/web-demo-synthetic-7d.json
+
+web-detect:
+	$(BIN)/python -m app.evaluation.web --input examples/http-access/access.jsonl --source-id synthetic-web --service-id example-site
 
 run:
 	$(BIN)/python -m uvicorn app.api.app:app --app-dir backend --reload --port 8000

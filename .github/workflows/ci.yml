@@ -34,6 +34,9 @@ jobs:
       - name: Run the reduction demo (smoke)
         run: PYTHONPATH=backend python -m app.evaluation.demo
 
+      - name: HTTP detection fixture reproduces its evidence report
+        run: PYTHONPATH=backend python -m app.evaluation.web --input examples/http-access/access.jsonl --source-id synthetic-web --service-id example-site --check examples/http-access/report.json
+
       - name: Safety demo reproduces the published audit timeline
         run: |
           PYTHONPATH=backend python -m app.safety_demo
@@ -61,6 +64,12 @@ jobs:
 
       - name: Build the image
         run: docker compose build
+
+      - name: Validate the example HTTP log format with Nginx
+        run: >-
+          docker run --rm --entrypoint nginx
+          --mount type=bind,source="${{ github.workspace }}/deploy/nginx-http-access.example.conf",target=/etc/nginx/conf.d/riskops-http.conf,readonly
+          nginx:stable -t
 
       - name: Run the demo in the container
         run: docker compose run --rm demo
