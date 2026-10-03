@@ -1,0 +1,5 @@
+{
+  "mode": "offline",
+  "database_path": "/var/lib/riskops-ai/analysis.sqlite",
+  "allow_external": false
+}
