@@ -4,7 +4,7 @@ The other documents in this repository describe the **target design**. This
 page records what is **actually implemented in code** so the two are never
 confused.
 
-Last reviewed: 2026-09-29. The walking skeleton and measured demo baseline are
+Last reviewed: 2026-10-03. The walking skeleton and measured demo baseline are
 preserved; further demo work is paused. Active development targets the independent
 SSH/auth telemetry pilot. The [production plan](./production-plan.md) tracks
 model comparison and broader detection; planned capabilities are not claims of
@@ -33,6 +33,7 @@ Criteria* in the [Project Charter](./project-charter.md):
 | Safety demo on two recorded model escalations; its exported timeline reproduces byte for byte in CI | `backend/app/safety_demo.py`, `examples/safety-demo/`, [safety-demo.md](./safety-demo.md) |
 | Read-only web demo at `/demo`: a replay of the synthetic week, built from a snapshot that CI rebuilds byte for byte. It shows incident detail, the score breakdown and the recorded model verdicts, and its response buttons run the real policy engine and executor on lab copies. A headless-browser check runs in CI | `backend/app/webdemo/`, `docs/eval/web-demo-synthetic-7d.json`, [web-demo.md](./web-demo.md) |
 | Configurable model triage: Responses and Chat Completions APIs; shared durable budget; validated synthetic calls and historical Claude replay | `backend/app/agents/triage_api.py`, `backend/app/agents/triage_budget.py`, [usage](model-triage.md) |
+| Versioned SSH/HTTP advisory dossiers, deterministic typed-claim and dismissal validation, 72 built-in synthetic development/holdout scenarios; model proposals and effective advice reported separately | `backend/app/agents/triage_evidence.py`, `backend/app/evaluation/triage_benchmark.py`, [scope](triage-evidence.md) |
 | Immutable, hash-bound assessment scope | `backend/app/authorization.py` |
 | Replay from retained evidence | `backend/app/replay.py` |
 | FastAPI surface + SQLite persistence | `backend/app/api/app.py`, `backend/app/storage/repository.py` |

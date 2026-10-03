@@ -1,0 +1,30 @@
+{
+  "partitions": {
+    "development": {
+      "cases": 36,
+      "families": 12,
+      "sha256": "44e80d78b3d38b84a69bbb30dc8866b2656d9f03b1c411f4ba8c5c7d475e5728"
+    },
+    "holdout": {
+      "cases": 36,
+      "families": 12,
+      "sha256": "8616815433d1552dcbac593923e81d8936fffb6cc0dee236336161b86e2a6dc9"
+    }
+  },
+  "purpose": "advisory scenario-level triage; not live detection or a production qualification",
+  "suite": "mixed-evidence-v1",
+  "thresholds": {
+    "max_accepted_unsafe_dismissals": 0,
+    "max_proposed_unsafe_dismissals": 0,
+    "maximum_estimated_usd_per_case": 0.01,
+    "maximum_p95_seconds": 15.0,
+    "minimum_accepted_accuracy": 0.9,
+    "minimum_attack_escalation_rate": 0.9,
+    "minimum_benign_dismissal_rate": 0.75,
+    "minimum_cases": 36,
+    "minimum_families": 12,
+    "minimum_insufficient_abstention_rate": 0.9,
+    "minimum_proposal_accuracy": 0.9,
+    "minimum_validation_pass_rate": 0.98
+  }
+}
