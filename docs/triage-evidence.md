@@ -128,5 +128,21 @@ and recorded replay, never real credentials or paid requests.
 
 The eval design follows the [official OpenAI evaluation guidance](https://developers.openai.com/api/docs/guides/evaluation-best-practices)
 on explicit success criteria, task-specific examples and adversarial cases.
-Production jobs, provenance, console review states and current-revision
-checks at display time remain #118; general semantic verification remains #10.
+The [manual console workflow](manual-ai-triage.md) now supplies persistent jobs,
+local provenance, review states and current-revision checks. Live rollout and
+richer trusted context remain #118; general semantic verification remains #10.
+
+## Additional frozen pilot suite
+
+`--suite pilot-evidence-v1 --split holdout` selects a separate new 36-case,
+12-family suite, frozen by `examples/model-triage/scenarios-pilot-v1.json`.
+It has no development split and does not change the default `mixed-evidence-v1`
+suite or its historical protocol. The generator registry remains closed to
+arbitrary data. Replays must select the same suite as the original run.
+
+The October 3 [three-model comparison](eval/triage-pilot-model-comparison.md)
+uses these fresh cases and the unchanged v3 prompt / v2 validator. All responses
+were recorded before any analysis of results; subsequent workflow integration
+changes do not alter the frozen evaluator. The same limitations and predeclared
+gates above apply. These cases are now used evaluation evidence and must not be
+reused as an untouched holdout after tuning.

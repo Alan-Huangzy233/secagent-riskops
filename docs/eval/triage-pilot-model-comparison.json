@@ -1,0 +1,915 @@
+{
+  "corpus": {
+    "cases": 36,
+    "families": 12,
+    "sha256": "a04c3b86fe9c26ab812e6c185581b7628efc8bc47ef35600fb264d7e17cf0cb9"
+  },
+  "date": "2026-10-03",
+  "dossier_version": 3,
+  "estimated_round_usd": 0.078276,
+  "evaluation_commit": "a3e34cf56e4d8bda500c613a55b31e7bd1f06df3",
+  "limitations": [
+    "Related authored variants, not IID production observations or expert labels.",
+    "One call per model/case, not a repeatability measurement.",
+    "No collection, live summary adapter, rule recall or production HTTP measurement."
+  ],
+  "models": {
+    "deepseek-flash-low": {
+      "accepted": {
+        "abstained": 15,
+        "attack_dismissals": 0,
+        "attack_escalation_rate": 0.6667,
+        "attack_scenarios": 12,
+        "benign_dismissal_rate": 0.9167,
+        "correct": 29,
+        "decision_accuracy": 0.8056,
+        "insufficient_abstention_rate": 0.8333,
+        "insufficient_dismissals": 0,
+        "matrix_expected_by_verdict": {
+          "abstain": {
+            "abstain": 10,
+            "dismiss": 0,
+            "escalate": 2,
+            "invalid": 0,
+            "unjudged": 0
+          },
+          "dismiss": {
+            "abstain": 1,
+            "dismiss": 11,
+            "escalate": 0,
+            "invalid": 0,
+            "unjudged": 0
+          },
+          "escalate": {
+            "abstain": 4,
+            "dismiss": 0,
+            "escalate": 8,
+            "invalid": 0,
+            "unjudged": 0
+          }
+        },
+        "n": 36,
+        "unsafe_dismissals": 0
+      },
+      "by_kind": {
+        "http": {
+          "accepted": {
+            "abstained": 8,
+            "attack_dismissals": 0,
+            "attack_escalation_rate": 0.5,
+            "attack_scenarios": 6,
+            "benign_dismissal_rate": 1.0,
+            "correct": 14,
+            "decision_accuracy": 0.7778,
+            "insufficient_abstention_rate": 0.8333,
+            "insufficient_dismissals": 0,
+            "matrix_expected_by_verdict": {
+              "abstain": {
+                "abstain": 5,
+                "dismiss": 0,
+                "escalate": 1,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "dismiss": {
+                "abstain": 0,
+                "dismiss": 6,
+                "escalate": 0,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "escalate": {
+                "abstain": 3,
+                "dismiss": 0,
+                "escalate": 3,
+                "invalid": 0,
+                "unjudged": 0
+              }
+            },
+            "n": 18,
+            "unsafe_dismissals": 0
+          },
+          "proposed": {
+            "abstained": 5,
+            "attack_dismissals": 0,
+            "attack_escalation_rate": 0.8333,
+            "attack_scenarios": 6,
+            "benign_dismissal_rate": 1.0,
+            "correct": 16,
+            "decision_accuracy": 0.8889,
+            "insufficient_abstention_rate": 0.8333,
+            "insufficient_dismissals": 0,
+            "matrix_expected_by_verdict": {
+              "abstain": {
+                "abstain": 5,
+                "dismiss": 0,
+                "escalate": 1,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "dismiss": {
+                "abstain": 0,
+                "dismiss": 6,
+                "escalate": 0,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "escalate": {
+                "abstain": 0,
+                "dismiss": 0,
+                "escalate": 5,
+                "invalid": 1,
+                "unjudged": 0
+              }
+            },
+            "n": 18,
+            "unsafe_dismissals": 0
+          }
+        },
+        "ssh": {
+          "accepted": {
+            "abstained": 7,
+            "attack_dismissals": 0,
+            "attack_escalation_rate": 0.8333,
+            "attack_scenarios": 6,
+            "benign_dismissal_rate": 0.8333,
+            "correct": 15,
+            "decision_accuracy": 0.8333,
+            "insufficient_abstention_rate": 0.8333,
+            "insufficient_dismissals": 0,
+            "matrix_expected_by_verdict": {
+              "abstain": {
+                "abstain": 5,
+                "dismiss": 0,
+                "escalate": 1,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "dismiss": {
+                "abstain": 1,
+                "dismiss": 5,
+                "escalate": 0,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "escalate": {
+                "abstain": 1,
+                "dismiss": 0,
+                "escalate": 5,
+                "invalid": 0,
+                "unjudged": 0
+              }
+            },
+            "n": 18,
+            "unsafe_dismissals": 0
+          },
+          "proposed": {
+            "abstained": 5,
+            "attack_dismissals": 0,
+            "attack_escalation_rate": 1.0,
+            "attack_scenarios": 6,
+            "benign_dismissal_rate": 1.0,
+            "correct": 17,
+            "decision_accuracy": 0.9444,
+            "insufficient_abstention_rate": 0.8333,
+            "insufficient_dismissals": 0,
+            "matrix_expected_by_verdict": {
+              "abstain": {
+                "abstain": 5,
+                "dismiss": 0,
+                "escalate": 1,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "dismiss": {
+                "abstain": 0,
+                "dismiss": 6,
+                "escalate": 0,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "escalate": {
+                "abstain": 0,
+                "dismiss": 0,
+                "escalate": 6,
+                "invalid": 0,
+                "unjudged": 0
+              }
+            },
+            "n": 18,
+            "unsafe_dismissals": 0
+          }
+        }
+      },
+      "checks": {
+        "accepted_accuracy": false,
+        "accepted_unsafe_dismissals": true,
+        "attack_escalation": false,
+        "benign_dismissal": true,
+        "complete_corpus": true,
+        "estimated_cost": true,
+        "insufficient_abstention": false,
+        "minimum_cases": true,
+        "minimum_families": true,
+        "p95_latency": true,
+        "proposal_accuracy": true,
+        "proposal_unsafe_dismissals": true,
+        "validation_pass_rate": false
+      },
+      "configuration": {
+        "api_format": "openai-chat",
+        "effort": "low",
+        "endpoint": "https://api.deepseek.com/chat/completions",
+        "key_name": "DEEPSEEK_API_KEY",
+        "max_input_tokens": 65536,
+        "max_output_tokens": 8192,
+        "model": "deepseek-flash",
+        "prices": {
+          "as_of": "2026-10-02",
+          "cache_read": "0.006",
+          "cache_write": "0.30",
+          "input": "0.30",
+          "output": "1.20"
+        },
+        "provider": "deepseek",
+        "thinking": "enabled"
+      },
+      "cost": {
+        "cache_read_input_tokens": 27648,
+        "cache_write_input_tokens": 0,
+        "calls": 36,
+        "estimated_usd": 0.056314,
+        "estimated_usd_per_case": 0.001564,
+        "input_tokens": 29003,
+        "latency_p50_seconds": 5.029,
+        "latency_p95_seconds": 11.323,
+        "output_tokens": 39523,
+        "reasoning_tokens": 26423,
+        "served_by": {
+          "deepseek-flash": 36
+        }
+      },
+      "judged": 36,
+      "live_report_sha256": "b721c51cf7707752f25ddae6351143fbda29a89dfd87ac22c2496a927e846af4",
+      "not_judged": [],
+      "offline_replay_verified": true,
+      "passes_scenario_gates": false,
+      "proposed": {
+        "abstained": 10,
+        "attack_dismissals": 0,
+        "attack_escalation_rate": 0.9167,
+        "attack_scenarios": 12,
+        "benign_dismissal_rate": 1.0,
+        "correct": 33,
+        "decision_accuracy": 0.9167,
+        "insufficient_abstention_rate": 0.8333,
+        "insufficient_dismissals": 0,
+        "matrix_expected_by_verdict": {
+          "abstain": {
+            "abstain": 10,
+            "dismiss": 0,
+            "escalate": 2,
+            "invalid": 0,
+            "unjudged": 0
+          },
+          "dismiss": {
+            "abstain": 0,
+            "dismiss": 12,
+            "escalate": 0,
+            "invalid": 0,
+            "unjudged": 0
+          },
+          "escalate": {
+            "abstain": 0,
+            "dismiss": 0,
+            "escalate": 11,
+            "invalid": 1,
+            "unjudged": 0
+          }
+        },
+        "n": 36,
+        "unsafe_dismissals": 0
+      },
+      "protocol_sha256": "dbd4159943b6ff504607dd202b41b75b55c34124b583501a6ec09ece99a1e55c",
+      "stopped_by_api": null,
+      "stopped_by_budget": null,
+      "system_sha256": "251d73c5e31ac4cca6df8d4a9aa6a364f147d2f9b2ed0e3b54d6bfd81f1e26a6",
+      "tape_sha256": "48d88134ecc3fb8d594b38670d1eb226f682eacab5f3cd035f279ecb273dc065",
+      "validation": {
+        "counts": {
+          "invalid_schema": 1,
+          "unknown_evidence": 5,
+          "unsupported_claim": 1,
+          "valid": 29
+        },
+        "pass_rate": 0.8056
+      }
+    },
+    "openai-luna-low": {
+      "accepted": {
+        "abstained": 12,
+        "attack_dismissals": 0,
+        "attack_escalation_rate": 1.0,
+        "attack_scenarios": 12,
+        "benign_dismissal_rate": 1.0,
+        "correct": 36,
+        "decision_accuracy": 1.0,
+        "insufficient_abstention_rate": 1.0,
+        "insufficient_dismissals": 0,
+        "matrix_expected_by_verdict": {
+          "abstain": {
+            "abstain": 12,
+            "dismiss": 0,
+            "escalate": 0,
+            "invalid": 0,
+            "unjudged": 0
+          },
+          "dismiss": {
+            "abstain": 0,
+            "dismiss": 12,
+            "escalate": 0,
+            "invalid": 0,
+            "unjudged": 0
+          },
+          "escalate": {
+            "abstain": 0,
+            "dismiss": 0,
+            "escalate": 12,
+            "invalid": 0,
+            "unjudged": 0
+          }
+        },
+        "n": 36,
+        "unsafe_dismissals": 0
+      },
+      "by_kind": {
+        "http": {
+          "accepted": {
+            "abstained": 6,
+            "attack_dismissals": 0,
+            "attack_escalation_rate": 1.0,
+            "attack_scenarios": 6,
+            "benign_dismissal_rate": 1.0,
+            "correct": 18,
+            "decision_accuracy": 1.0,
+            "insufficient_abstention_rate": 1.0,
+            "insufficient_dismissals": 0,
+            "matrix_expected_by_verdict": {
+              "abstain": {
+                "abstain": 6,
+                "dismiss": 0,
+                "escalate": 0,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "dismiss": {
+                "abstain": 0,
+                "dismiss": 6,
+                "escalate": 0,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "escalate": {
+                "abstain": 0,
+                "dismiss": 0,
+                "escalate": 6,
+                "invalid": 0,
+                "unjudged": 0
+              }
+            },
+            "n": 18,
+            "unsafe_dismissals": 0
+          },
+          "proposed": {
+            "abstained": 6,
+            "attack_dismissals": 0,
+            "attack_escalation_rate": 1.0,
+            "attack_scenarios": 6,
+            "benign_dismissal_rate": 1.0,
+            "correct": 18,
+            "decision_accuracy": 1.0,
+            "insufficient_abstention_rate": 1.0,
+            "insufficient_dismissals": 0,
+            "matrix_expected_by_verdict": {
+              "abstain": {
+                "abstain": 6,
+                "dismiss": 0,
+                "escalate": 0,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "dismiss": {
+                "abstain": 0,
+                "dismiss": 6,
+                "escalate": 0,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "escalate": {
+                "abstain": 0,
+                "dismiss": 0,
+                "escalate": 6,
+                "invalid": 0,
+                "unjudged": 0
+              }
+            },
+            "n": 18,
+            "unsafe_dismissals": 0
+          }
+        },
+        "ssh": {
+          "accepted": {
+            "abstained": 6,
+            "attack_dismissals": 0,
+            "attack_escalation_rate": 1.0,
+            "attack_scenarios": 6,
+            "benign_dismissal_rate": 1.0,
+            "correct": 18,
+            "decision_accuracy": 1.0,
+            "insufficient_abstention_rate": 1.0,
+            "insufficient_dismissals": 0,
+            "matrix_expected_by_verdict": {
+              "abstain": {
+                "abstain": 6,
+                "dismiss": 0,
+                "escalate": 0,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "dismiss": {
+                "abstain": 0,
+                "dismiss": 6,
+                "escalate": 0,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "escalate": {
+                "abstain": 0,
+                "dismiss": 0,
+                "escalate": 6,
+                "invalid": 0,
+                "unjudged": 0
+              }
+            },
+            "n": 18,
+            "unsafe_dismissals": 0
+          },
+          "proposed": {
+            "abstained": 6,
+            "attack_dismissals": 0,
+            "attack_escalation_rate": 1.0,
+            "attack_scenarios": 6,
+            "benign_dismissal_rate": 1.0,
+            "correct": 18,
+            "decision_accuracy": 1.0,
+            "insufficient_abstention_rate": 1.0,
+            "insufficient_dismissals": 0,
+            "matrix_expected_by_verdict": {
+              "abstain": {
+                "abstain": 6,
+                "dismiss": 0,
+                "escalate": 0,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "dismiss": {
+                "abstain": 0,
+                "dismiss": 6,
+                "escalate": 0,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "escalate": {
+                "abstain": 0,
+                "dismiss": 0,
+                "escalate": 6,
+                "invalid": 0,
+                "unjudged": 0
+              }
+            },
+            "n": 18,
+            "unsafe_dismissals": 0
+          }
+        }
+      },
+      "checks": {
+        "accepted_accuracy": true,
+        "accepted_unsafe_dismissals": true,
+        "attack_escalation": true,
+        "benign_dismissal": true,
+        "complete_corpus": true,
+        "estimated_cost": true,
+        "insufficient_abstention": true,
+        "minimum_cases": true,
+        "minimum_families": true,
+        "p95_latency": true,
+        "proposal_accuracy": true,
+        "proposal_unsafe_dismissals": true,
+        "validation_pass_rate": true
+      },
+      "configuration": {
+        "api_format": "openai-responses",
+        "effort": "low",
+        "endpoint": "https://api.openai.com/v1/responses",
+        "key_name": "OPENAI_API_KEY",
+        "max_input_tokens": 65536,
+        "max_output_tokens": 8192,
+        "model": "gpt-6-luna",
+        "prices": {
+          "as_of": "2026-10-02",
+          "cache_read": "0.01",
+          "cache_write": "0.125",
+          "input": "0.10",
+          "output": "0.50"
+        },
+        "provider": "openai",
+        "thinking": null
+      },
+      "cost": {
+        "cache_read_input_tokens": 36890,
+        "cache_write_input_tokens": 23089,
+        "calls": 36,
+        "estimated_usd": 0.009787,
+        "estimated_usd_per_case": 0.000272,
+        "input_tokens": 108,
+        "latency_p50_seconds": 3.358,
+        "latency_p95_seconds": 6.274,
+        "output_tokens": 13006,
+        "reasoning_tokens": 3476,
+        "served_by": {
+          "gpt-6-luna": 36
+        }
+      },
+      "judged": 36,
+      "live_report_sha256": "4463af7ba8fe2cbf6e59ca457a3ec092a4adcd4d46c8e67230be2af426120212",
+      "not_judged": [],
+      "offline_replay_verified": true,
+      "passes_scenario_gates": true,
+      "proposed": {
+        "abstained": 12,
+        "attack_dismissals": 0,
+        "attack_escalation_rate": 1.0,
+        "attack_scenarios": 12,
+        "benign_dismissal_rate": 1.0,
+        "correct": 36,
+        "decision_accuracy": 1.0,
+        "insufficient_abstention_rate": 1.0,
+        "insufficient_dismissals": 0,
+        "matrix_expected_by_verdict": {
+          "abstain": {
+            "abstain": 12,
+            "dismiss": 0,
+            "escalate": 0,
+            "invalid": 0,
+            "unjudged": 0
+          },
+          "dismiss": {
+            "abstain": 0,
+            "dismiss": 12,
+            "escalate": 0,
+            "invalid": 0,
+            "unjudged": 0
+          },
+          "escalate": {
+            "abstain": 0,
+            "dismiss": 0,
+            "escalate": 12,
+            "invalid": 0,
+            "unjudged": 0
+          }
+        },
+        "n": 36,
+        "unsafe_dismissals": 0
+      },
+      "protocol_sha256": "76742eb361410c0ffe1d3c3412061bc38ae84ec90a9b38d4036f7eae5e978301",
+      "stopped_by_api": null,
+      "stopped_by_budget": null,
+      "system_sha256": "251d73c5e31ac4cca6df8d4a9aa6a364f147d2f9b2ed0e3b54d6bfd81f1e26a6",
+      "tape_sha256": "595b8ba2e22048fcfc5e42095de3bd0005c89645713ef4df3c3c6b3e11b40915",
+      "validation": {
+        "counts": {
+          "valid": 36
+        },
+        "pass_rate": 1.0
+      }
+    },
+    "zai-glm-flash-low": {
+      "accepted": {
+        "abstained": 21,
+        "attack_dismissals": 0,
+        "attack_escalation_rate": 0.4167,
+        "attack_scenarios": 12,
+        "benign_dismissal_rate": 0.6667,
+        "correct": 24,
+        "decision_accuracy": 0.6667,
+        "insufficient_abstention_rate": 0.9167,
+        "insufficient_dismissals": 0,
+        "matrix_expected_by_verdict": {
+          "abstain": {
+            "abstain": 11,
+            "dismiss": 0,
+            "escalate": 1,
+            "invalid": 0,
+            "unjudged": 0
+          },
+          "dismiss": {
+            "abstain": 3,
+            "dismiss": 8,
+            "escalate": 1,
+            "invalid": 0,
+            "unjudged": 0
+          },
+          "escalate": {
+            "abstain": 7,
+            "dismiss": 0,
+            "escalate": 5,
+            "invalid": 0,
+            "unjudged": 0
+          }
+        },
+        "n": 36,
+        "unsafe_dismissals": 0
+      },
+      "by_kind": {
+        "http": {
+          "accepted": {
+            "abstained": 12,
+            "attack_dismissals": 0,
+            "attack_escalation_rate": 0.3333,
+            "attack_scenarios": 6,
+            "benign_dismissal_rate": 0.6667,
+            "correct": 12,
+            "decision_accuracy": 0.6667,
+            "insufficient_abstention_rate": 1.0,
+            "insufficient_dismissals": 0,
+            "matrix_expected_by_verdict": {
+              "abstain": {
+                "abstain": 6,
+                "dismiss": 0,
+                "escalate": 0,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "dismiss": {
+                "abstain": 2,
+                "dismiss": 4,
+                "escalate": 0,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "escalate": {
+                "abstain": 4,
+                "dismiss": 0,
+                "escalate": 2,
+                "invalid": 0,
+                "unjudged": 0
+              }
+            },
+            "n": 18,
+            "unsafe_dismissals": 0
+          },
+          "proposed": {
+            "abstained": 4,
+            "attack_dismissals": 0,
+            "attack_escalation_rate": 0.6667,
+            "attack_scenarios": 6,
+            "benign_dismissal_rate": 0.6667,
+            "correct": 12,
+            "decision_accuracy": 0.6667,
+            "insufficient_abstention_rate": 0.6667,
+            "insufficient_dismissals": 0,
+            "matrix_expected_by_verdict": {
+              "abstain": {
+                "abstain": 4,
+                "dismiss": 0,
+                "escalate": 0,
+                "invalid": 2,
+                "unjudged": 0
+              },
+              "dismiss": {
+                "abstain": 0,
+                "dismiss": 4,
+                "escalate": 0,
+                "invalid": 2,
+                "unjudged": 0
+              },
+              "escalate": {
+                "abstain": 0,
+                "dismiss": 0,
+                "escalate": 4,
+                "invalid": 2,
+                "unjudged": 0
+              }
+            },
+            "n": 18,
+            "unsafe_dismissals": 0
+          }
+        },
+        "ssh": {
+          "accepted": {
+            "abstained": 9,
+            "attack_dismissals": 0,
+            "attack_escalation_rate": 0.5,
+            "attack_scenarios": 6,
+            "benign_dismissal_rate": 0.6667,
+            "correct": 12,
+            "decision_accuracy": 0.6667,
+            "insufficient_abstention_rate": 0.8333,
+            "insufficient_dismissals": 0,
+            "matrix_expected_by_verdict": {
+              "abstain": {
+                "abstain": 5,
+                "dismiss": 0,
+                "escalate": 1,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "dismiss": {
+                "abstain": 1,
+                "dismiss": 4,
+                "escalate": 1,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "escalate": {
+                "abstain": 3,
+                "dismiss": 0,
+                "escalate": 3,
+                "invalid": 0,
+                "unjudged": 0
+              }
+            },
+            "n": 18,
+            "unsafe_dismissals": 0
+          },
+          "proposed": {
+            "abstained": 3,
+            "attack_dismissals": 0,
+            "attack_escalation_rate": 0.8333,
+            "attack_scenarios": 6,
+            "benign_dismissal_rate": 0.6667,
+            "correct": 12,
+            "decision_accuracy": 0.6667,
+            "insufficient_abstention_rate": 0.5,
+            "insufficient_dismissals": 0,
+            "matrix_expected_by_verdict": {
+              "abstain": {
+                "abstain": 3,
+                "dismiss": 0,
+                "escalate": 3,
+                "invalid": 0,
+                "unjudged": 0
+              },
+              "dismiss": {
+                "abstain": 0,
+                "dismiss": 4,
+                "escalate": 1,
+                "invalid": 1,
+                "unjudged": 0
+              },
+              "escalate": {
+                "abstain": 0,
+                "dismiss": 0,
+                "escalate": 5,
+                "invalid": 1,
+                "unjudged": 0
+              }
+            },
+            "n": 18,
+            "unsafe_dismissals": 0
+          }
+        }
+      },
+      "checks": {
+        "accepted_accuracy": false,
+        "accepted_unsafe_dismissals": true,
+        "attack_escalation": false,
+        "benign_dismissal": false,
+        "complete_corpus": true,
+        "estimated_cost": true,
+        "insufficient_abstention": true,
+        "minimum_cases": true,
+        "minimum_families": true,
+        "p95_latency": true,
+        "proposal_accuracy": false,
+        "proposal_unsafe_dismissals": true,
+        "validation_pass_rate": false
+      },
+      "configuration": {
+        "api_format": "openai-chat",
+        "effort": "low",
+        "endpoint": "https://api.z.ai/api/paas/v4/chat/completions",
+        "key_name": "ZAI_API_KEY",
+        "max_input_tokens": 65536,
+        "max_output_tokens": 8192,
+        "model": "glm-5.3-flash",
+        "prices": {
+          "as_of": "2026-10-02",
+          "cache_read": "0.03",
+          "cache_write": "0.15",
+          "input": "0.15",
+          "output": "0.50"
+        },
+        "provider": "zai",
+        "thinking": "enabled"
+      },
+      "cost": {
+        "cache_read_input_tokens": 31040,
+        "cache_write_input_tokens": 0,
+        "calls": 36,
+        "estimated_usd": 0.012175,
+        "estimated_usd_per_case": 0.000338,
+        "input_tokens": 25339,
+        "latency_p50_seconds": 7.174,
+        "latency_p95_seconds": 14.489,
+        "output_tokens": 14849,
+        "reasoning_tokens": 1506,
+        "served_by": {
+          "glm-5.3-flash": 36
+        }
+      },
+      "judged": 36,
+      "live_report_sha256": "818fc3064ce343854c178fd7ff0f29b7bd8839a3509b707a3835c956e42aa172",
+      "not_judged": [],
+      "offline_replay_verified": true,
+      "passes_scenario_gates": false,
+      "proposed": {
+        "abstained": 7,
+        "attack_dismissals": 0,
+        "attack_escalation_rate": 0.75,
+        "attack_scenarios": 12,
+        "benign_dismissal_rate": 0.6667,
+        "correct": 24,
+        "decision_accuracy": 0.6667,
+        "insufficient_abstention_rate": 0.5833,
+        "insufficient_dismissals": 0,
+        "matrix_expected_by_verdict": {
+          "abstain": {
+            "abstain": 7,
+            "dismiss": 0,
+            "escalate": 3,
+            "invalid": 2,
+            "unjudged": 0
+          },
+          "dismiss": {
+            "abstain": 0,
+            "dismiss": 8,
+            "escalate": 1,
+            "invalid": 3,
+            "unjudged": 0
+          },
+          "escalate": {
+            "abstain": 0,
+            "dismiss": 0,
+            "escalate": 9,
+            "invalid": 3,
+            "unjudged": 0
+          }
+        },
+        "n": 36,
+        "unsafe_dismissals": 0
+      },
+      "protocol_sha256": "c466842c2c3c35b0d39c37114ceb94779b552cf2d8100f5638b8c9cd9bf75dd7",
+      "stopped_by_api": null,
+      "stopped_by_budget": null,
+      "system_sha256": "251d73c5e31ac4cca6df8d4a9aa6a364f147d2f9b2ed0e3b54d6bfd81f1e26a6",
+      "tape_sha256": "e098042a43c799b8752b46e72fc328a7b6c02b5b47a86abf716fd65947701725",
+      "validation": {
+        "counts": {
+          "invalid_json": 5,
+          "invalid_schema": 3,
+          "unsupported_claim": 6,
+          "valid": 22
+        },
+        "pass_rate": 0.6111
+      }
+    }
+  },
+  "production_qualified": false,
+  "shared_evaluation_budget": {
+    "attempts": 552,
+    "available_usd": 9.517179,
+    "budget_usd": 10.0,
+    "charged_usd": 0.482821,
+    "halted": false,
+    "reserved_usd": 0.0,
+    "unresolved_calls": 0
+  },
+  "split": "holdout",
+  "suite": "pilot-evidence-v1",
+  "thresholds": {
+    "max_accepted_unsafe_dismissals": 0,
+    "max_proposed_unsafe_dismissals": 0,
+    "maximum_estimated_usd_per_case": 0.01,
+    "maximum_p95_seconds": 15.0,
+    "minimum_accepted_accuracy": 0.9,
+    "minimum_attack_escalation_rate": 0.9,
+    "minimum_benign_dismissal_rate": 0.75,
+    "minimum_cases": 36,
+    "minimum_families": 12,
+    "minimum_insufficient_abstention_rate": 0.9,
+    "minimum_proposal_accuracy": 0.9,
+    "minimum_validation_pass_rate": 0.98
+  },
+  "validator_version": 2
+}

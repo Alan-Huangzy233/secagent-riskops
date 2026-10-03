@@ -19,9 +19,13 @@ DeepSeek, Z.AI and compatible APIs with shared durable budget reservations.
 The original live command accepts only the published synthetic authentication
 datasets. A separate [evidence-aware benchmark](triage-evidence.md) adds 72
 built-in SSH/HTTP scenarios, development/holdout families and deterministic
-typed-claim/dismissal checks. Production context adapters, background jobs,
-console review integration and broader model selection remain unfinished;
-historical demo results retain their original attribution.
+typed-claim/dismissal checks. A separate new 36-case
+[three-model comparison](eval/triage-pilot-model-comparison.md) supports Luna low
+as the next manual-pilot candidate. The [optional console workflow](manual-ai-triage.md)
+now implements bounded SSH summaries, private trusted context, durable jobs,
+total/daily budgets, versioned results and human feedback. It remains disabled
+by default; real-provider rollout and broader independent validation are still
+pending. Historical demo results retain their original attribution.
 
 The offline HTTP parser, three rules and evidence replay are in
 [PR #116](https://github.com/Alan-Huangzy233/secagent-riskops/pull/116), awaiting
@@ -37,8 +41,8 @@ still needed before claiming production HTTP coverage.
 | First network source | [#120](https://github.com/Alan-Huangzy233/secagent-riskops/issues/120) | A real observation point and a small validated connection/DNS/firewall rule set |
 | Linux host behavior | [#121](https://github.com/Alan-Huangzy233/secagent-riskops/issues/121) | Source-backed rules for a selected subset of sudo, account/privilege, service or scheduled-task activity |
 
-Start with the evaluation corpus and offline AI foundation alongside HTTP
-engineering. Detection expands in order: **Web → network → Linux host behavior**.
+Review the completed offline AI foundation, then prepare its controlled
+manual rollout alongside HTTP engineering. Detection expands in order: **Web → network → Linux host behavior**.
 Source discovery can continue while real HTTP activation waits for an available
 service; offline fixtures never establish live coverage.
 
@@ -50,10 +54,12 @@ service; offline fixtures never establish live coverage.
 | DeepSeek-V4.1-Flash (`deepseek-flash`) | Compare non-thinking and low-reasoning settings |
 | GLM-5.3-Flash (`glm-5.3-flash`) | Low reasoning; current API does not allow disabling thinking |
 
-These are candidates, not a production default. Exercise DeepSeek first without
-assuming it wins on accuracy or latency. Verify availability, API behavior and
-prices again when running the comparison; distinguish Z.AI and mainland
-platforms when selecting the GLM endpoint.
+The October 3 low-reasoning comparison gave Luna 36/36, DeepSeek 29/36 and
+GLM 24/36 effective agreement with authored decisions. Only Luna passed every
+frozen scenario gate; use it as the next human-reviewed candidate. This does
+not set a production default or establish production accuracy. Verify
+availability, behavior and prices again for new runs; distinguish Z.AI and
+mainland platforms when selecting the GLM endpoint.
 
 References reviewed for the plan: [Luna](https://developers.openai.com/api/docs/models/gpt-6-luna),
 [DeepSeek models](https://api-docs.deepseek.com/quick_start/pricing/),
@@ -82,13 +88,14 @@ fields; planning this comparison does not enable or fund API calls.
 
 ## Production AI stages
 
-1. **Offline foundation:** field allowlists and local aliases; bounded summaries;
+1. **Offline foundation (implemented; opt-in):** field allowlists and local aliases; bounded summaries;
    persistent jobs, leases, attempts and idempotency; transactional budget
    reservations; versioned results and cache invalidation. Test restart,
    concurrency, stale evidence, invalid references, prompt injection, failures
    and uncertain request outcomes with fake/recorded providers.
-2. **Manual-trigger pilot:** use the evaluated configuration within agreed data
-   and spending limits. Show advice and validation/failure states in the console.
+2. **Manual-trigger pilot (UI implemented; rollout pending):** review deployment,
+   backup/recovery, outbound fields and production budget, then use the evaluated
+   configuration. Advice and validation/failure states are shown in the console.
    Preserve rule alerts and manual disposition; collection and human handling
    continue when the provider is unavailable.
 3. **Possible later automatic analysis:** after quality, cost and throughput meet

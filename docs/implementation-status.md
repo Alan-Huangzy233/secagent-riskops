@@ -33,7 +33,7 @@ Criteria* in the [Project Charter](./project-charter.md):
 | Safety demo on two recorded model escalations; its exported timeline reproduces byte for byte in CI | `backend/app/safety_demo.py`, `examples/safety-demo/`, [safety-demo.md](./safety-demo.md) |
 | Read-only web demo at `/demo`: a replay of the synthetic week, built from a snapshot that CI rebuilds byte for byte. It shows incident detail, the score breakdown and the recorded model verdicts, and its response buttons run the real policy engine and executor on lab copies. A headless-browser check runs in CI | `backend/app/webdemo/`, `docs/eval/web-demo-synthetic-7d.json`, [web-demo.md](./web-demo.md) |
 | Configurable model triage: Responses and Chat Completions APIs; shared durable budget; validated synthetic calls and historical Claude replay | `backend/app/agents/triage_api.py`, `backend/app/agents/triage_budget.py`, [usage](model-triage.md) |
-| Versioned SSH/HTTP advisory dossiers, deterministic typed-claim and dismissal validation, 72 built-in synthetic development/holdout scenarios; model proposals and effective advice reported separately | `backend/app/agents/triage_evidence.py`, `backend/app/evaluation/triage_benchmark.py`, [scope](triage-evidence.md) |
+| Versioned SSH/HTTP advisory dossiers, deterministic typed-claim and dismissal validation, 72 built-in synthetic development/holdout scenarios plus a separate 36-case three-model pilot suite; model proposals and effective advice reported separately | `backend/app/agents/triage_evidence.py`, `backend/app/evaluation/triage_benchmark.py`, [scope](triage-evidence.md) |
 | Immutable, hash-bound assessment scope | `backend/app/authorization.py` |
 | Replay from retained evidence | `backend/app/replay.py` |
 | FastAPI surface + SQLite persistence | `backend/app/api/app.py`, `backend/app/storage/repository.py` |
@@ -76,9 +76,10 @@ Run it: `make install && make test && make demo`.
 | 恢复包：先游标后快照的一致捕获、SHA-256 与 schema 指纹清单、zstd 压缩、gpg 指纹加密与清单签名、原子发布、摘要校验 / 深度校验 / 隔离目录恢复演练 | `scripts/recovery_package.py`, `deploy/recovery-package.example.json` |
 | 备份节点主动拉取：固定命令只允许列出 / 取用清单内文件 / 按自身节点名回执，不接受路径、不开 shell；拉取端逐文件校验后才发布副本并回执；本地轮换只删除"已有独立副本确认且超出保留代数"的包 | `scripts/backup_export.py`, `scripts/pull_recovery_packages.py`, `scripts/recovery_package.py` |
 | 采集完整性：按来源持久记录缺口（覆盖起点、游标丢失、来源日志轮转；区间只算到恢复窗口起点，窗口与已收日志重叠时不算缺口）和延迟（来源读取失败、5 分钟无批次、批次在本地排队、积压追赶），缺口永不覆盖；满页时同一轮有界多页追赶；控制台把在线、采集完整性、延迟 / 追赶分列显示，另有采集记录；恢复包还原后可写入恢复点 | `backend/app/telemetry/collection.py`, `scripts/telemetry_collector.py`, `backend/app/telemetry/dashboard.py`, `scripts/recovery_package.py` |
+| 可选人工 AI 复核：有界别名化摘要预览、可信私有上下文、持久队列 / 租约 / 总额与每日预算、缓存和未知调用恢复、证据版本历史与人工反馈；默认禁用，离线验收 | `backend/app/telemetry/ai_summary.py`, `ai_jobs.py`, `ai_triage.py`, `ai_dashboard.py`, [说明](manual-ai-triage.md) |
 
 试点仅覆盖进入部署者指定 journal 过滤范围的 SSH/auth 日志，不提供全网络活动可见性，
-也不调用模型。封禁只在单个操作员预览并勾选确认后执行，规则命中不会自动封禁；
+默认不调用模型；可选 AI 模式与外发边界见上表，开发完成不代表已上线。封禁只在单个操作员预览并勾选确认后执行，规则命中不会自动封禁；
 封禁只作用于目标本机入站（不过滤转发流量），是单操作员手动控制，不是完整的角色 / 审批体系。raw events 默认保留 14 天，receipts 和事件证据不会自动
 随之清除。首次覆盖窗口、日志轮转、积压追赶和消息截断会作为缺口、延迟或提示写入采集记录，
 不会被后续批次覆盖；来源状态“在线”只表示近期收到心跳，完整性与延迟分列显示。

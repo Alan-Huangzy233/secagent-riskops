@@ -155,10 +155,13 @@ are sent; ground-truth labels and pipeline scores stay local.
 The original corpus and command above cover authentication incidents. A
 separate [v3 evidence policy and synthetic SSH/HTTP benchmark](triage-evidence.md)
 adds typed context, checked dismissal preconditions, development/holdout
-families and separate proposal/validated metrics. Production job persistence,
-trusted context adapters, broader comparison and final model selection remain
-follow-up work in issues #117, #10 and #118. CI uses fake HTTP
-responses and historical recordings, never paid APIs.
+families and separate proposal/validated metrics. The optional
+[manual console workflow](manual-ai-triage.md) implements bounded SSH summaries,
+private trusted inventory, persistent jobs/budgets, revision checks and review.
+A [fresh three-model comparison](eval/triage-pilot-model-comparison.md) informs
+the next pilot candidate. Real-provider rollout, broader independent evaluation
+and final production model selection remain #118, #117 and #10. CI uses fake
+HTTP responses and recordings, never paid APIs.
 
 Protocol references:
 [OpenAI structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs),
