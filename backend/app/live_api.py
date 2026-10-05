@@ -128,6 +128,17 @@ class ReadNotificationsRequest(BaseModel):
     ids: list[Annotated[StrictInt, Field(ge=1)]] = Field(min_length=1, max_length=100)
 
 
+class AnalysisRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+    preview_key: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class AnalysisFeedback(BaseModel):
+    model_config = {"extra": "forbid"}
+    verdict: Literal["agree", "disagree", "needs_more"]
+    note: str = Field(default="", max_length=1000)
+
+
 class TelemetryBatch(BaseModel):
     model_config = {"extra": "forbid"}
     source_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
@@ -145,7 +156,7 @@ class TelemetryBatch(BaseModel):
 
 
 def create_app(config: LiveConfig | None = None, store: Any | None = None,
-               control: Any | None = None) -> FastAPI:
+               control: Any | None = None, ai: Any | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI):
         from .telemetry.store import TelemetryStore
@@ -182,9 +193,15 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
         if application.state.config.notifications_enabled:
             notification_worker = NotificationWorker(live_store, application.state.config)
             notification_worker.start()
+        from .telemetry.ai_triage import Service as AIService
+        application.state.ai = ai if ai is not None else AIService.from_environment(live_store)
+        if ai is None:
+            application.state.ai.start()
         try:
             yield
         finally:
+            if ai is None:
+                await run_in_threadpool(application.state.ai.close)
             if notification_worker:
                 await run_in_threadpool(notification_worker.close)
             if control is None:
@@ -350,6 +367,44 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
             raise HTTPException(403, "不允许跨站操作")
         if request.headers.get("content-type", "").split(";", 1)[0].strip() != "application/json":
             raise HTTPException(415, "Expected application/json")
+
+    def ai_service(request: Request):
+        service = request.app.state.ai
+        if not service.enabled:
+            raise HTTPException(503, "人工 AI 分析尚未启用或配置不可用")
+        return service
+
+    def ai_result(action):
+        try:
+            return action()
+        except KeyError:
+            raise HTTPException(404, "事件或分析记录不存在") from None
+        except ValueError:
+            raise HTTPException(409, "分析请求无效、队列已满或证据已更新，请重新预览") from None
+        except OSError:
+            raise HTTPException(503, "分析资料暂不可用，请稍后重试") from None
+
+    @application.get("/api/ai/status", dependencies=[Depends(operator)])
+    def ai_status(request: Request):
+        return {**request.app.state.ai.status(), "csrf_token": request.app.state.control.csrf_token}
+
+    @application.get("/api/incidents/{incident_id}/ai/preview", dependencies=[Depends(operator)])
+    def ai_preview(request: Request, incident_id: str):
+        return ai_result(lambda: ai_service(request).preview(incident_id))
+
+    @application.post("/api/incidents/{incident_id}/ai", dependencies=[Depends(operator_write)], status_code=202)
+    def ai_enqueue(request: Request, incident_id: str, body: AnalysisRequest):
+        return ai_result(lambda: ai_service(request).enqueue(
+            incident_id, body.preview_key, request.app.state.config.operator_username))
+
+    @application.get("/api/ai/jobs/{job_id}", dependencies=[Depends(operator)])
+    def ai_job(request: Request, job_id: str):
+        return ai_result(lambda: ai_service(request).job(job_id))
+
+    @application.post("/api/ai/jobs/{job_id}/review", dependencies=[Depends(operator_write)])
+    def ai_review(request: Request, job_id: str, body: AnalysisFeedback):
+        return ai_result(lambda: ai_service(request).feedback(
+            job_id, body.verdict, body.note, request.app.state.config.operator_username))
 
     def control_write(request: Request, _: None = Depends(operator_write)):
         if not request.app.state.control.enabled:

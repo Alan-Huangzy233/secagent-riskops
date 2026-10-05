@@ -1,0 +1,25 @@
+{
+  "partitions": {
+    "holdout": {
+      "cases": 36,
+      "families": 12,
+      "sha256": "a04c3b86fe9c26ab812e6c185581b7628efc8bc47ef35600fb264d7e17cf0cb9"
+    }
+  },
+  "purpose": "fresh authored policy scenarios; not live detection or production qualification",
+  "suite": "pilot-evidence-v1",
+  "thresholds": {
+    "max_accepted_unsafe_dismissals": 0,
+    "max_proposed_unsafe_dismissals": 0,
+    "maximum_estimated_usd_per_case": 0.01,
+    "maximum_p95_seconds": 15.0,
+    "minimum_accepted_accuracy": 0.9,
+    "minimum_attack_escalation_rate": 0.9,
+    "minimum_benign_dismissal_rate": 0.75,
+    "minimum_cases": 36,
+    "minimum_families": 12,
+    "minimum_insufficient_abstention_rate": 0.9,
+    "minimum_proposal_accuracy": 0.9,
+    "minimum_validation_pass_rate": 0.98
+  }
+}

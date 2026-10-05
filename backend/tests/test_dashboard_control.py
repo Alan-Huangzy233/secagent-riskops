@@ -164,12 +164,13 @@ def test_incident_evidence_is_paginated_and_untrusted_messages_are_text():
     run_dashboard(r"""
 const hostile='<img src=x onerror=alert(1)>';
 route=path=>{
+ if(path==='/api/ai/status')return response({enabled:false});
  if(path==='/api/incidents/fixture%2Fid')return response({incident_id:'fixture/id',evidence_count:75,rules:[]});
  if(path==='/api/incidents/fixture%2Fid/evidence?page=1&limit=50')return response({page:1,total_pages:2,total:75,items:[{timestamp:'2026-01-01T00:00:00Z',source_id:'source-a',message:hostile}]});
  if(path==='/api/incidents/fixture%2Fid/evidence?page=2&limit=50')return response({page:2,total_pages:2,total:75,items:[{source_id:'source-b',message:'last page'}]});
  throw new Error('Unexpected path '+path);
 };
-await showIncident({incident_id:'fixture/id'});assert.equal(calls.length,2);assert.equal($('evidence-view').hidden,false);
+await showIncident({incident_id:'fixture/id'});assert.equal(calls.length,3);assert.equal($('evidence-view').hidden,false);
 const message=$('evidence-rows').children[0].children[5];assert.equal(message.textContent,hostile);assert.equal(message.children.length,0);assert.match($('evidence-page').textContent,/共 2 页/);
 await loadEvidence(2);assert.equal($('evidence-next').disabled,true);assert.match($('evidence-rows').textContent,/source-b/);assert.match($('evidence-page').textContent,/第 2 页/);
 """)

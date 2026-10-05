@@ -800,6 +800,58 @@ class TelemetryStore:
                 FROM incident_triage_log WHERE incident_id=? ORDER BY seq DESC LIMIT 50""", (canonical,))]
             return {**rows[0], "requested_incident_id": incident_id, "triage_log": log}
 
+    def ai_snapshot(self, incident_id: str, limit: int = 40) -> dict[str, Any] | None:
+        """One read transaction; only a bounded evidence sample leaves SQLite."""
+        if type(limit) is not int or not 1 <= limit <= 40:
+            raise ValueError("AI evidence limit must be between 1 and 40")
+        with self._connection() as db:
+            canonical = self._canonical_incident(db, incident_id)
+            row = db.execute("SELECT * FROM incidents WHERE incident_id=?", (canonical,)).fetchone()
+            if row is None:
+                return None
+            detail = db.execute("SELECT evidence_count FROM incident_details WHERE incident_id=?",
+                                (canonical,)).fetchone()
+            total = detail[0] if detail else db.execute(
+                "SELECT count(*) FROM incident_evidence WHERE incident_id=?", (canonical,)).fetchone()[0]
+            records = [json.loads(r[0]) for r in db.execute(
+                "SELECT snapshot_json FROM incident_evidence WHERE incident_id=? "
+                "ORDER BY event_ts DESC,source_id DESC,event_id DESC LIMIT ?", (canonical, limit))]
+            records.reverse()
+            sources = {r["source_id"] for r in db.execute(
+                "SELECT source_id FROM incident_sources WHERE incident_id=?", (canonical,))}
+            sources.add(row["source_id"])
+            reasons = []
+            for source_id in sorted(sources):
+                coverage = db.execute("SELECT * FROM source_collection WHERE source_id=?", (source_id,)).fetchone()
+                if coverage is None:
+                    reasons.append("collection_coverage_unknown")
+                else:
+                    start = coverage["tracking_since"] if coverage["coverage_note"] else coverage["coverage_start"]
+                    if start is None or start > row["first_seen"]:
+                        reasons.append("collection_coverage_unknown")
+                    if not coverage["caught_up"]:
+                        reasons.append("collection_not_caught_up")
+                gap = db.execute("""SELECT 1 FROM collection_issues
+                    WHERE source_id=? AND category='gap'
+                    AND (started_at IS NULL OR started_at<=?)
+                    AND (ended_at IS NULL OR ended_at>?) LIMIT 1""",
+                    (source_id, row["last_seen"], row["first_seen"])).fetchone()
+                if gap:
+                    reasons.append("collection_gap")
+                if db.execute("""SELECT 1 FROM collection_issues WHERE source_id=?
+                    AND kind='message_truncated' AND opened_at>=? AND opened_at<=? LIMIT 1""",
+                    (source_id, row["created_at"], row["updated_at"])).fetchone():
+                    reasons.append("upstream_message_truncated")
+            # Human disposition changes updated_at but not the analysis evidence.
+            material = [canonical, row["first_seen"], total, records, sorted(set(reasons))]
+            revision = hashlib.sha256(_json(material).encode()).hexdigest()
+            return {"incident_id": canonical, "requested_incident_id": incident_id, "kind": "ssh",
+                    "related_incident_ids": [r[0] for r in db.execute("""WITH RECURSIVE family(id) AS (
+                        SELECT ? UNION SELECT i.incident_id FROM incidents i JOIN family f ON i.merged_into=f.id
+                    ) SELECT id FROM family""", (canonical,))],
+                    "first_seen": row["first_seen"], "evidence_count": total, "records": records,
+                    "revision": revision, "completeness_reasons": sorted(set(reasons))}
+
     def set_triage(self, incident_ids: list[str], state: str, *, actor: str,
                    note: str | None = None) -> dict[str, Any]:
         """Apply one operator transition to each listed incident.

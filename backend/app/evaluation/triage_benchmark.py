@@ -19,6 +19,17 @@ from ..agents.triage_budget import BudgetLedger, CallUncertain
 from .metrics import _percentile
 from .triage import _append
 from .triage_scenarios import SUITE, verified_scenarios
+from . import triage_pilot_scenarios
+
+SUITES = (SUITE, triage_pilot_scenarios.SUITE)
+
+
+def _scenarios(split: str, suite: str):
+    if suite == SUITE:
+        return verified_scenarios(split)
+    if suite == triage_pilot_scenarios.SUITE:
+        return triage_pilot_scenarios.verified_scenarios(split)
+    raise ValueError("unknown built-in suite")
 
 
 def _private_write(path: Path, text: str, *, exclusive: bool = False):
@@ -36,7 +47,7 @@ def protocol_path(tape: Path) -> Path:
 
 
 def _protocol(split: str, rows: list[dict], manifest: dict, config: APIConfig) -> dict:
-    return {"suite": SUITE, "split": split, "corpus": manifest["partitions"][split],
+    return {"suite": manifest["suite"], "split": split, "corpus": manifest["partitions"][split],
             "thresholds": manifest["thresholds"], "configuration": config.model_dump(mode="json"),
             "dossier_version": triage_evidence.VERSION,
             "validator_version": triage_evidence.VALIDATOR_VERSION,
@@ -75,12 +86,12 @@ def _metrics(rows: list[dict], calls: dict, *, proposed: bool) -> dict:
 
 
 def evaluate(split: str, tape: Path, *, config: APIConfig, live: APITriage | None = None,
-             limit: int | None = None) -> dict:
+             limit: int | None = None, suite: str = SUITE) -> dict:
     if limit is not None and (type(limit) is not int or limit <= 0):
         raise ValueError("limit must be positive")
     if live is not None and (live.config != config or live.run_id != str(tape.resolve())):
         raise ValueError("live configuration and recording path must match")
-    all_rows, frozen = verified_scenarios(split)
+    all_rows, frozen = _scenarios(split, suite)
     protocol = _protocol(split, all_rows, frozen, config)
     saved = protocol_path(tape)
     if saved.exists():
@@ -153,7 +164,7 @@ def evaluate(split: str, tape: Path, *, config: APIConfig, live: APITriage | Non
             differences.append({"incident_id": iid, "family": row["family"], "expected": row["expected_verdict"],
                                 "proposed": proposal["verdict"] if proposal else None, "accepted": call.verdict,
                                 "validation_reasons": details["reasons"]})
-    return {"suite": SUITE, "split": split, "dossier_version": triage_evidence.VERSION,
+    return {"suite": suite, "split": split, "dossier_version": triage_evidence.VERSION,
             "validator_version": triage_evidence.VALIDATOR_VERSION, "protocol": protocol,
             "by_kind": {kind: {"proposed": _metrics([r for r in rows if r["case"]["kind"] == kind], calls, proposed=True),
                                "accepted": _metrics([r for r in rows if r["case"]["kind"] == kind], calls, proposed=False)}
@@ -182,6 +193,7 @@ def evaluate(split: str, tape: Path, *, config: APIConfig, live: APITriage | Non
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--suite", choices=SUITES, default=SUITE)
     parser.add_argument("--split", required=True, choices=("development", "holdout"))
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--tape", required=True, type=Path)
@@ -200,7 +212,7 @@ def main(argv: list[str] | None = None) -> int:
         config = APIConfig.load(args.config)
         if args.limit is not None and args.limit <= 0:
             raise ValueError
-        verified_scenarios(args.split)
+        _scenarios(args.split, args.suite)
     except (OSError, ValueError):
         parser.error("invalid profile, limit or built-in synthetic corpus")
     live = ledger = None
@@ -216,7 +228,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.keys_file or args.ledger or args.budget_usd != "0":
         parser.error("keys and budget arguments require --live")
     try:
-        report = evaluate(args.split, args.tape, config=config, live=live, limit=args.limit)
+        report = evaluate(args.split, args.tape, config=config, live=live, limit=args.limit, suite=args.suite)
     except (OSError, ValueError) as error:
         # Errors intentionally exclude key contents and remote responses.
         parser.error(str(error) if isinstance(error, ValueError) else "cannot read or save evaluation files")
