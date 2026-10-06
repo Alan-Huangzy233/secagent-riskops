@@ -305,3 +305,44 @@ def test_large_search_filters_use_indexes_and_receipt_identity_lookups(store):
             if filters:
                 assert "SEARCH events USING" in plan
     print("Synthetic 50000-record local search milliseconds:", elapsed)
+
+
+def test_fresh_page_avoids_per_event_receipt_work(store, monkeypatch):
+    # Bound SQLite VM work instead of wall time: a full receipt walk can be fast
+    # on a tiny warm fixture but dominates a large console's first page.
+    from contextlib import contextmanager
+
+    count = 20_000
+    at = module._iso(NOW)
+    with store._connection(write=True) as db:
+        db.executemany("""INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?,?)""", (
+            ("source-a", f"fresh-{n:06}", "synthetic-host", at, NOW.timestamp() + n, at,
+             "other", None, None, json.dumps({"event_id": f"fresh-{n:06}", "source_id": "source-a",
+                                              "event_type": "other", "src_ip": None, "ssh_user": None}), None)
+            for n in range(count)
+        ))
+        db.executemany("INSERT INTO event_receipts VALUES(?,?,?,?)", (
+            ("source-a", f"fresh-{n:06}", "synthetic-hash", at) for n in range(count)
+        ))
+    original = store._connection
+    instructions = 0
+
+    @contextmanager
+    def bounded_connection(**kwargs):
+        nonlocal instructions
+        with original(**kwargs) as db:
+            def progress():
+                nonlocal instructions
+                instructions += 100
+                return int(instructions > 5_000)
+            db.set_progress_handler(progress, 100)
+            try:
+                yield db
+            finally:
+                db.set_progress_handler(None, 0)
+
+    monkeypatch.setattr(store, "_connection", bounded_connection)
+    page = store.paginate_events(limit=5)
+    assert page["total"] == count and page["total_pages"] == count // 5
+    assert [row["event_id"] for row in page["items"]] == [f"fresh-{n:06}" for n in range(count - 1, count - 6, -1)]
+    assert page["snapshot"] == f"r1:{count}"

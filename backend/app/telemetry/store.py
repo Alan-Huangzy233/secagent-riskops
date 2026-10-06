@@ -684,13 +684,18 @@ class TelemetryStore:
         with self._connection() as db:
             # Receipts outlive raw-event retention. Their monotonically appended
             # rowids exclude late arrivals even if they have old event times.
-            if filters.get("snapshot") is None:
-                filters["snapshot"] = "r1:" + str(db.execute("SELECT coalesce(max(rowid),0) FROM event_receipts").fetchone()[0])
+            snapshot = filters.get("snapshot")
+            if snapshot is None:
+                snapshot = "r1:" + str(db.execute("SELECT coalesce(max(rowid),0) FROM event_receipts").fetchone()[0])
+                # This first read pins the SQLite transaction. Every retained
+                # event already has a receipt inside that boundary, so a fresh
+                # view needs no per-event receipt lookup for its count or page.
+                # Caller-supplied snapshots still filter out later arrivals.
             where, params = self._event_filter(source_id, **filters)
             total = db.execute(f"SELECT count(*) FROM events {where}", params).fetchone()[0]
             pagination = self._pagination(total, limit, page)
             return {"items": self._events(db, source_id, limit, pagination["offset"], **filters),
-                    **pagination, "snapshot": filters["snapshot"]}
+                    **pagination, "snapshot": snapshot}
 
     def _incidents(self, db: sqlite3.Connection, source_id: str | None,
                    limit: int, offset: int, *, include_evidence: bool = True,
