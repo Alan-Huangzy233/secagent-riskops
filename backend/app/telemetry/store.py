@@ -25,6 +25,8 @@ from .sshd_parse import FAILURE_KINDS, parse_sshd
 
 _WINDOW_SECONDS = 300
 _EVIDENCE_RESPONSE_LIMIT = 20
+# Bound the receipt tail inspected when counting a recently frozen log view.
+_SNAPSHOT_COUNT_TAIL_LIMIT = 10_000
 _SSH_PREFIX = re.compile(
     r"^(?:\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\S+\s+)?"
     r"sshd(?:-session|-auth)?(?:\[\d+\])?:\s*"
@@ -681,21 +683,49 @@ class TelemetryStore:
         page, including when retention removed rows since the previous request.
         """
         self._page_number(limit, page)
+        where, params = self._event_filter(source_id, **filters)
+        # Journal cursor IDs can dominate the paging indexes' size. A plain
+        # source count can use the existing covering index without those IDs.
+        source_only = source_id is not None and all(value is None for name, value in filters.items() if name != "snapshot")
+        count_table = "events INDEXED BY events_detection" if source_only else "events"
         with self._connection() as db:
-            # Receipts outlive raw-event retention. Their monotonically appended
-            # rowids exclude late arrivals even if they have old event times.
+            # This first read pins the transaction for both counts and items.
+            # Receipts outlive raw retention and append monotonically, including
+            # arrivals whose event timestamps are older than this view.
+            head = db.execute("SELECT coalesce(max(rowid),0) FROM event_receipts").fetchone()[0]
             snapshot = filters.get("snapshot")
             if snapshot is None:
-                snapshot = "r1:" + str(db.execute("SELECT coalesce(max(rowid),0) FROM event_receipts").fetchone()[0])
-                # This first read pins the SQLite transaction. Every retained
-                # event already has a receipt inside that boundary, so a fresh
-                # view needs no per-event receipt lookup for its count or page.
-                # Caller-supplied snapshots still filter out later arrivals.
-            where, params = self._event_filter(source_id, **filters)
-            total = db.execute(f"SELECT count(*) FROM events {where}", params).fetchone()[0]
+                snapshot = "r1:" + str(head)
+                bound = head
+            else:
+                bound = int(snapshot[3:])  # Validated by _event_filter above.
+            if bound == 0:
+                total = 0
+            elif bound >= head:
+                # No receipt falls outside this view yet. The current read
+                # transaction excludes concurrent arrivals without a row lookup.
+                filters = {**filters, "snapshot": None}
+                where, params = self._event_filter(source_id, **filters)
+                total = db.execute(f"SELECT count(*) FROM {count_table} {where}", params).fetchone()[0]
+            elif head - bound <= _SNAPSHOT_COUNT_TAIL_LIMIT:
+                # Count all matching retained rows, then subtract only matching
+                # arrivals after the boundary. Both counts see the same read
+                # transaction; expired rows and other sources subtract nothing.
+                base_where, base_params = self._event_filter(source_id, **{**filters, "snapshot": None})
+                retained = db.execute(f"SELECT count(*) FROM {count_table} {base_where}", base_params).fetchone()[0]
+                extra = " AND " + base_where.removeprefix("WHERE ") if base_where else ""
+                # Force the rowid range and loop order: a source equality must
+                # not switch this to scanning that source's entire receipt index.
+                newer = db.execute(f"""SELECT count(*) FROM event_receipts r NOT INDEXED
+                    CROSS JOIN events USING(source_id,event_id)
+                    WHERE r.rowid>? {extra}""", (bound, *base_params)).fetchone()[0]
+                total = retained - newer
+            else:
+                # Old views must not build or scan an unbounded receipt tail.
+                total = db.execute(f"SELECT count(*) FROM events {where}", params).fetchone()[0]
             pagination = self._pagination(total, limit, page)
-            return {"items": self._events(db, source_id, limit, pagination["offset"], **filters),
-                    **pagination, "snapshot": snapshot}
+            items = self._events(db, source_id, limit, pagination["offset"], **filters) if total else []
+            return {"items": items, **pagination, "snapshot": snapshot}
 
     def _incidents(self, db: sqlite3.Connection, source_id: str | None,
                    limit: int, offset: int, *, include_evidence: bool = True,
