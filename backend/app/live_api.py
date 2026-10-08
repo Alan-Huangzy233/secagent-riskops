@@ -18,6 +18,7 @@ from starlette.datastructures import Headers, MutableHeaders
 from .telemetry.config import LiveConfig, load_config
 from .telemetry.dashboard import DASHBOARD_HTML, CONTENT_SECURITY_POLICY
 from .telemetry.operator_auth import OperatorVerifier
+from .telemetry.console_cache import ConsoleCache, build_bootstrap, build_summary
 
 MAX_BODY_BYTES = 1024 * 1024
 _basic = HTTPBasic(auto_error=False)
@@ -181,6 +182,8 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
             # marks the peer's open incidents as handled, with the job as reference.
             live_store.resolve_blocked_incidents(event["ip"], event["source_ids"], actor=event["actor"],
                                                  reference=event["job_id"], note=event.get("reason"))
+            if hasattr(application.state, "console_cache"):
+                application.state.console_cache.invalidate()
 
         application.state.control = control or ControlService.from_environment(
             application.state.config.sources, block_listener=resolve_blocked)
@@ -197,9 +200,14 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
         application.state.ai = ai if ai is not None else AIService.from_environment(live_store)
         if ai is None:
             application.state.ai.start()
+        application.state.console_cache = ConsoleCache(
+            lambda: build_bootstrap(live_store, application.state.config),
+            enabled=application.state.config.console_cache_enabled)
+        application.state.console_cache.start()
         try:
             yield
         finally:
+            await run_in_threadpool(application.state.console_cache.close)
             if ai is None:
                 await run_in_threadpool(application.state.ai.close)
             if notification_worker:
@@ -235,36 +243,13 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
 
     @application.get("/api/summary", dependencies=[Depends(operator)])
     def summary(request: Request):
-        cfg = request.app.state.config
-        reported = {item["source_id"]: item for item in request.app.state.store.list_sources(limit=200, offset=0)}
-        now = datetime.now(timezone.utc)
-        sources = []
-        totals = {"events": 0, "incidents": 0, "ssh_failures": 0, "ssh_successes": 0}
-        for source in cfg.sources:
-            row = dict(reported.get(source.id, {}))
-            row.update({"source_id": source.id, "hostname": source.hostname})
-            last_seen = row.get("last_seen")
-            connection_status = "never_seen"
-            if last_seen:
-                age = (now - datetime.fromisoformat(last_seen.replace("Z", "+00:00"))).total_seconds()
-                # "error" means the source cannot be read right now; a report
-                # about coverage or truncation does not make a source unhealthy.
-                failing = "source_error" in ((row.get("collection") or {}).get("open") or [])
-                if row.get("collection") is None:
-                    failing = bool(row.get("last_error"))
-                connection_status = "offline" if age > cfg.heartbeat_timeout_seconds else ("error" if failing else "online")
-            row["connection_status"] = connection_status
-            sources.append(row)
-            for total, counter in (("events", "event_count"), ("incidents", "incident_count"),
-                                   ("ssh_failures", "ssh_failure_count"), ("ssh_successes", "ssh_success_count")):
-                totals[total] += int(row.get(counter, 0))
-        # A correlated incident appears under every participating source but is
-        # counted once in the global total.
-        triage = request.app.state.store.triage_counts()
-        totals["incidents"] = triage["total"]
-        return {"generated_at": now.isoformat(), "retention_days": cfg.retention_days,
-                "heartbeat_timeout_seconds": cfg.heartbeat_timeout_seconds, "sources": sources,
-                "totals": totals, "triage_counts": triage}
+        return build_summary(request.app.state.store, request.app.state.config)
+
+    @application.get("/api/console/bootstrap", dependencies=[Depends(operator)])
+    def console_bootstrap(request: Request):
+        result = request.app.state.console_cache.read()
+        status = {"warming": 202, "unavailable": 503}.get(result["state"], 200)
+        return JSONResponse(result, status_code=status)
 
     def source_filter(request: Request, source_id: str | None) -> str | None:
         if source_id is not None and source_id not in {source.id for source in request.app.state.config.sources}:
@@ -419,8 +404,10 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
         except ValidationError:
             raise HTTPException(422, "处置请求无效：需要 1–100 个告警 ID、目标状态和不超过 300 字的备注") from None
         try:
-            return await run_in_threadpool(request.app.state.store.set_triage, body.incident_ids, body.state,
-                                           actor=request.app.state.config.operator_username, note=body.note)
+            result = await run_in_threadpool(request.app.state.store.set_triage, body.incident_ids, body.state,
+                                            actor=request.app.state.config.operator_username, note=body.note)
+            request.app.state.console_cache.invalidate()
+            return result
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from None
 
@@ -526,6 +513,7 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
         except Exception:
             # Never acknowledge a batch whose transaction did not commit.
             raise HTTPException(503, "Telemetry storage unavailable; retry this batch") from None
+        request.app.state.console_cache.invalidate()
         return {**result, "batch_id": batch.batch_id, "durable": True}
 
     return application

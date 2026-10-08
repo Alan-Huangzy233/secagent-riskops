@@ -151,3 +151,38 @@ def test_future_boundary_and_empty_snapshot_keep_their_existing_meaning(store):
     assert future["items"] == store.list_events()
     empty = store.paginate_events(snapshot="r1:0", page=50)
     assert (empty["total"], empty["items"], empty["page"]) == (0, [], 1)
+
+
+@pytest.mark.parametrize("source_id", [None, "source-a"])
+@pytest.mark.parametrize("arrivals", [0, 3])
+def test_plain_count_plan_avoids_long_cursor_indexes(store, monkeypatch, source_id, arrivals):
+    # SQLite may prefer the two-column primary key for COUNT(*) even though
+    # journal cursors make it much wider than the normalized detection index.
+    records = [{**row, "event_id": row["event_id"] + "-" + "c" * 512} for row in rows(0, 30)]
+    insert(store, records)
+    snapshot = store.paginate_events()["snapshot"]
+    insert(store, rows(30, arrivals))
+    original = store._connection
+    statements = []
+
+    @contextmanager
+    def traced_connection(**kwargs):
+        with original(**kwargs) as db:
+            db.set_trace_callback(statements.append)
+            yield db
+            db.set_trace_callback(None)
+
+    monkeypatch.setattr(store, "_connection", traced_connection)
+    page = store.paginate_events(source_id=source_id, snapshot=snapshot)
+    assert page["total"] == len(records)
+    counts = [sql for sql in statements if sql.startswith("SELECT count(*) FROM events ")]
+    assert counts
+    with original() as db:
+        compact = []
+        for index in db.execute('PRAGMA index_list(events)').fetchall():
+            columns = {row[2] for row in db.execute('PRAGMA index_info("' + index[1] + '")')}
+            if not columns & {"event_id", "record_json"}:
+                compact.append(index[1])
+        for sql in counts:
+            plan = " ".join(row[3] for row in db.execute("EXPLAIN QUERY PLAN " + sql))
+            assert any("COVERING INDEX " + index in plan for index in compact), plan

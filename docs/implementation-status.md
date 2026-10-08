@@ -65,7 +65,7 @@ Run it: `make install && make test && make demo`.
 | 总页数、数字跳页、独立列表请求与匹配排序索引 | `backend/app/telemetry/store.py`, `backend/app/telemetry/dashboard.py` |
 | 成功认证摘要单项缓存，60 秒到期，保留 PBKDF2 强度 | `backend/app/telemetry/operator_auth.py` |
 | sshd 完整对端解析、认证前断开/协议探测、受保护的历史派生字段回填 | `backend/app/telemetry/sshd_parse.py`, `scripts/reparse_ssh_telemetry.py` |
-| 默认手动刷新、可选 1/5/15 分钟，刷新保留记录与详情、合并请求 | `backend/app/telemetry/dashboard.py`, `backend/app/live_api.py` |
+| 分视图表格与详情抽屉、按需查询及可选 1/5/15 分钟刷新；可选服务器首屏预载与后台同步，显示更新时间，保留分页查询边界 | `backend/app/telemetry/dashboard.py`, `console_workspace.py`, `console_cache.py`, [说明](console-workspace.md) |
 | 主动触发 AbuseIPDB 风险分、5 分钟缓存、服务端 Key 与限额处理 | `backend/app/telemetry/abuseipdb.py` |
 | SSH 短时/慢速、多账号、跨来源、失败后成功关联；共享证据合并、按参与来源筛选 | `backend/app/telemetry/detection.py`, `backend/app/telemetry/store.py` |
 | 历史告警预览、独立备份后重评估、原始记录与回执完整性校验 | `scripts/rebuild_ssh_detections.py`, `docs/ssh-detection.md` |

@@ -71,6 +71,7 @@ class LiveConfig(BaseModel):
     retention_days: int = Field(default=14, ge=1, le=365)
     heartbeat_timeout_seconds: int = Field(default=300, ge=60, le=3600)
     notifications_enabled: bool = True
+    console_cache_enabled: bool = False
     notification_backup_directories: tuple[str, ...] = Field(default=(), max_length=8)
 
     @field_validator("notification_backup_directories")

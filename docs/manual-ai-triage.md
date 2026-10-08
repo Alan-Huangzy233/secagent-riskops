@@ -13,7 +13,7 @@ open.
 
 ## Operator workflow
 
-1. Open an incident and select **预览分析摘要**. The visible JSON is the dossier
+1. Open an incident, select the **AI 分析** detail tab and **预览分析摘要**. The visible JSON is the dossier
    used for analysis. Check its completeness and contents.
 2. Select **提交本地演练**, **读取录制结果**, or **开始模型分析**, depending on the
    configured mode. The server rebuilds the dossier and rejects an expired
@@ -68,6 +68,7 @@ from the evaluation corpus is not interchangeable with a telemetry incident.
 Offline and recorded modes never instantiate a model HTTP client.
 
 Before an API pilot, agree the provider, field policy and production budget.
+See the concrete [online pilot proposal](online-ai-pilot.md).
 `profile_path` uses the existing [configurable provider profiles](model-triage.md);
 API mode needs the optional HTTP dependency installed with `pip install '.[ai]'`.
 `keys_file` uses that guide's 0600 JSON format; key values never enter the browser.
@@ -165,8 +166,9 @@ uncertain paid call; an operator must investigate the provider outcome first.
 
 Back up the queue with SQLite's online backup API, together with the private
 configuration, inventory and access-controlled credential recovery procedure.
-Copying a live database file alone can omit WAL data. The queue is not yet wired
-into the existing telemetry recovery-package configuration. Restore it without
+Copying a live database file alone can omit WAL data. Deployments must include
+the queue and private configuration in their recovery-package component list;
+API mode additionally needs the reviewed profile and credential recovery. Restore it without
 discarding reservations or regenerating the alias key. Audit entries are
 append-only through the application, not a cryptographic tamper-proof archive.
 Removing the environment configuration and restarting disables future work;

@@ -326,6 +326,7 @@ def test_fresh_page_avoids_per_event_receipt_work(store, monkeypatch):
         ))
     original = store._connection
     instructions = 0
+    budget = None
 
     @contextmanager
     def bounded_connection(**kwargs):
@@ -334,13 +335,20 @@ def test_fresh_page_avoids_per_event_receipt_work(store, monkeypatch):
             def progress():
                 nonlocal instructions
                 instructions += 100
-                return int(instructions > 5_000)
+                return int(budget is not None and instructions > budget)
             db.set_progress_handler(progress, 100)
             try:
                 yield db
             finally:
                 db.set_progress_handler(None, 0)
 
+    # Isolate extra receipt work from the ordinary retained-row count. The
+    # compact count scan uses VM steps; SQLite's bare COUNT shortcut does not,
+    # although both read an index. A receipt lookup per event still exceeds this
+    # baseline by far more than the allowance for the first five items.
+    with bounded_connection() as db:
+        assert db.execute("SELECT count(*) FROM events WHERE 1").fetchone()[0] == count
+    budget, instructions = instructions + 5_000, 0
     monkeypatch.setattr(store, "_connection", bounded_connection)
     page = store.paginate_events(limit=5)
     assert page["total"] == count and page["total_pages"] == count // 5
