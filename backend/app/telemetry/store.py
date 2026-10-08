@@ -685,9 +685,11 @@ class TelemetryStore:
         self._page_number(limit, page)
         where, params = self._event_filter(source_id, **filters)
         # Journal cursor IDs can dominate the paging indexes' size. A plain
-        # source count can use the existing covering index without those IDs.
-        source_only = source_id is not None and all(value is None for name, value in filters.items() if name != "snapshot")
-        count_table = "events INDEXED BY events_detection" if source_only else "events"
+        # global or source-only count can use the covering index without those
+        # IDs. SQLite may otherwise choose the two-column cursor primary key,
+        # which is expensive to read cold despite having fewer indexed columns.
+        plain_count = all(value is None for name, value in filters.items() if name != "snapshot")
+        count_table = "events INDEXED BY events_detection" if plain_count else "events"
         with self._connection() as db:
             # This first read pins the transaction for both counts and items.
             # Receipts outlive raw retention and append monotonically, including
@@ -706,13 +708,15 @@ class TelemetryStore:
                 # transaction excludes concurrent arrivals without a row lookup.
                 filters = {**filters, "snapshot": None}
                 where, params = self._event_filter(source_id, **filters)
-                total = db.execute(f"SELECT count(*) FROM {count_table} {where}", params).fetchone()[0]
+                # A bare COUNT(*) uses SQLite's own index shortcut even with
+                # INDEXED BY. WHERE 1 retains the chosen compact scan instead.
+                total = db.execute(f"SELECT count(*) FROM {count_table} {where or 'WHERE 1'}", params).fetchone()[0]
             elif head - bound <= _SNAPSHOT_COUNT_TAIL_LIMIT:
                 # Count all matching retained rows, then subtract only matching
                 # arrivals after the boundary. Both counts see the same read
                 # transaction; expired rows and other sources subtract nothing.
                 base_where, base_params = self._event_filter(source_id, **{**filters, "snapshot": None})
-                retained = db.execute(f"SELECT count(*) FROM {count_table} {base_where}", base_params).fetchone()[0]
+                retained = db.execute(f"SELECT count(*) FROM {count_table} {base_where or 'WHERE 1'}", base_params).fetchone()[0]
                 extra = " AND " + base_where.removeprefix("WHERE ") if base_where else ""
                 # Force the rowid range and loop order: a source equality must
                 # not switch this to scanning that source's entire receipt index.

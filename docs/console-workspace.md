@@ -25,6 +25,8 @@ pending-incident page (score order) and the newest 50 logs. It starts before any
 browser connects and refreshes about every 15 seconds. Successful ingestion,
 disposition changes and completed block dispositions wake it, coalescing bursts
 with at least two seconds between starts. A slow build never overlaps another.
+Unfiltered global and source counts use the existing compact covering index;
+long cursor IDs remain in the separate pagination indexes. No index is added.
 The process publishes all three sections together; their database reads can
 observe adjacent collection transactions rather than one shared transaction.
 
