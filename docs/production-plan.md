@@ -1,6 +1,6 @@
 # Production plan and issue tracking
 
-Updated 2026-10-03. Further demo work is paused while development focuses on the
+Updated 2026-10-08. Further demo work is paused while development focuses on the
 independent telemetry pilot. This is a plan, not a statement that the features
 below are implemented or deployed. See [implementation status](./implementation-status.md).
 Historical issue-seeding files in `docs/process/` are provenance, not a live
@@ -28,8 +28,7 @@ by default; real-provider rollout and broader independent validation are still
 pending. Historical demo results retain their original attribution.
 
 The offline HTTP parser, three rules and evidence replay are in
-[PR #116](https://github.com/Alan-Huangzy233/secagent-riskops/pull/116), awaiting
-review at this update. Live HTTP collection/integration and an actual source are
+[merged PR #116](https://github.com/Alan-Huangzy233/secagent-riskops/pull/116). Live HTTP collection/integration and an actual source are
 still needed before claiming production HTTP coverage.
 
 | Work | Issue | Acceptance boundary |
@@ -41,8 +40,11 @@ still needed before claiming production HTTP coverage.
 | First network source | [#120](https://github.com/Alan-Huangzy233/secagent-riskops/issues/120) | A real observation point and a small validated connection/DNS/firewall rule set |
 | Linux host behavior | [#121](https://github.com/Alan-Huangzy233/secagent-riskops/issues/121) | Source-backed rules for a selected subset of sudo, account/privilege, service or scheduled-task activity |
 
-Review the completed offline AI foundation, then prepare its controlled
-manual rollout alongside HTTP engineering. Detection expands in order: **Web → network → Linux host behavior**.
+The immediate console increment is [tabbed views and a server-prepared first page](console-workspace.md),
+with a separate [controlled online-AI proposal](online-ai-pilot.md). Review the
+console changes before deployment; real-provider activation needs an agreed
+production budget and outgoing-field policy. Continue HTTP engineering after
+this console increment. Detection expands in order: **Web → network → Linux host behavior**.
 Source discovery can continue while real HTTP activation waits for an available
 service; offline fixtures never establish live coverage.
 

@@ -5,6 +5,7 @@ import base64
 import hashlib
 
 from .ai_dashboard import AI_PANEL, AI_SCRIPT
+from .console_workspace import STYLE as WORKSPACE_STYLE, SCRIPT as WORKSPACE_SCRIPT, arrange
 
 _STYLE = """
 :root{color-scheme:dark;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#0b1422;color:#e7edf5}
@@ -44,20 +45,20 @@ function when(value){if(!value)return '尚未收到'; const d=new Date(value);re
 function duration(started){const elapsed=Math.round(performance.now()-started);return elapsed<1000?`${elapsed} 毫秒`:`${(elapsed/1000).toFixed(1)} 秒`;}
 function isBusy(){return refreshRunning||summaryPending||Object.values(pages).some(state=>state.pending);}
 function updateRefreshButton(){const busy=isBusy();$('refresh').disabled=busy;text('refresh',busy?'正在更新…':'刷新数据');}
-function clearDetails(){aiClear();++detailRequestId;if(detailController)detailController.abort();detailIncident=null;$('evidence-view').hidden=true;text('detail-title','记录详情');text('detail','选择上方记录查看详情。');}
+function clearDetails(){aiClear();++detailRequestId;if(detailController)detailController.abort();detailIncident=null;$('detail-fields').replaceChildren();$('evidence-view').hidden=true;text('detail-title','记录详情');text('detail','选择上方记录查看详情。');}
 function cell(row,value){const td=document.createElement('td');td.textContent=String(value??'—');row.append(td);return td;}
 function empty(tbody,span,message){const tr=document.createElement('tr');const td=cell(tr,message);td.colSpan=span;tbody.append(tr);}
 async function get(path,signal){const response=await fetch(path,{credentials:'same-origin',cache:'no-store',signal});if(!response.ok)throw new Error(response.status===401?'登录已失效，请刷新页面重新登录。':`读取失败（${response.status}）。请检查中控服务。`);return response.json();}
-function details(record,title){clearDetails();text('detail-title',title);text('detail',JSON.stringify(record,null,2));$('detail-section').scrollIntoView({behavior:'smooth',block:'nearest'});}
+function details(record,title){clearDetails();text('detail-title',title);text('detail',JSON.stringify(record,null,2));renderRecordOverview(record);openRecordDrawer();}
 function filterKey(){return JSON.stringify({filters:eventFilters,snapshot:eventSnapshot});}
 function listKey(kind){return kind==='event'?filterKey():JSON.stringify([incidentTriage,incidentFocus,incidentSort]);}
 function saveView(){try{sessionStorage.setItem('riskops-view',JSON.stringify({source:currentSource,filters:eventFilters,snapshot:eventSnapshot,eventPage:pages.event.page,incidentPage:pages.incident.page,incidentTriage,incidentFocus,incidentSort}));}catch{}}
 function setFilterInputs(){for(const key of ['ip','username','event_type','q','start','end']){let value=eventFilters[key]||'';if(value&&(key==='start'||key==='end')){const d=new Date(value);if(!Number.isNaN(d.valueOf())){const local=new Date(d.valueOf()-d.getTimezoneOffset()*60000);value=local.toISOString().slice(0,16);}}$('search-'+key).value=value;}}
-function queryLogsForIP(ip){eventFilters={...eventFilters,ip:String(ip)};eventSnapshot=null;setFilterInputs();saveView();loadList('event',1);$('event-section').scrollIntoView({behavior:'smooth',block:'start'});}
+function queryLogsForIP(ip){eventFilters={...eventFilters,ip:String(ip)};eventSnapshot=null;setFilterInputs();saveView();selectWorkspace('events',false);loadList('event',1);}
 async function showIncident(incident){
  clearDetails();const id=incident.incident_id;if(!id){details(incident,'SSH 认证告警与原始证据');return;}
- detailIncident=String(id);const requestId=++detailRequestId;detailController=new AbortController();text('detail-title','SSH 认证告警与原始证据');text('detail','正在读取事件详情…');$('detail-section').scrollIntoView({behavior:'smooth',block:'nearest'});
- try{const data=await get('/api/incidents/'+encodeURIComponent(id),detailController.signal);if(requestId!==detailRequestId)return;const summary={...data};delete summary.evidence_snapshots;text('detail',JSON.stringify(summary,null,2));await loadEvidence(1);loadAnalysis(String(id));}
+ detailIncident=String(id);const requestId=++detailRequestId;detailController=new AbortController();text('detail-title','SSH 认证告警与原始证据');text('detail','正在读取事件详情…');renderRecordOverview(incident);openRecordDrawer();
+ try{const data=await get('/api/incidents/'+encodeURIComponent(id),detailController.signal);if(requestId!==detailRequestId)return;const summary={...data};delete summary.evidence_snapshots;text('detail',JSON.stringify(summary,null,2));renderRecordOverview(data);await loadEvidence(1);loadAnalysis(String(id));}
  catch(error){if(requestId===detailRequestId&&error.name!=='AbortError')text('detail',error.message);}
 }
 async function loadEvidence(page){
@@ -72,7 +73,7 @@ async function loadEvidence(page){
 function ipCell(row,value){
  const td=cell(row,null);if(!value)return td;
  const ip=String(value);const button=document.createElement('button');button.type='button';button.className='ip-link';button.textContent=ip;button.setAttribute('aria-label',`查询 ${ip} 的属地`);
- button.addEventListener('click',event=>{event.stopPropagation();$('ip-input').value=ip;lookupIp(ip);$('ip-query-section').scrollIntoView({behavior:'smooth',block:'nearest'});});
+ button.addEventListener('click',event=>{event.stopPropagation();$('ip-input').value=ip;lookupIp(ip);closeRecordDrawer();selectWorkspace('ip',false);});
  button.addEventListener('keydown',event=>event.stopPropagation());td.replaceChildren(button);return td;
 }
 function renderIp(data){
@@ -153,15 +154,16 @@ async function loadControls(){
  catch(error){if(readId!==controlReadId)return;text('control-availability',error.message+' 下方仅保留上次读取的状态，当前情况待核实。');controlsData=null;controlState();}
 }
 async function csrfPost(path,payload){
+ if(!controlsData?.csrf_token)await loadControls();
  if(!controlsData?.csrf_token)throw new Error('操作校验尚未准备好，请点击“刷新封禁状态与操作记录”后重试。');
  const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-RiskOps-CSRF':controlsData.csrf_token},credentials:'same-origin',cache:'no-store',body:JSON.stringify(payload)});const data=await response.json().catch(()=>null);
  if(!response.ok){const errors={401:'登录已失效，请重新登录。',403:'操作校验失效，请刷新封禁状态后重新预览。',409:'计划已过期或状态冲突，请重新预览。',422:'目标、范围或时长不符合控制策略。',503:'受限执行通道尚不可用。'};const detail=typeof data?.detail==='string'?data.detail:null;throw new Error(detail||errors[response.status]||`操作失败（${response.status}）。`);}if(!data||typeof data!=='object')throw new Error('操作接口返回异常。');return data;
 }
 async function controlPost(path,payload){if(!controlsData?.enabled)throw new Error('执行通道尚未准备好，请刷新封禁状态。');return csrfPost(path,payload);}
-function renderTriageCounts(counts){
+function renderTriageCounts(counts,scope='all'){
  if(!counts||typeof counts!=='object')return;const n=key=>Number.isInteger(counts[key])?counts[key]:0;
- text('incident-total',n('pending'));text('incident-triage-summary',`已知晓 ${n('acknowledged')} · 已处理 ${n('resolved')} · 合计 ${n('total')}`);
- text('incident-triage-counts',`待处理 ${n('pending')} · 已知晓 ${n('acknowledged')} · 已处理 ${n('resolved')}`);
+ if(scope!=='list'){text('incident-total',n('pending'));text('incident-triage-summary',`已知晓 ${n('acknowledged')} · 已处理 ${n('resolved')} · 合计 ${n('total')}`);}
+ if(scope!=='summary')text('incident-triage-counts',`待处理 ${n('pending')} · 已知晓 ${n('acknowledged')} · 已处理 ${n('resolved')}`);
 }
 function appendTriageActions(td,incident,state){
  const id=incident.incident_id;if(!id)return;const options=triageActions[state]||[];if(!options.length)return;const wrap=document.createElement('div');wrap.className='row-actions';
@@ -172,9 +174,10 @@ async function triageIncident(id,state){
  if(triageBusy)return;triageBusy=true;$('triage-status').className='list-status muted';text('triage-status',`正在将告警标为${triageLabels[state]||state}…`);
  try{
   const note=$('triage-note').value.trim();const data=await csrfPost('/api/incidents/triage',{incident_ids:[id],state,...(note?{note}:{})});
+  invalidateBootstrap();
   const outcome=Array.isArray(data.results)&&data.results[0]?data.results[0].result:null;
   const messages={changed:`已将告警标为${triageLabels[state]}。`,unchanged:'告警已是该状态，未做更改。',invalid:`当前状态不允许直接改为${triageLabels[state]}。`,missing:'告警不存在或已合并，请刷新列表。'};
-  text('triage-status',messages[outcome]||'处置结果未知，请刷新列表核对。');if(data.triage_counts)renderTriageCounts(data.triage_counts);
+  text('triage-status',messages[outcome]||'处置结果未知，请刷新列表核对。');if(data.triage_counts)renderTriageCounts(data.triage_counts,'summary');
  }catch(error){text('triage-status',error instanceof TypeError?'网络连接失败，请稍后重试。':error.message);$('triage-status').className='list-status error';}
  finally{triageBusy=false;}
  await loadList('incident',pages.incident.page);
@@ -187,7 +190,7 @@ async function previewControl(payload=controlPayload()){
  }catch(error){text('control-status',error.message);}finally{controlBusy=false;controlState();}
 }
 async function previewUnban(block){
- $('control-section').scrollIntoView({behavior:'smooth',block:'start'});await previewControl({action:'unban',targets:[{source_id:block.source_id,ip:block.ip}],channels:[block.channel],duration_seconds:3600,reason:$('control-reason').value.trim()||'操作员手动解封'});
+ selectWorkspace('controls',false);await previewControl({action:'unban',targets:[{source_id:block.source_id,ip:block.ip}],channels:[block.channel],duration_seconds:3600,reason:$('control-reason').value.trim()||'操作员手动解封'});
 }
 const jobStatusLabels={queued:'等待执行',running:'正在执行',done:'已完成',partial:'部分完成',failed:'失败',succeeded:'成功',success:'成功',ok:'成功',pending:'等待执行',blocked:'拒绝执行',unknown:'结果待核实'};
 function renderJob(job){
@@ -219,7 +222,7 @@ async function loadCollection(page=collectionPage){const requestId=++collectionR
  catch(error){if(requestId===collectionRequestId)text('collection-status',`${error.message} 已保留上次读取的采集记录。`);}}
 function renderSummary(data){
  text('event-total',data.totals.events);text('failure-total',data.totals.ssh_failures);text('success-total',data.totals.ssh_successes);
- if(data.triage_counts)renderTriageCounts(data.triage_counts);else text('incident-total',data.totals.incidents);
+ if(data.triage_counts)renderTriageCounts(data.triage_counts,'summary');else text('incident-total',data.totals.incidents);
  text('updated',`概览更新于 ${when(data.generated_at)} · 原始日志保留 ${data.retention_days} 天`);
  const rowsKey=JSON.stringify(data.sources);
  if(rowsKey!==sourceRowsKey){const rows=$('sources');rows.replaceChildren();
@@ -231,7 +234,7 @@ function renderSummary(data){
 }
 function renderEvents(data){
  const rows=$('events');rows.replaceChildren();
- for(const event of data){const tr=document.createElement('tr');tr.className='selectable';tr.tabIndex=0;cell(tr,when(event.timestamp));cell(tr,event.source_id);cell(tr,event.event_kind||event.event_type);ipCell(tr,event.src_ip||event.peer_ip);cell(tr,event.message);tr.addEventListener('click',()=>details(event,'日志详情'));tr.addEventListener('keydown',e=>{if(e.target===tr&&e.key==='Enter')details(event,'日志详情');});rows.append(tr);}
+ for(const event of data){const tr=document.createElement('tr');tr.className='selectable';tr.tabIndex=0;cell(tr,when(event.timestamp));cell(tr,event.source_id);cell(tr,event.event_kind||event.event_type);ipCell(tr,event.src_ip||event.peer_ip);cell(tr,event.message);tr.addEventListener('click',()=>details(event,'日志详情'));tr.addEventListener('keydown',e=>{if(e.target===tr&&e.key==='Enter'){e.preventDefault();details(event,'日志详情');}});rows.append(tr);}
  if(!data.length)empty(rows,5,'此页没有已接收的日志。');
 }
 const detectionRuleLabels={burst:'短时密集失败',slow_scan:'慢速扫描',multi_account:'多账号尝试',cross_source:'跨服务器尝试',success_after_failures:'多次失败后成功'};
@@ -280,7 +283,7 @@ function renderIncidents(data){
   renderAssessment(ruleCell,incident.assessment);
   const state=triageLabels[incident.triage_status]?incident.triage_status:'pending',statusCell=cell(tr,''),badge=document.createElement('span');badge.className='triage triage-'+state;badge.textContent=triageLabels[state];statusCell.append(badge);
   if(incident.triage_updated_at){const stamp=document.createElement('small');stamp.className='muted triage-time';stamp.textContent=`更新于 ${when(incident.triage_updated_at)}`;statusCell.append(stamp);}
-  appendIncidentSelection(statusCell,incident);appendTriageActions(statusCell,incident,state);tr.addEventListener('click',()=>showIncident(incident));tr.addEventListener('keydown',e=>{if(e.target===tr&&e.key==='Enter')showIncident(incident);});rows.append(tr);
+  appendIncidentSelection(statusCell,incident);appendTriageActions(statusCell,incident,state);tr.addEventListener('click',()=>showIncident(incident));tr.addEventListener('keydown',e=>{if(e.target===tr&&e.key==='Enter'){e.preventDefault();showIncident(incident);}});rows.append(tr);
  }
  if(!data.length)empty(rows,6,incidentFocus!=='all'?'当前评分筛选没有匹配事件；可切换全部查看。':incidentTriage==='all'?'尚未发现达到阈值的 SSH 认证告警。':`没有${triageLabels[incidentTriage]||''}状态的告警；可切换处置状态查看其他告警。`);
 }
@@ -295,7 +298,7 @@ function beginList(kind,page){
  const queryKey=listKey(kind),previous=state.displayed,sameView=state.visible&&state.visible.source===source&&state.visible.page===page&&state.visible.queryKey===queryKey;
  state.page=page;state.pending=true;updatePager(kind);updateRefreshButton();
  const rows=$(kind==='event'?'events':'incidents');
- if(!sameView){state.visible=null;rows.replaceChildren();empty(rows,kind==='incident'?6:5,`正在读取第 ${page} 页…`);text(kind+'-updated','');clearDetails();}
+ if(!sameView){state.visible=null;rows.replaceChildren();showListSkeleton(rows,kind==='incident'?6:5);text(kind+'-updated','');clearDetails();}
  $(kind+'-section').setAttribute('aria-busy','true');$(kind+'-status').className='list-status muted';
  text(kind+'-status',sameView?`正在更新第 ${page} 页，保留当前显示…`:`正在读取第 ${page} 页…`);$(kind+'-jump').removeAttribute('aria-invalid');
  return {kind,state,source,page,started,requestId,previous,sameView,rows,queryKey};
@@ -308,8 +311,8 @@ async function acceptList(view,data){
   if(data.page>lastPage){await loadList(kind,lastPage);return;}
   const itemsKey=JSON.stringify(data.items),unchanged=sameView&&previous.page===data.page&&previous.itemsKey===itemsKey;
   state.page=data.page;if(!unchanged){if(kind==='event')renderEvents(data.items);else renderIncidents(data.items);}
-  if(kind==='event'&&data.snapshot!==undefined)eventSnapshot=data.snapshot;
-  if(kind==='incident'){if(data.triage_counts)renderTriageCounts(data.triage_counts);renderScoreCounts(data.score_counts);}
+  if(kind==='event'&&data.snapshot!==undefined){eventSnapshot=data.snapshot;updateLatestLabel();}
+  if(kind==='incident'){if(data.triage_counts)renderTriageCounts(data.triage_counts,currentSource?'list':'all');renderScoreCounts(data.score_counts);}
   state.displayed={source,page:state.page,queryKey:listKey(kind),total:state.total,totalPages:state.totalPages,items:data.items,itemsKey,updatedAt:new Date().toISOString(),elapsed:duration(started)};state.visible=state.displayed;saveView();
   updatePager(kind);text(kind+'-updated',`更新于 ${when(state.displayed.updatedAt)} · 用时 ${state.displayed.elapsed}`);text(kind+'-status',unchanged?'已是最新，内容无变化。':'');
 }
@@ -339,7 +342,7 @@ function navigate(kind,value){
 function scheduleAutoRefresh(){
  if(autoRefreshTimer!==null)clearTimeout(autoRefreshTimer);autoRefreshTimer=null;
  const minutes=Number($('refresh-interval').value);if(!minutes)return;
- autoRefreshTimer=setTimeout(()=>{autoRefreshTimer=null;if(document.hidden||isBusy()){scheduleAutoRefresh();return;}refresh();},minutes*60000);
+ autoRefreshTimer=setTimeout(()=>{autoRefreshTimer=null;if(document.hidden||isBusy()){scheduleAutoRefresh();return;}refresh({manual:true});},minutes*60000);
 }
 
 let notificationPage=1,notificationPages=1,notificationRequest=0,notificationItems=[];
@@ -388,20 +391,7 @@ async function readNotifications(ids,button){
  finally{button.disabled=button===$('notification-read-page')?!notificationItems.some(x=>!x.read_at):false;}
 }
 
-async function refresh(){
- loadControls();loadCollection();loadNotifications();
- const requestId=++refreshRequestId;if(summaryController)summaryController.abort();summaryController=new AbortController();
- const controller=summaryController,source=currentSource;refreshRunning=true;summaryPending=true;updateRefreshButton();text('error','');
- const views=[beginList('event',pages.event.page),beginList('incident',pages.incident.page)];
- const query=new URLSearchParams({limit:String(pageSize),event_page:String(views[0].page),incident_page:String(views[1].page),incident_triage:incidentTriage,incident_focus:incidentFocus,incident_sort:incidentSort});if(source)query.set('source_id',source);appendEventQuery(query);
- try{
-  const data=await get('/api/dashboard?'+query,controller.signal);if(requestId!==refreshRequestId||source!==currentSource)return;
-  if(!data||!data.summary||!data.events||!data.incidents)throw new Error('概览数据返回异常，请刷新重试。');
-  renderSummary(data.summary);
-  await Promise.all(views.map(async(view,index)=>{try{await acceptList(view,index===0?data.events:data.incidents);}catch(error){failList(view,error);}}));
- }catch(error){if(requestId===refreshRequestId&&error.name!=='AbortError'){text('error',`${error.message} 已保留上次成功读取的数据。`);for(const view of views)failList(view,error);}}
- finally{for(const view of views)finishList(view);if(requestId===refreshRequestId){refreshRunning=false;summaryPending=false;updateRefreshButton();scheduleAutoRefresh();}}
-}
+async function refresh(event){return refreshWorkspace(event);}
 $('refresh').addEventListener('click',refresh);
 $('notification-refresh').addEventListener('click',()=>loadNotifications());
 $('notification-prev').addEventListener('click',()=>loadNotifications(Math.max(1,notificationPage-1)));
@@ -415,12 +405,12 @@ $('collection-next').addEventListener('click',()=>loadCollection(Math.min(collec
 $('refresh-interval').addEventListener('change',()=>{try{localStorage.setItem('riskops-refresh-minutes',$('refresh-interval').value);}catch{}scheduleAutoRefresh();});
 $('ip-form').addEventListener('submit',event=>{event.preventDefault();lookupIp($('ip-input').value);});
 $('abuseipdb-check').addEventListener('click',lookupAbuse);
-$('incident-control-open').addEventListener('click',()=>$('control-section').scrollIntoView({behavior:'smooth',block:'start'}));
+$('incident-control-open').addEventListener('click',()=>selectWorkspace('controls'));
 for(const [id,values,apply] of [['incident-focus',scoreFilters,v=>incidentFocus=v],['incident-sort',scoreSorts,v=>incidentSort=v]])$(id).addEventListener('change',()=>{const value=$(id).value;if(!values.includes(value))return;apply(value);saveView();loadList('incident',1);});
 $('incident-triage').addEventListener('change',()=>{const value=$('incident-triage').value;incidentTriage=triageFilters.includes(value)?value:'pending';saveView();loadList('incident',1);});
 $('ip-show-events').addEventListener('click',()=>{const ip=$('ip-input').value.trim();if(ip)queryLogsForIP(ip);else text('ip-status','请先输入要查日志的 IP。');});
-$('ip-add-control').addEventListener('click',()=>{$('control-ip').value=$('ip-input').value.trim();$('control-section').scrollIntoView({behavior:'smooth',block:'start'});});
-$('source-filter').addEventListener('change',()=>{currentSource=$('source-filter').value;eventSnapshot=null;if(summaryController)summaryController.abort();++refreshRequestId;refreshRunning=false;summaryPending=false;clearDetails();for(const kind of ['event','incident']){pages[kind].totalPages=null;pages[kind].total=0;text(kind+'-updated','');loadList(kind,1);}if(controlsData){$('control-sources').dataset.key='';renderControlSources(controlsData.sources||[]);}loadCollection(1);saveView();scheduleAutoRefresh();});
+$('ip-add-control').addEventListener('click',()=>{$('control-ip').value=$('ip-input').value.trim();selectWorkspace('controls');});
+$('source-filter').addEventListener('change',changeWorkspaceSource);
 $('search-form').addEventListener('submit',event=>{event.preventDefault();const next={};for(const key of ['ip','username','event_type','q','start','end']){const value=$('search-'+key).value.trim();if(!value)continue;if(key==='start'||key==='end'){const date=new Date(value);if(Number.isNaN(date.valueOf())){text('event-status','请输入有效的起止时间。');return;}next[key]=date.toISOString();}else next[key]=value;}if(next.start&&next.end&&next.start>next.end){text('event-status','开始时间不能晚于结束时间。');return;}eventFilters=next;eventSnapshot=null;saveView();loadList('event',1);});
 $('search-clear').addEventListener('click',()=>{eventFilters={};eventSnapshot=null;setFilterInputs();saveView();loadList('event',1);});
 $('event-latest').addEventListener('click',()=>{eventSnapshot=null;saveView();loadList('event',1);});
@@ -442,7 +432,8 @@ $('incident-triage').value=incidentTriage;$('incident-focus').value=incidentFocu
 refresh();
 """
 
-_SCRIPT = _SCRIPT.removesuffix("refresh();\n") + AI_SCRIPT + "\nrefresh();\n"
+_SCRIPT = _SCRIPT.removesuffix("refresh();\n") + AI_SCRIPT + WORKSPACE_SCRIPT + "\ninitializeWorkspace();\nrefresh();\n"
+_STYLE += WORKSPACE_STYLE
 
 DASHBOARD_HTML = """<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SecAgent RiskOps · 实时日志</title><style>__STYLE__</style></head>
@@ -473,6 +464,8 @@ DASHBOARD_HTML = """<!doctype html>
 <div id="control-plan" hidden><h3 id="control-plan-title">请核对封禁计划</h3><div class="table-wrap"><table><thead><tr><th>目标来源</th><th>目标 IP</th><th>影响范围</th><th>动作 / 有效时长</th></tr></thead><tbody id="control-plan-items"></tbody></table></div><p id="control-plan-expiry"></p><label class="selection"><input id="control-confirm" type="checkbox">我已核对上方全部目标、范围和有效时长</label><div class="actions"><button id="control-execute" type="button" class="danger" disabled>确认执行此计划</button><button id="control-cancel" type="button">取消</button></div></div>
 <div id="control-job" hidden><h3 id="control-job-title">操作结果</h3><div class="table-wrap"><table><thead><tr><th>来源</th><th>IP</th><th>范围</th><th>状态</th><th>说明</th></tr></thead><tbody id="control-job-items"></tbody></table></div></div><h3>封禁状态与最近核实记录</h3><p>到期封禁由目标服务器自动解除；永久封禁需要手动解封。表格是最近一次核实的快照，核实失败时不代表当前仍然生效；解封同样需要核对预览。</p><div class="table-wrap"><table><thead><tr><th>来源</th><th>IP</th><th>范围</th><th>到期时间</th><th>最近确认时间</th><th>操作</th></tr></thead><tbody id="control-blocks"></tbody></table></div><p id="control-source-checks" class="incident-value" role="status"></p><h3>最近操作记录</h3><div id="control-history" class="actions"></div></section><script>__SCRIPT__</script></body></html>""".replace("__STYLE__", _STYLE).replace("__SCRIPT__", _SCRIPT).replace("__AI_PANEL__", AI_PANEL)
 
+
+DASHBOARD_HTML = arrange(DASHBOARD_HTML)
 
 def _csp_hash(value: str) -> str:
     return "'sha256-" + base64.b64encode(hashlib.sha256(value.encode("utf-8")).digest()).decode("ascii") + "'"
