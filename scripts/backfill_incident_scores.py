@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Inspect missing scores, or fill one bounded batch of derived scores.
 
-No logs, receipts, evidence or operator decisions are rewritten. Run repeatedly
+Only derived scores and unsupported success-after-failures rule projections
+are corrected. No logs, receipts, evidence or operator decisions are rewritten.
+Run repeatedly
 with --apply until scored=0; unscored rows remain visible in the console. This
 is deliberately not an API endpoint or an automatic startup migration.
 """

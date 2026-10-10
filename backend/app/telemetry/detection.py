@@ -19,6 +19,13 @@ RULE_VERSION = 1
 MAX_WINDOW_SECONDS = 2 * 60 * 60
 _FAILURE_TYPES = FAILURE_KINDS | {"ssh_failure"}
 _SUCCESS_TYPES = {"auth_success", "ssh_success"}
+# Disconnects before authentication remain scan evidence, but do not establish
+# rejected credentials before a later successful login. Keep legacy failures
+# conservative until their retained evidence is reparsed.
+AUTHENTICATION_FAILURE_TYPES = frozenset({"auth_failure", "invalid_user", "ssh_failure"})
+SUCCESS_WINDOW_SECONDS = 30 * 60
+SUCCESS_MIN_FAILURES = 3
+SUCCESS_RULE_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -137,8 +144,8 @@ def _failure_matches(events: list[_Event], triggers: set[tuple[str, str]],
 
 
 def _success_matches(events: list[_Event], triggers: set[tuple[str, str]]) -> list[RuleMatch]:
-    window, minimum = 30 * 60, 3
-    failures = [event for event in events if event.kind in _FAILURE_TYPES]
+    window, minimum = SUCCESS_WINDOW_SECONDS, SUCCESS_MIN_FAILURES
+    failures = [event for event in events if event.kind in AUTHENTICATION_FAILURE_TYPES]
     successes = [event for event in events if event.kind in _SUCCESS_TYPES]
     # Failure interval bounds are monotonic as success times advance. Adjacent
     # matches merge only when they share an actual failure record.
@@ -167,10 +174,11 @@ def _success_matches(events: list[_Event], triggers: set[tuple[str, str]]) -> li
         evidence = sorted(failures[start:end] + matched_successes,
                           key=lambda event: (event.at, event.key))
         matches.append(RuleMatch(
-            "success_after_failures", RULE_VERSION, window,
+            "success_after_failures", SUCCESS_RULE_VERSION, window,
             [dict(event.row) for event in evidence],
             f"Authentication succeeded strictly after at least {minimum} failed "
-            f"SSH log records in the preceding {window // 60} minutes on the same "
+            f"SSH authentication records (excluding pre-authentication disconnects) "
+            f"in the preceding {window // 60} minutes on the same "
             f"source. {len(matched_successes)} qualifying window(s) linked by shared "
             f"evidence; {len(evidence)} log records retained.",
         ))

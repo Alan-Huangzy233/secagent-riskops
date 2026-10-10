@@ -76,6 +76,7 @@ class ControlService:
         self._thread = None
         self._last_reconcile = 0
         self.sources = {}
+        self.protected = ()
         if config is None:
             return
         allowed = {s.id: s.hostname for s in live_sources}
@@ -124,6 +125,22 @@ class ControlService:
                 CREATE TABLE IF NOT EXISTS source_checks (
                     source_id TEXT PRIMARY KEY, checked_at REAL NOT NULL, error TEXT);
             """)
+
+    def source_context(self, value):
+        """Display configured management protection without exporting the list.
+
+        Membership prevents a ban; it is not authorization for arbitrary SSH
+        activity and does not create AI trusted evidence or a score discount.
+        """
+        protected = False
+        if isinstance(value, str) and len(value) <= 64 and "%" not in value:
+            try:
+                peer = ipaddress.ip_address(value)
+                peer = getattr(peer, "ipv4_mapped", None) or peer
+                protected = any(peer in network for network in self.protected)
+            except ValueError:
+                pass
+        return {"management_protected": protected}
 
     @classmethod
     def from_environment(cls, live_sources, *, block_listener=None):

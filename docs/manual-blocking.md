@@ -95,6 +95,11 @@ The configuration must have mode `0600`, root ownership, and trusted root-owned
 parent directories. `protected_networks` must be nonempty and contain every
 management peer or management network, including the central server, bastion,
 inter-server administration paths, and an operator's management/VPN address.
+The authenticated console exposes matching membership from the central control
+configuration as **管理白名单 · 禁止封禁** in incidents and IP lookup, including
+the prepared first page. This is anti-lockout protection, not permission to
+dismiss every detection; see [live scoring](live-incident-scoring.md).
+
 These addresses must reflect the source addresses actually visible to the
 target, including any NAT or relay. Do not use a catch-all network unless the
 intention is to prevent all blocking.

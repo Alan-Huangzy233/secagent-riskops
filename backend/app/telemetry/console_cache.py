@@ -46,11 +46,22 @@ def build_summary(store, config):
             "totals": totals, "triage_counts": triage}
 
 
-def build_bootstrap(store, config):
+def with_source_context(value, control):
+    """Add only per-address membership to authenticated display responses."""
+    if control is None:
+        return value
+    if isinstance(value, list):
+        return [with_source_context(item, control) for item in value]
+    if "items" in value:
+        return {**value, "items": with_source_context(value["items"], control)}
+    return {**value, "source_context": control.source_context(value.get("src_ip"))}
+
+
+def build_bootstrap(store, config, control=None):
     return {"summary": build_summary(store, config),
             "events": store.paginate_events(limit=50),
-            "incidents": store.paginate_incidents(limit=50, include_evidence=False,
-                                                  triage="pending", focus="all", sort="score")}
+            "incidents": with_source_context(store.paginate_incidents(limit=50, include_evidence=False,
+                                                  triage="pending", focus="all", sort="score"), control)}
 
 
 class ConsoleCache:

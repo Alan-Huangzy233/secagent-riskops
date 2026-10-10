@@ -18,7 +18,7 @@ from starlette.datastructures import Headers, MutableHeaders
 from .telemetry.config import LiveConfig, load_config
 from .telemetry.dashboard import DASHBOARD_HTML, CONTENT_SECURITY_POLICY
 from .telemetry.operator_auth import OperatorVerifier
-from .telemetry.console_cache import ConsoleCache, build_bootstrap, build_summary
+from .telemetry.console_cache import ConsoleCache, build_bootstrap, build_summary, with_source_context
 
 MAX_BODY_BYTES = 1024 * 1024
 _basic = HTTPBasic(auto_error=False)
@@ -201,7 +201,7 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
         if ai is None:
             application.state.ai.start()
         application.state.console_cache = ConsoleCache(
-            lambda: build_bootstrap(live_store, application.state.config),
+            lambda: build_bootstrap(live_store, application.state.config, application.state.control),
             enabled=application.state.config.console_cache_enabled)
         application.state.console_cache.start()
         try:
@@ -300,9 +300,11 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
                   focus: Literal["all", "attention", "low", "unscored"] = "all",
                   sort: Literal["recent", "score"] = "recent"):
         if page is not None:
-            return request.app.state.store.paginate_incidents(source_id=source_filter(request, source_id), limit=limit, page=page,
+            result = request.app.state.store.paginate_incidents(source_id=source_filter(request, source_id), limit=limit, page=page,
                                                               include_evidence=include_evidence, triage=triage, focus=focus, sort=sort)
-        return request.app.state.store.list_incidents(source_id=source_filter(request, source_id), limit=limit, offset=offset, triage=triage, focus=focus, sort=sort)
+        else:
+            result = request.app.state.store.list_incidents(source_id=source_filter(request, source_id), limit=limit, offset=offset, triage=triage, focus=focus, sort=sort)
+        return with_source_context(result, request.app.state.control)
 
     @application.get("/api/dashboard", dependencies=[Depends(operator)])
     def dashboard_snapshot(request: Request, source_id: str | None = Query(None, max_length=64),
@@ -319,16 +321,16 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
         store = request.app.state.store
         return {"summary": summary(request),
                 "events": store.paginate_events(source_id=selected, limit=limit, page=event_page, **filters),
-                "incidents": store.paginate_incidents(source_id=selected, limit=limit, page=incident_page,
+                "incidents": with_source_context(store.paginate_incidents(source_id=selected, limit=limit, page=incident_page,
                                                       include_evidence=False, triage=triage_filter(incident_triage),
-                                                      focus=incident_focus, sort=incident_sort)}
+                                                      focus=incident_focus, sort=incident_sort), request.app.state.control)}
 
     @application.get("/api/incidents/{incident_id}", dependencies=[Depends(operator)])
     def incident_detail(request: Request, incident_id: str):
         result = request.app.state.store.get_incident(incident_id)
         if result is None:
             raise HTTPException(404, "事件不存在")
-        return result
+        return with_source_context(result, request.app.state.control)
 
     @application.get("/api/incidents/{incident_id}/evidence", dependencies=[Depends(operator)])
     def incident_evidence(request: Request, incident_id: str,
@@ -466,6 +468,7 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
     def ip_info(request: Request, ip: str = Query(min_length=1, max_length=128)):
         try:
             result = request.app.state.geoip.lookup(ip)
+            result = {**result, "source_context": request.app.state.control.source_context(ip)}
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from None
         return JSONResponse(result, status_code=503 if result["status"] == "unavailable" else 200)
