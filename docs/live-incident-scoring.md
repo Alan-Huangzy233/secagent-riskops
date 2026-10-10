@@ -30,13 +30,21 @@ attack probability or an automatic dismissal/blocking decision.
 
 | Evidence signal | Points |
 |---|---:|
-| A successful login among correlated failures | +50 |
+| A login strictly after at least three authentication failure records on the same host and peer, within 30 minutes | +50 |
 | Existing non-root accounts attempted | +12 each, up to three |
 | Two or more monitored hosts | +10 |
 | At least ten failures over two hours | +15 |
 | At least fifty failure records | +5 |
 
 Attention threshold: 25; P3: 25–39, P2: 40–59, P1: 60+.
+
+`ssh-evidence-v2` qualifies the success signal using the same host, peer, window
+and minimum as `success_after_failures` rule v2. `preauth_abort` alone does not
+prove rejected credentials: a management connection can disconnect before
+authentication and then log in normally. These records still count toward scan
+rules and volume, but cannot contribute to the three preceding authentication
+failures. The lower time boundary is inclusive; equal-time failures are excluded.
+Legacy `ssh_failure` records remain eligible until explicitly reparsed.
 
 Scores use **all retained incident evidence**, not the first 20 displayed rows.
 Failure counts count log records, not distinct connections. Explicit `invalid
@@ -50,6 +58,21 @@ can be shared, and collection/retention gaps make an absent history inconclusive
 The API explicitly reports `known_source_discount: false`. Published demo
 metrics do not measure this live adaptation; no production precision or miss
 rate is claimed.
+
+## Management protection
+
+Authenticated incident lists, details, dashboard responses and prepared first
+pages include `source_context.management_protected`, derived from the central
+control configuration's existing `protected_networks`. IP lookup uses the same
+membership check, including IPv4-mapped IPv6 normalization. Only the queried
+address's membership is returned, not the private network list. The console
+labels matching addresses **管理白名单 · 禁止封禁**.
+
+This management list prevents accidental blocking. It does not subtract points,
+automatically resolve incidents, change external reputation scores or create
+trusted AI authorization. Evidence of genuine authentication failures followed
+by success still needs review. Routine preauth-only activity loses the incorrect
+success weight through the evidence correction, including for nonlisted peers.
 
 ## Persistence, historical backfill and rollback
 
@@ -71,6 +94,13 @@ The first command is read-only. Each apply call fills at most 50 missing or
 outdated projections in one transaction; repeat until `batch.scored` is zero.
 Start with a limit of one on a large database and measure before raising it.
 The limit bounds incidents, not evidence per incident or wall-clock time.
+The v2 backfill also removes an unsupported `success_after_failures` entry from
+`incident_rules`, a derived projection; otherwise its old high severity and rule
+label would contradict the corrected score. It retains incident IDs, raw and
+retained evidence, receipts, counts and operator decisions. No historical
+incident is deleted or automatically marked resolved. Already delivered
+notifications retain their original payload, labelled as the score when the
+notification was generated; pending deliveries recheck the current score.
 Rows with no retained evidence stay unscored and appear in `without_evidence`.
 No API endpoint triggers backfill and GET requests do not score evidence.
 

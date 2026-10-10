@@ -15,7 +15,9 @@ in the same transaction as their new evidence. A bounded, rotating scan of 200
 scored incidents per cycle also covers existing history and score backfills.
 Before delivery it checks the canonical incident is still pending and its
 score is current and attention-worthy. Merged, handled or unscored pending
-candidates are cancelled; delivered history stays available.
+candidates are cancelled; delivered history stays available. The console labels
+incident scores as their value when the notification was generated. Open the
+incident for its current assessment after a score correction or new evidence.
 
 The outbox coalesces updates by topic. Unchanged evidence never produces another
 notification, including after replay or restart. New evidence of the same

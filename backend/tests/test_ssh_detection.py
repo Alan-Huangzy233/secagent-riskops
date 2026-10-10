@@ -281,7 +281,7 @@ def test_rolling_evidence_matches_exhaustive_reference_for_mixed_batches():
 
         expected = set()
         for success in [row for row in rows if row["event_type"] == "auth_success"]:
-            failures = [row for row in rows if row["event_type"] in failure_kinds
+            failures = [row for row in rows if row["event_type"] in {"auth_failure", "invalid_user", "ssh_failure"}
                         and row["source_id"] == success["source_id"]
                         and success["event_ts"] - 1800 <= row["event_ts"] < success["event_ts"]]
             keys = {key(row) for row in failures} | {key(success)}

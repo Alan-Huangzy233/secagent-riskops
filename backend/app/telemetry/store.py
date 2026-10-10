@@ -479,7 +479,16 @@ class TelemetryStore:
         db.execute("""UPDATE incidents SET failure_count=?,first_ts=?,last_ts=?,first_seen=?,last_seen=?
             WHERE incident_id=?""", (stats[3], stats[1], stats[2],
             _iso(datetime.fromtimestamp(stats[1], timezone.utc)), _iso(datetime.fromtimestamp(stats[2], timezone.utc)), incident_id))
-        scoring.refresh(db, incident_id)
+        self._refresh_score(db, incident_id)
+
+    @staticmethod
+    def _refresh_score(db: sqlite3.Connection, incident_id: str) -> None:
+        if scoring.refresh(db, incident_id) == 0:
+            # This is a derived rule projection, not evidence or an operator
+            # decision. An old preauth-only match must not keep severity=high
+            # after its success weight has been corrected.
+            db.execute("DELETE FROM incident_rules WHERE incident_id=? AND rule_id='success_after_failures'",
+                       (incident_id,))
 
     def backfill_scores(self, limit: int = 100) -> dict[str, Any]:
         """One bounded transaction, repeatable between live batches.
@@ -495,7 +504,7 @@ class TelemetryStore:
                     WHERE incident_evidence.incident_id=incidents.incident_id)
                 ORDER BY incidents.last_ts DESC,incidents.incident_id LIMIT ?""", (limit,)).fetchall()
             for row in rows:
-                scoring.refresh(db, row[0])
+                self._refresh_score(db, row[0])
         return {"scored": len(rows), "limit": limit, "version": scoring.VERSION}
 
     def _apply_match(self, db: sqlite3.Connection, match: RuleMatch, now: str) -> str:

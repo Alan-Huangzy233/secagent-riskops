@@ -76,7 +76,14 @@ function ipCell(row,value){
  button.addEventListener('click',event=>{event.stopPropagation();$('ip-input').value=ip;lookupIp(ip);closeRecordDrawer();selectWorkspace('ip',false);});
  button.addEventListener('keydown',event=>event.stopPropagation());td.replaceChildren(button);return td;
 }
+const managementProtectionLabel='管理白名单 · 禁止封禁';
+function protectedSource(record){return record?.source_context?.management_protected===true;}
+function renderProtectedSource(parent,record){
+ if(!protectedSource(record))return;
+ const badge=document.createElement('div');badge.className='muted';badge.textContent=managementProtectionLabel;badge.title='管理白名单保护此地址不被封禁；明确的认证异常仍需核查。';parent.append(badge);
+}
 function renderIp(data){
+ text('ip-protection',protectedSource(data)?managementProtectionLabel+'；明确的认证异常仍需核查。':'');
  text('ip-address',data.ip);text('ip-type',[data.version?`IPv${data.version}`:null,data.address_type_label].filter(Boolean).join(' · ')||'—');
  text('ip-country',[data.country,data.country_code].filter(Boolean).join(' · ')||'—');text('ip-region',[data.region,data.city].filter(Boolean).join(' / ')||'—');
  text('ip-network',data.network_name||'—');text('ip-asn',data.asn===null||data.asn===undefined?'—':`AS${data.asn}`);
@@ -113,13 +120,13 @@ async function lookupAbuse(){
 }
 async function lookupIp(value){
  const ip=String(value).trim();const requestId=++ipRequestId;if(ipController)ipController.abort();ipController=new AbortController();
- $('ip-result').hidden=true;$('ip-status').className='muted';updateAbuseLink(null);resetAbuse();
+ $('ip-result').hidden=true;$('ip-status').className='muted';text('ip-protection','');updateAbuseLink(null);resetAbuse();
  if(!ip){text('ip-status','请输入要查询的 IPv4 或 IPv6 地址。');$('ip-query-section').setAttribute('aria-busy','false');text('ip-query-button','查询属地');return;}
  $('ip-query-section').setAttribute('aria-busy','true');text('ip-query-button','查询中…');text('ip-status',`正在查询 ${ip}…`);
  try{
   const response=await fetch('/api/ip-info?'+new URLSearchParams({ip}),{credentials:'same-origin',cache:'no-store',signal:ipController.signal});
   const data=await response.json().catch(()=>null);if(requestId!==ipRequestId)return;
-  if(response.ok||response.status===503){updateAbuseLink(data);setAbuseIP(data);}
+  if(response.ok||response.status===503){updateAbuseLink(data);setAbuseIP(data);text('ip-protection',protectedSource(data)?managementProtectionLabel+'；明确的认证异常仍需核查。':'');}
   if(!response.ok){const messages={401:'登录已失效，请刷新页面重新登录。',422:'IP 地址格式无效，请输入完整的 IPv4 或 IPv6 地址。',503:'IP 属地库暂不可用，请联系管理员安装或更新数据库。'};throw new Error(messages[response.status]||`查询失败（${response.status}），请稍后重试。`);}
   if(!data||typeof data!=='object'||!data.ip)throw new Error('属地查询返回异常，请稍后重试。');
   renderIp(data);const messages={ok:'查询完成。',not_public:'这是非公网地址，没有可查询的公网属地。',not_found:'属地库暂未收录此 IP。',unavailable:'IP 属地库暂不可用，请稍后重试。'};
@@ -272,7 +279,7 @@ function renderIncidents(data){
  const rows=$('incidents');rows.replaceChildren();
  for(const incident of data){
   const tr=document.createElement('tr');tr.className='selectable';tr.tabIndex=0;cell(tr,when(incident.last_seen));
-  const sources=cell(tr,incidentSources(incident));sources.className='incident-value';ipCell(tr,incident.src_ip||incident.peer_ip);
+  const sources=cell(tr,incidentSources(incident));sources.className='incident-value';const peerCell=ipCell(tr,incident.src_ip||incident.peer_ip);renderProtectedSource(peerCell,incident);
   const counts=[`失败日志：${incident.failure_count??0} 条`];
   if(incident.success_count!==undefined&&incident.success_count!==null)counts.push(`成功日志：${incident.success_count} 条`);
   if(incident.username_count!==undefined&&incident.username_count!==null)counts.push(`非空账号：${incident.username_count} 个`);
@@ -350,7 +357,7 @@ const notificationLabels={incident:'安全事件',collection:'采集',health:'�
 const collectionConditions={never_seen:'尚未收到采集数据',offline:'采集心跳超时',source_error:'来源读取失败',catching_up:'积压持续未追平'};
 function notificationText(item){
  const p=item.payload;
- if(item.kind==='incident')return `${p.priority} · ${p.score} 分 · ${p.src_ip} · ${p.source_ids.join('、')} · ${p.evidence_count} 条证据`;
+ if(item.kind==='incident')return `通知生成时：${p.priority} · ${p.score} 分 · ${p.src_ip} · ${p.source_ids.join('、')} · ${p.evidence_count} 条证据`;
  if(item.kind==='briefing')return `已采集日志 ${p.log_count} 条；新增事件 ${p.new_incidents} 个：关注 ${p.attention}、低分 ${p.low}、未评分 ${p.unscored}；采集缺口 ${p.collection_gaps} 个。${p.skipped_days?`另有 ${p.skipped_days} 天超出可汇总范围。`:''} ${p.note}`;
  if(item.kind==='collection')return p.conditions?`${p.source_id} · ${p.conditions.map(x=>collectionConditions[x]||x).join('、')||'采集正常'}`:`${p.source_id} · ${when(p.started_at)} 至 ${when(p.ended_at)}`;
  return p.key==='capacity'?'监测数据库所在磁盘；低于 10% 或 1 GiB 时提醒。':`${p.key} · 监测已配置的本机备份目录。`;
@@ -445,7 +452,7 @@ DASHBOARD_HTML = """<!doctype html>
 <section id="ip-query-section" aria-busy="false"><h2>IP 属地查询</h2><p id="ip-help">输入 IPv4 / IPv6 地址，或点击下方日志中的来源 IP。属地查询使用离线库，不会自动发送 IP 给第三方；属地仅供参考，不能确定实际使用者位置。</p>
 <form id="ip-form" class="ip-form"><label for="ip-input">IP 地址</label><input id="ip-input" name="ip" type="text" required maxlength="128" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="ip-help" placeholder="例如 8.8.8.8 或 2001:4860:4860::8888"><button id="ip-query-button" type="submit">查询属地</button></form>
 <div class="actions"><button id="ip-show-events" type="button">查看此 IP 的日志</button><button id="ip-add-control" type="button">为此 IP 选择封禁来源</button></div>
-<p id="ip-status" class="muted" role="status" aria-live="polite">等待输入 IP 地址。</p>
+<p id="ip-status" class="muted" role="status" aria-live="polite">等待输入 IP 地址。</p><p id="ip-protection" class="muted" role="status"></p>
 <p><button id="abuseipdb-check" type="button" disabled>查询 AbuseIPDB 风险分</button></p><p id="abuseipdb-status" role="status" aria-live="polite">先查询一个公网 IP，再点击风险查询。</p>
 <div id="abuseipdb-result" hidden><dl class="ip-fields"><div><dt>风险评分（举报置信度）</dt><dd id="abuseipdb-score">—</dd></div><div><dt>近 90 天举报条数</dt><dd id="abuseipdb-reports">—</dd></div><div><dt>独立举报者</dt><dd id="abuseipdb-reporters">—</dd></div><div><dt>最近举报时间</dt><dd id="abuseipdb-last">—</dd></div></dl><p><small id="abuseipdb-checked"></small></p></div>
 <p><a id="abuseipdb-link" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" hidden>在 AbuseIPDB 查看完整报告 ↗</a></p><p><small>外部风险查询：仅在点击按钮或报告入口时向 AbuseIPDB 发送所选公网 IP，不发送 SSH 原始日志或账号。评分仅供核查，0 分不代表确认安全。</small></p>

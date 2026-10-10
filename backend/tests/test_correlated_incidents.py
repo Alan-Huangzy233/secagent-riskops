@@ -17,8 +17,9 @@ def store(tmp_path, monkeypatch):
     return TelemetryStore(tmp_path / "live.sqlite")
 
 
-def record(event_id, seconds, *, user="root", ip="198.51.100.23", success=False):
+def record(event_id, seconds, *, user="root", ip="198.51.100.23", success=False, auth_failure=False):
     message = (f"Accepted publickey for {user} from {ip} port 42000 ssh2" if success else
+               f"Failed publickey for {user} from {ip} port 42000 ssh2" if auth_failure else
                f"Connection closed by authenticating user {user} {ip} port 42000 [preauth]")
     return {"event_id": event_id, "timestamp": (START + timedelta(seconds=seconds)).isoformat(),
             "message": message, "identifier": "sshd", "unit": "ssh.service", "priority": "6"}
@@ -101,7 +102,7 @@ def test_multi_account_and_no_unqualified_tail_attachment(store):
 
 @pytest.mark.parametrize("success_first", [False, True])
 def test_success_after_failures_retains_both_outcomes(store, success_first, monkeypatch):
-    failures = [record(str(i), i * 600) for i in range(3)]
+    failures = [record(str(i), i * 600, auth_failure=True) for i in range(3)]
     success = record("success", 1500, user="admin", success=True)
     batches = [("failed", failures), ("succeeded", [success])]
     for batch, rows in reversed(batches) if success_first else batches:
@@ -121,7 +122,7 @@ def test_success_after_failures_retains_both_outcomes(store, success_first, monk
 
 def test_reparse_success_evidence_allows_username_repair_but_not_outcome_change(store, monkeypatch):
     store.ingest("source-a", "host-a", "batch",
-                 [record(str(i), i * 600) for i in range(3)] + [record("success", 1500, success=True)])
+                 [record(str(i), i * 600, auth_failure=True) for i in range(3)] + [record("success", 1500, success=True)])
     with store._connection(write=True) as db:
         row = db.execute("SELECT snapshot_json FROM incident_evidence WHERE event_id='success'").fetchone()
         old = json.loads(row[0])
