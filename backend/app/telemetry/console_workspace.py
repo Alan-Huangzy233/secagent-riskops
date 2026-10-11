@@ -108,7 +108,10 @@ async function refreshWorkspace(event){
   else scheduleBootstrap(2000);
  }catch(error){
   $('console-sync-line').dataset.stale='true';text('error',error.message+' 已保留上次成功读取的数据。');
-  if(event){try{renderSummary(await get('/api/summary'));await loadWorkspaceView(true);text('console-sync','预载暂不可用，已按需读取当前视图。');}catch(fallback){text('error',fallback.message);}}
+  if(event){
+   if(workspaceView==='overview')text('console-sync','概览暂不可用，后台会继续重试。');
+   else{text('console-sync','概览暂不可用，正在直接刷新当前视图。');await loadWorkspaceView(true);}
+  }
   scheduleBootstrap();
  }
  finally{refreshRunning=false;updateRefreshButton();scheduleAutoRefresh();}

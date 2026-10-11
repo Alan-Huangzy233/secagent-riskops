@@ -151,3 +151,47 @@ def test_default_disabled_preserves_on_demand_api(config):
         assert client.get("/api/console/bootstrap", auth=auth).json()["state"] == "disabled"
         assert client.get("/api/summary", auth=auth).status_code == 200
         assert client.get("/api/events?page=1", auth=auth).status_code == 200
+
+
+def test_summary_reuses_cache_under_concurrency_and_never_falls_back_to_history_scans(config, monkeypatch):
+    monkeypatch.setattr(ConsoleCache, "start", lambda self: None)
+    with TestClient(create_app(config.model_copy(update={"console_cache_enabled": True}))) as client:
+        auth = ("operator", PASSWORD)
+        cache = client.app.state.console_cache
+        now = [0.0]
+        cache.clock = lambda: now[0]
+        assert send(client).status_code == 200
+        assert cache.refresh_once()
+        summary = cache.read()["data"]["summary"]
+
+        def unexpected(*args, **kwargs):
+            raise AssertionError("summary reader scanned history")
+
+        monkeypatch.setattr(client.app.state.store, "list_sources", unexpected)
+        monkeypatch.setattr(client.app.state.store, "triage_counts", unexpected)
+        assert client.get("/api/summary").status_code == 401
+        assert client.get("/api/summary", headers={"Authorization": "Bearer " + TOKEN_A}).status_code == 401
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            replies = list(pool.map(lambda _: client.get("/api/summary", auth=auth), range(12)))
+        for response in replies:
+            assert response.status_code == 200
+            body = response.json()
+            assert body.pop("cache")["stale"] is False
+            assert body == summary
+        # The compatibility dashboard also uses the prepared summary, while
+        # its explicit event/incident pages still read their own snapshots.
+        assert client.get("/api/dashboard", auth=auth).json()["summary"]["totals"] == summary["totals"]
+        now[0] = 16
+        stale = client.get("/api/summary", auth=auth).json()
+        assert stale["cache"]["stale"] and stale["generated_at"] == summary["generated_at"]
+        assert not cache.refresh_once()
+        assert client.get("/api/summary", auth=auth).json()["cache"]["error"] == "refresh_failed"
+        now[0] = MAX_AGE_SECONDS + 1
+        expired = client.get("/api/summary", auth=auth)
+        assert expired.status_code == 503 and int(expired.headers["Retry-After"]) > 0
+        assert "summary reader" not in expired.text
+        cache.failed = False
+        cache.data = cache.built_at = None
+        assert client.get("/api/summary", auth=auth).status_code == 503
+        assert client.get("/api/dashboard", auth=auth).status_code == 503
+        assert client.get("/api/console/bootstrap", auth=auth).status_code == 202
