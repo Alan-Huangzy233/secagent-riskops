@@ -37,6 +37,9 @@ jobs:
       - name: HTTP detection fixture reproduces its evidence report
         run: PYTHONPATH=backend python -m app.evaluation.web --input examples/http-access/access.jsonl --source-id synthetic-web --service-id example-site --check examples/http-access/report.json
 
+      - name: HTTP durable ingestion and lost-ACK simulation
+        run: PYTHONPATH=backend python scripts/simulate_http_ingest.py
+
       - name: Safety demo reproduces the published audit timeline
         run: |
           PYTHONPATH=backend python -m app.safety_demo

@@ -174,6 +174,10 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
         )
         if not await run_in_threadpool(application.state.store.healthcheck):
             raise RuntimeError("Live telemetry database is unavailable")
+        from .telemetry.http_store import HttpStore
+        http_config = application.state.config.http_ingest
+        application.state.http_store = (HttpStore(http_config.database_path, http_config.retention_days)
+                                        if http_config else None)
         from .telemetry.control import ControlService
         live_store = application.state.store
 
@@ -229,10 +233,15 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
                                                          cfg.operator_username, cfg.operator_password_pbkdf2):
             raise HTTPException(401, "Authentication required", headers={"WWW-Authenticate": 'Basic realm="RiskOps"'})
 
+    from .telemetry.http_api import register_routes
+    register_routes(application, operator)
+
     @application.get("/health")
     def health(request: Request):
         try:
             ready = request.app.state.store.healthcheck()
+            if request.app.state.http_store is not None:
+                ready = ready and request.app.state.http_store.healthcheck()
         except Exception:
             ready = False
         return JSONResponse({"status": "ok" if ready else "unavailable"}, status_code=200 if ready else 503)

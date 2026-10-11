@@ -59,6 +59,7 @@ Run it: `make install && make test && make demo`.
 | 中文只读来源、日志和事件页面；无 CDN，日志按文本渲染 | `backend/app/telemetry/dashboard.py` |
 | 固定命令 journal 导出与受限 relay | `scripts/journal_export.py` |
 | 最早未读前缀轮询、本地 spool、持久化确认后推进游标 | `scripts/telemetry_collector.py` |
+| 可选 HTTP 结构化日志本地采集、独立来源凭据/数据库、批次与事件回执、轮转/拒收报告、持久化 ACK 后推进文件游标；隔离入库后规则回放，尚未接持续关联/评分/页面/通知 | `scripts/http_collector.py`, `backend/app/telemetry/http_store.py`, `http_api.py`, [范围与验证](http-ingestion.md) |
 | localhost API、VPN socket proxy、采集/备份定时单元 | `deploy/systemd/` |
 | SQLite 一致恢复副本与完整性检查 | `scripts/backup_telemetry.py` |
 | IPv4 / IPv6 离线属地、ASN 查询；DB-IP 月度库原子更新 | `backend/app/telemetry/geoip.py`, `scripts/update_geoip.py` |

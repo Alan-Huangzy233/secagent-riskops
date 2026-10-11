@@ -1,8 +1,10 @@
 # HTTP detection foundation
 
 The first non-SSH increment is an **offline structured HTTP access-log parser
-and three request-pattern rules**. It is not connected to live ingestion, the
-console, incident scoring or notifications. It does not make model calls. A
+and three request-pattern rules**. An opt-in [durable HTTP collection and
+receipt store](http-ingestion.md) now supports isolated ingestion exercises.
+Continuous rule execution, console incidents, scoring and notifications are
+not connected yet. It does not make model calls. A
 real web service and a reviewed collection configuration are needed before
 claiming production HTTP coverage.
 
