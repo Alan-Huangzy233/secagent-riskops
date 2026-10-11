@@ -10,8 +10,10 @@ from __future__ import annotations
 import hashlib
 import ipaddress
 import json
+import logging
 import re
 import sqlite3
+import time
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
@@ -27,6 +29,10 @@ _WINDOW_SECONDS = 300
 _EVIDENCE_RESPONSE_LIMIT = 20
 # Bound the receipt tail inspected when counting a recently frozen log view.
 _SNAPSHOT_COUNT_TAIL_LIMIT = 10_000
+# A daily expiry backlog must not hold the batch ACK's write lock unboundedly.
+_INGEST_CLEANUP_LIMIT = 1000
+_SLOW_TRANSACTION_SECONDS = 2
+logger = logging.getLogger(__name__)
 _SSH_PREFIX = re.compile(
     r"^(?:\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\S+\s+)?"
     r"sshd(?:-session|-auth)?(?:\[\d+\])?:\s*"
@@ -261,7 +267,11 @@ class TelemetryStore:
                 db.execute("INSERT INTO maintenance VALUES('detection_metadata_v1',?)", (_iso(_now()),))
 
     @contextmanager
-    def _connection(self, *, write: bool = False, transaction: bool = True) -> Iterator[sqlite3.Connection]:
+    def _connection(self, *, write: bool = False, transaction: bool = True,
+                    operation: str = "telemetry") -> Iterator[sqlite3.Connection]:
+        started = time.monotonic()
+        ready = worked = None
+        outcome = "failed"
         db = sqlite3.connect(self.path, timeout=30, isolation_level=None)
         db.row_factory = sqlite3.Row
         try:
@@ -269,15 +279,29 @@ class TelemetryStore:
             db.execute("PRAGMA synchronous=FULL")
             if transaction:
                 db.execute("BEGIN IMMEDIATE" if write else "BEGIN")
-            yield db
+            ready = time.monotonic()
+            try:
+                yield db
+            finally:
+                worked = time.monotonic()
             if transaction:
                 db.commit()
+            outcome = "ok"
         except BaseException:
             if transaction:
                 db.rollback()
             raise
         finally:
             db.close()
+            finished = time.monotonic()
+            if finished - started >= _SLOW_TRANSACTION_SECONDS:
+                # Fixed operation labels and timings only: never SQL, evidence,
+                # request parameters, credentials or exception messages.
+                ready = finished if ready is None else ready
+                worked = finished if worked is None else worked
+                logger.warning("telemetry_db_slow operation=%s write=%s outcome=%s wait_ms=%d work_ms=%d finish_ms=%d",
+                               operation, write, outcome, int((ready - started) * 1000),
+                               int((worked - ready) * 1000), int((finished - worked) * 1000))
 
     def healthcheck(self) -> bool:
         try:
@@ -338,7 +362,7 @@ class TelemetryStore:
         payload_hash = _hash(_json({"hostname": hostname,
                                    "record_hashes": [record["record_hash"] for record in normalized],
                                    "error": error}))
-        with self._connection(write=True) as db:
+        with self._connection(write=True, operation="ingest") as db:
             receipt = db.execute("SELECT * FROM batches WHERE source_id=? AND batch_id=?",
                                  (source_id, batch_id)).fetchone()
             if receipt and receipt["payload_hash"] != payload_hash:
@@ -402,7 +426,7 @@ class TelemetryStore:
             day = received_at[:10]
             last_cleanup = db.execute("SELECT value FROM maintenance WHERE name='last_cleanup'").fetchone()
             if not last_cleanup or last_cleanup[0] != day:
-                self._cleanup(db, now)
+                self._cleanup(db, now, limit=_INGEST_CLEANUP_LIMIT)
             return result
 
     @staticmethod
@@ -424,8 +448,13 @@ class TelemetryStore:
     def _merge_incident(db: sqlite3.Connection, target: str, other: str, now: str) -> None:
         if target == other:
             return
+        # Evidence has an incident index; raw events do not. Resolve just the
+        # other incident's keys before reparenting, including expired evidence
+        # whose raw row no longer exists. Never scan all retained log payloads.
+        db.execute("""UPDATE events SET incident_id=? WHERE incident_id=?
+            AND (source_id,event_id) IN (
+                SELECT source_id,event_id FROM incident_evidence WHERE incident_id=?)""", (target, other, other))
         db.execute("UPDATE incident_evidence SET incident_id=? WHERE incident_id=?", (target, other))
-        db.execute("UPDATE events SET incident_id=? WHERE incident_id=?", (target, other))
         db.execute("""INSERT OR IGNORE INTO incident_rules
             SELECT ?,rule_id,rule_version,window_seconds,reason FROM incident_rules WHERE incident_id=?""", (target, other))
         db.execute("UPDATE incidents SET status='merged',merged_into=?,updated_at=? WHERE incident_id=?",
@@ -699,7 +728,7 @@ class TelemetryStore:
         # which is expensive to read cold despite having fewer indexed columns.
         plain_count = all(value is None for name, value in filters.items() if name != "snapshot")
         count_table = "events INDEXED BY events_detection" if plain_count else "events"
-        with self._connection() as db:
+        with self._connection(operation="event_page") as db:
             # This first read pins the transaction for both counts and items.
             # Receipts outlive raw retention and append monotonically, including
             # arrivals whose event timestamps are older than this view.
@@ -998,7 +1027,7 @@ class TelemetryStore:
                            triage: str | None = None, focus: str = "all", sort: str = "recent") -> dict[str, Any]:
         self._page_number(limit, page)
         where, params = self._incident_filter(source_id, triage, focus)
-        with self._connection() as db:
+        with self._connection(operation="incident_page") as db:
             total = db.execute(f"SELECT count(*) {_INCIDENT_FROM} WHERE incidents.status!='merged' {where}", params).fetchone()[0]
             pagination = self._pagination(total, limit, page)
             return {"items": self._incidents(db, source_id, limit, pagination["offset"],
@@ -1008,7 +1037,7 @@ class TelemetryStore:
 
     def list_sources(self, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
         self._page(limit, offset)
-        with self._connection() as db:
+        with self._connection(operation="source_summary") as db:
             rows = db.execute("SELECT * FROM sources ORDER BY source_id LIMIT ? OFFSET ?", (limit, offset)).fetchall()
             return [self._source(db, row) for row in rows]
 
@@ -1033,15 +1062,23 @@ class TelemetryStore:
             return {"items": items, **self._pagination(total, limit, page)}
 
     def get_source(self, source_id: str) -> dict[str, Any] | None:
-        with self._connection() as db:
+        with self._connection(operation="source_summary") as db:
             row = db.execute("SELECT * FROM sources WHERE source_id=?", (source_id,)).fetchone()
             return self._source(db, row) if row else None
 
-    def _cleanup(self, db: sqlite3.Connection, now: datetime) -> dict[str, int]:
+    def _cleanup(self, db: sqlite3.Connection, now: datetime, *, limit: int | None = None) -> dict[str, int]:
         cutoff = (now - timedelta(days=self.retention_days)).timestamp()
-        deleted = db.execute("DELETE FROM events WHERE event_ts<?", (cutoff,)).rowcount
-        db.execute("INSERT INTO maintenance VALUES('last_cleanup',?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
-                   (_iso(now)[:10],))
+        # Use rowid selection instead of optional SQLite DELETE LIMIT support.
+        # An incomplete pass leaves the marker unchanged, so later new batches
+        # (including empty heartbeats) resume it, also after a process restart.
+        if limit is None:
+            deleted = db.execute("DELETE FROM events WHERE event_ts<?", (cutoff,)).rowcount
+        else:
+            deleted = db.execute("""DELETE FROM events WHERE rowid IN (
+                SELECT rowid FROM events WHERE event_ts<? ORDER BY event_ts LIMIT ?)""", (cutoff, limit)).rowcount
+        if not db.execute("SELECT 1 FROM events WHERE event_ts<? LIMIT 1", (cutoff,)).fetchone():
+            db.execute("INSERT INTO maintenance VALUES('last_cleanup',?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
+                       (_iso(now)[:10],))
         return {"deleted_events": deleted, "deleted_batches": 0}
 
     def cleanup(self) -> dict[str, int]:

@@ -326,3 +326,55 @@ def test_collector_error_heartbeat_and_ack_match_live_api(config):
         assert responses[-1]["accepted"] == 0
         assert json.loads((Path(config["state_dir"]) / "source-a.state.json").read_text())["cursor"] == "cursor-1"
         assert collector.run_once(config, lambda *args: exported([], "cursor-1"), send)[0]["status"] == "acknowledged"
+
+
+@pytest.mark.parametrize("kind,wrapped,during_read,code", [
+    (TimeoutError, False, False, "http_timeout"),
+    (TimeoutError, True, False, "http_timeout"),
+    (TimeoutError, False, True, "http_timeout"),
+    (ConnectionRefusedError, False, False, "http_connection_refused"),
+    (ConnectionRefusedError, True, False, "http_connection_refused"),
+    (OSError, True, False, "http_unavailable"),
+])
+def test_http_failure_codes_are_safe_and_keep_spool_for_recovery(config, monkeypatch, kind, wrapped, during_read, code):
+    from urllib.error import URLError
+
+    sensitive = "private-endpoint-or-token"
+    cause = kind(sensitive)
+    error = URLError(cause) if wrapped else cause
+
+    class Reply:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self, limit):
+            raise error
+
+    class Opener:
+        def open(self, *args, **kwargs):
+            if during_read:
+                return Reply()
+            raise error
+
+    monkeypatch.setattr(collector, "build_opener", lambda *args: Opener())
+    first = collector.run_once(config, lambda *args: exported(), collector.post_batch)
+    assert first[0]["code"] == code and first[0]["duration_ms"] >= 0
+    assert sensitive not in json.dumps(first)
+    root = Path(config["state_dir"])
+    pending = json.loads((root / "source-a.pending.json").read_text())["body"]
+    assert not (root / "source-a.state.json").exists()
+    sent = []
+
+    def acknowledge(endpoint, token, body, timeout):
+        sent.append(body)
+        return durable(endpoint, token, body, timeout)
+
+    second = collector.run_once(config, lambda *args: pytest.fail("retry must use spool"), acknowledge)
+    assert second[0]["status"] == "acknowledged" and second[0]["duration_ms"] >= 0
+    assert sent == [pending]
+    assert json.loads((root / "source-a.state.json").read_text())["cursor"] == "cursor-1"

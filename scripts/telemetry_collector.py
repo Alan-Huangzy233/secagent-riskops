@@ -320,8 +320,15 @@ def post_batch(endpoint: str, token: str, body: dict, timeout: int) -> dict:
             return json.loads(payload)
     except HTTPError:
         raise CollectorError("http_rejected") from None
-    except (URLError, TimeoutError, OSError, HTTPException):
-        raise CollectorError("http_unavailable") from None
+    except (URLError, TimeoutError, OSError, HTTPException) as exc:
+        reason = exc.reason if isinstance(exc, URLError) else exc
+        if isinstance(reason, TimeoutError):
+            code = "http_timeout"
+        elif isinstance(reason, ConnectionRefusedError):
+            code = "http_connection_refused"
+        else:
+            code = "http_unavailable"
+        raise CollectorError(code) from None
     except (ValueError, UnicodeError):
         raise CollectorError("invalid_ack") from None
 
@@ -439,12 +446,14 @@ def run_once(config: dict, fetch: Callable = ssh_export, send: Callable = post_b
     results = []
     with collector_lock(Path(config["state_dir"])):
         for source in config["sources"]:
+            started = time.monotonic()
             try:
                 results.append(collect_source(config, source, fetch, send))
             except CollectorError as exc:
                 results.append({"source_id": source["id"], "status": "error", "code": str(exc)})
             except OSError:
                 results.append({"source_id": source["id"], "status": "error", "code": "local_storage_failed"})
+            results[-1]["duration_ms"] = round((time.monotonic() - started) * 1000)
     return results
 
 

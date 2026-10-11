@@ -243,7 +243,14 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
 
     @application.get("/api/summary", dependencies=[Depends(operator)])
     def summary(request: Request):
-        return build_summary(request.app.state.store, request.app.state.config)
+        cached = request.app.state.console_cache.read()
+        if cached["state"] == "disabled":
+            return build_summary(request.app.state.store, request.app.state.config)
+        if cached["data"] is None:
+            # Do not turn a cold/failed cache into parallel full-history scans.
+            raise HTTPException(503, "Console summary is warming or unavailable; retry shortly",
+                                headers={"Retry-After": str(cached["refresh_seconds"])})
+        return {**cached["data"]["summary"], "cache": {key: value for key, value in cached.items() if key != "data"}}
 
     @application.get("/api/console/bootstrap", dependencies=[Depends(operator)])
     def console_bootstrap(request: Request):

@@ -18,7 +18,9 @@ a skeleton is a loading placeholder rather than the navigation itself.
 Opt in with `"console_cache_enabled": true` in the existing private `RISKOPS_CONFIG`
 JSON and restart through the reviewed deployment process. The default is false;
 disabled deployments fetch the selected view on demand. Existing endpoints keep
-their filters, authentication and response shapes.
+their filters and authentication. With the cache enabled, summary endpoints also
+reuse the prepared generation and expose its freshness metadata; see
+[live stability](production-stability.md#prepared-summaries).
 
 One background worker per API process prepares the overview, the default global
 pending-incident page (score order) and the newest 50 logs. It starts before any
@@ -42,7 +44,7 @@ plans or AI submissions. Original write APIs still recheck their own inputs.
 | Warming | 202 | Display loading state; poll again in two seconds |
 | Ready | 200 | Display prepared overview/default pages and preparation time |
 | Refresh failed, last good data no older than 120 seconds | 200, stale | Show freshness warning; retain visible data, avoid replacing lists with stale snapshots |
-| Refresh failed with no usable snapshot | 503 | Keep any previously displayed rows with a warning; explicit Refresh can read the active view directly |
+| Refresh failed with no usable snapshot | 503 | Keep displayed rows with a warning; explicit Refresh reads non-overview views directly while the overview waits for a new generation |
 
 The cache is server memory, not a public HTTP cache; authenticated responses stay
 `Cache-Control: no-store`. It is rebuilt on restart and needs no new backup or
@@ -89,3 +91,6 @@ Roll back the opt-in by setting `console_cache_enabled` false and restarting.
 When rolling back to code that predates this field, remove the field too: the
 configuration rejects unknown keys. No telemetry or AI database should be
 restored backwards for a UI/cache rollback.
+
+For summary-cache compatibility, warming responses and release acceptance, see
+[live stability](production-stability.md#prepared-summaries).

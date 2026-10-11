@@ -100,6 +100,12 @@ Gaps are never overwritten. After putting a restored database back into service,
 `recovery_package.py mark-restored <database> <package>` records the restore
 point.
 
+## Stability and release checks
+
+See [live stability](../docs/production-stability.md) for bounded automatic
+retention, prepared-summary response states, safe timing diagnostics, and the
+release/rollback acceptance procedure.
+
 ## Optional enrichment and maintenance
 
 - `RISKOPS_GEOIP_DIRECTORY` selects offline DB-IP City/ASN databases. Use

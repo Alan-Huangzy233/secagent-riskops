@@ -113,3 +113,21 @@ await readBootstrap();
 assert.equal($('incident-total').textContent,'20');
 assert.match($('incident-triage-counts').textContent,/待处理 1 · 已知晓 2 · 已处理 3/);
 """)
+
+
+def test_manual_refresh_reads_current_table_when_summary_cache_is_unavailable():
+    run_dashboard(FIXTURE + r"""
+await readBootstrap();await selectWorkspace('events');
+route=path=>{
+ if(path==='/api/console/bootstrap')return {ok:false,status:503,json:async()=>({detail:'cache unavailable'})};
+ if(path.startsWith('/api/events?'))return response(page([{event_id:'direct-event',message:'direct log'}],{snapshot:'r1:40'}));
+ throw new Error('Unexpected request '+path);
+};
+calls.length=0;await refreshWorkspace({manual:true});
+assert.match($('events').textContent,/direct log/);
+assert.equal(calls.filter(c=>c.path.startsWith('/api/events?')).length,1);
+assert.equal(calls.filter(c=>c.path==='/api/summary').length,0);
+assert.equal($('console-sync-line').dataset.stale,'true');
+setWorkspace('overview');calls.length=0;await refreshWorkspace({manual:true});
+assert.equal(calls.length,1);assert.match($('console-sync').textContent,/后台会继续重试/);
+""")
