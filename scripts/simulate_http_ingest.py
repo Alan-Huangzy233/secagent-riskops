@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise synthetic HTTP file -> spool -> authenticated API -> DB -> rules.
+"""Exercise synthetic HTTP file -> spool -> authenticated API -> DB -> incidents -> console inbox.
 
 Uses the in-process ASGI test transport and temporary databases. No production
 configuration, outbound request, website or model is needed. Install .[dev].
@@ -22,6 +22,7 @@ from app.telemetry.ai_triage import Service
 from app.telemetry.config import LiveConfig, hash_operator_password
 from app.telemetry.control import ControlService
 from app.telemetry.http_parse import HttpEvent
+from app.telemetry.http_worker import publish
 from app.telemetry.store import TelemetryStore
 from app.telemetry.web_detection import detect_web
 from http_collector import CollectorError, load_config, run_once
@@ -30,7 +31,7 @@ from http_collector import CollectorError, load_config, run_once
 def simulate(fixture: Path):
     rows = [json.loads(line) for line in fixture.read_text().splitlines()]
     first = min(datetime.fromisoformat(r['timestamp'].replace('Z', '+00:00')) for r in rows)
-    start = datetime.now(timezone.utc) - timedelta(days=1)
+    start = (datetime.now(timezone.utc) - timedelta(hours=2)).replace(minute=10, second=0, microsecond=0)
     for row in rows:
         row['timestamp'] = (start + (datetime.fromisoformat(row['timestamp'].replace('Z', '+00:00')) - first)).isoformat()
     token = secrets.token_urlsafe(32)
@@ -55,6 +56,7 @@ def simulate(fixture: Path):
         control, ai = ControlService(None, config.sources), Service(ssh)
         attempts, acknowledgements, results = [], [], []
         with TestClient(create_app(config, store=ssh, control=control, ai=ai)) as client:
+            client.app.state.http_worker.close()  # Drive actual worker ticks deterministically.
             def send(endpoint, supplied_token, body, timeout):
                 attempts.append(body)
                 response = client.post('/api/http/batches', json=body, headers={'Authorization': 'Bearer '+supplied_token})
@@ -74,6 +76,7 @@ def simulate(fixture: Path):
                     assert attempts[0] == attempts[1] and acknowledgements[0] == acknowledgements[1]
                 assert result['status'] == 'acknowledged' and result['caught_up']
                 results.append(result)
+                client.app.state.http_worker.tick()
             # Inspect the persistent evidence through the authenticated, paged API.
             events, after, snapshot = [], 0, None
             while True:
@@ -95,15 +98,40 @@ def simulate(fixture: Path):
             findings = detect_web(events)
             assert [(f.rule_id, len(f.evidence_ids)) for f in findings] == [
                 ('http_sensitive_resource', 2), ('http_path_traversal', 1), ('http_multi_path_scan', 20)]
+            for _ in range(20):
+                if client.app.state.http_worker.tick()['caught_up']:
+                    break
+            else:
+                raise AssertionError('HTTP worker failed to drain')
+            cases = client.get('/api/http/incidents', auth=('operator', password)).json()['items']
+            assert sorted(case['assessment']['score'] for case in cases) == [25, 30, 35]
+            retained = []
+            for case in cases:
+                response = client.get('/api/http/incidents/'+case['incident_id']+'/evidence',
+                                      params={'revision': case['revision']}, auth=('operator', password))
+                assert response.status_code == 200
+                retained.extend(response.json()['items'])
+            now = datetime.now(timezone.utc).timestamp()
+            publish(client.app.state.http_store, ssh, now)
+            ssh.run_notifications([], now=now)
+            notices = ssh.list_notifications(kind='http_incident')['items']
+            assert len(notices) == 2
+            assert sorted(n['payload']['assessment']['score'] for n in notices) == [30, 35]
+            # A repeat tick and bridge must not produce another incident or notice.
+            client.app.state.http_worker.tick()
+            assert publish(client.app.state.http_store, ssh, now) == 0
+            ssh.run_notifications([], now=now+1)
+            assert ssh.list_notifications(kind='http_incident')['total'] == 2
             referenced = {eid for f in findings for eid in f.evidence_ids}
+            assert referenced == {e['event_id'] for e in retained}
             assert referenced <= {e.event_id for e in events}
-            return dict(mode='isolated_http_ingestion_simulation', records=len(rows), stored_unique_events=len(events),
+            return dict(mode='isolated_http_incident_simulation', records=len(rows), stored_unique_events=len(events),
                         acknowledged_pages=len(results), retry_kept_same_receipt=True,
+                        incidents=cases, console_notifications=len(notices),
                         findings=[asdict(f) for f in findings],
                         evidence=[asdict(e) for e in events if e.event_id in referenced],
                         production_writes=False, model_calls=0,
                         limitations=['Authored fixtures are not an accuracy benchmark.',
-                                     'Detection is a replay over persisted rows, not a continuous incident engine.',
                                      'The ASGI transport does not test a deployed TLS proxy or real Nginx rotation.'])
 
 
@@ -115,8 +143,8 @@ def main():
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(json.dumps(report, indent=2)+'\n')
-    print(json.dumps({k: v for k, v in report.items() if k not in ('evidence', 'findings')} |
-                     {'findings': [{'rule_id': f['rule_id'], 'evidence_count': len(f['evidence_ids'])} for f in report['findings']]}))
+    print(json.dumps({k: v for k, v in report.items() if k not in ('evidence', 'findings', 'incidents')} |
+                     {'incidents': len(report['incidents']), 'findings': [{'rule_id': f['rule_id'], 'evidence_count': len(f['evidence_ids'])} for f in report['findings']]}))
 
 
 if __name__ == '__main__':
