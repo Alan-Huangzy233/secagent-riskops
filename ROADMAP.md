@@ -10,9 +10,11 @@ console notifications and UTC daily briefings are implemented. Next:
   redacted incidents before choosing a production model.
 - Build persistent AI jobs, budgets and evidence validation with offline
   providers first; introduce real calls through a bounded, manual-trigger pilot.
-- Expand detection in order: Web, network, then Linux host behavior. The HTTP
-  foundation is in [PR #116](https://github.com/Alan-Huangzy233/secagent-riskops/pull/116),
-  awaiting review; live HTTP coverage still needs collection and a real source.
+- Expand detection in order: Web, network, then Linux host behavior. HTTP
+  parser/rules and opt-in durable collection, continuous cases, scoring and
+  console notifications are implemented ([guide](./docs/http-ingestion.md)).
+  Real-source acceptance, HTTP recovery mapping and daily briefings remain
+  before full production coverage.
 
 Acceptance criteria and active issues are in the
 [production plan](./docs/production-plan.md). AI advice does not change incident

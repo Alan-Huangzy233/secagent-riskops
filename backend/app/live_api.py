@@ -204,6 +204,13 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
         application.state.ai = ai if ai is not None else AIService.from_environment(live_store)
         if ai is None:
             application.state.ai.start()
+        from .telemetry.http_worker import HttpWorker
+        http_worker = None
+        if application.state.http_store is not None:
+            http_worker = HttpWorker(application.state.http_store, live_store,
+                                     notify=application.state.config.notifications_enabled)
+            http_worker.start()
+        application.state.http_worker = http_worker
         application.state.console_cache = ConsoleCache(
             lambda: build_bootstrap(live_store, application.state.config, application.state.control),
             enabled=application.state.config.console_cache_enabled)
@@ -211,6 +218,8 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
         try:
             yield
         finally:
+            if http_worker:
+                await run_in_threadpool(http_worker.close)
             await run_in_threadpool(application.state.console_cache.close)
             if ai is None:
                 await run_in_threadpool(application.state.ai.close)
@@ -432,7 +441,7 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
     @application.get("/api/notifications", dependencies=[Depends(operator)])
     def notification_inbox(request: Request, page: int = Query(1, ge=1, le=1_000_000_000),
                            limit: int = Query(20, ge=1, le=100), unread: bool = False,
-                           kind: Literal["incident", "collection", "health", "briefing"] | None = None):
+                           kind: Literal["incident", "http_incident", "collection", "health", "briefing"] | None = None):
         result = request.app.state.store.list_notifications(page=page, limit=limit, unread=unread, kind=kind)
         return {**result, "enabled": request.app.state.config.notifications_enabled,
                 "backup_monitor_configured": bool(request.app.state.config.notification_backup_directories)}

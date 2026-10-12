@@ -1,12 +1,13 @@
 # HTTP collection and durable ingestion
 
-This is the first live-ingestion increment of [issue #119](https://github.com/Alan-Huangzy233/secagent-riskops/issues/119).
-It adds an **opt-in HTTP receipt store and local-file collector** to the live
-API. It is disabled unless `http_ingest` is configured. The SSH database,
-incidents, scores, notifications, controls and AI summaries remain separate.
-Continuous HTTP correlation, incident scoring, console views, notification
-routing and real-source acceptance are still subsequent work; this increment
-does not complete #119 or establish production HTTP coverage.
+This is the opt-in HTTP ingestion and review path for
+[issue #119](https://github.com/Alan-Huangzy233/secagent-riskops/issues/119).
+It stores collector receipts, continuously correlates committed HTTP records,
+and exposes scored, versioned cases in a separate console table. Qualifying
+HTTP cases use the existing console notification queue. HTTP collection is
+still disabled unless `http_ingest` is configured; this does not enroll a real
+source or complete #119. SSH evidence, scoring, response actions and AI remain
+separate. Daily briefings currently cover SSH only.
 
 ## Run the isolated simulation
 
@@ -22,10 +23,14 @@ appends them in four groups, and runs the actual collector spool and
 credential-bound API using an in-process ASGI transport and temporary
 databases. It deliberately loses the first response **after database commit**,
 then verifies the retry retains the same batch and receipt. It reads the
-stored evidence through bounded API pages before replaying the three rules.
+stored evidence through bounded API pages and drives the actual background
+analysis worker after each batch. A separate rule replay checks the expected
+patterns against those same committed inputs.
 Expected findings: one sensitive-resource group (2 records), one traversal
 attempt (1 record), and one multi-path scan (20 records spanning batches).
-There are 42 unique stored requests, no production writes and no model calls.
+There are 42 unique stored requests, 3 persisted HTTP cases scored 25/35/30,
+and 2 console notifications (scores 35 and 30). Repeat ticks do not duplicate
+receipts, cases or notifications. There are no production writes or model calls.
 Temporary logs/databases are removed after the run; the optional report is
 synthetic. This is a reproducible functional exercise, not an accuracy estimate
 or a test of a deployed TLS proxy/Nginx rotation.
@@ -155,6 +160,10 @@ are generic and do not echo private values.
 | `GET /api/http/streams` | Operator Basic | Configured streams, accepted/rejected totals, current/delayed/degraded/stale/never-seen status |
 | `GET /api/http/events` | Operator Basic | Explicit source/service, `after`, `limit` (1–200), optional frozen `snapshot` |
 | `GET /api/http/batches` | Operator Basic | Same keyset pagination for durable receipts, reports and rejected record IDs |
+| `GET /api/http/status` | Operator Basic | Analysis progress, incomplete windows and collection status; `enabled: false` when unconfigured |
+| `GET /api/http/incidents` | Operator Basic | HTTP-only source/service/focus filters and page/limit (up to 200) |
+| `GET /api/http/incidents/{id}` | Operator Basic | Current case or immutable `revision` |
+| `GET /api/http/incidents/{id}/evidence` | Operator Basic | Exact evidence for `revision`, page/limit (up to 200) |
 
 `next_after`, `snapshot` and `has_more` allow complete bounded enumeration.
 New ingests cannot enter a frozen page sequence. Raw-event retention can remove
@@ -166,13 +175,80 @@ by default), at most 1,000 rows per new batch including heartbeat batches.
 Receipts, counters and rejection/gap history survive raw expiry; disk capacity
 for these growing tables needs monitoring. A late event outside retention is
 acknowledged and may immediately expire; durable receipt is not unlimited raw
-retention. No separate long-lived HTTP incident evidence exists yet.
+retention. Case versions and their evidence survive raw-event expiry. They are
+not automatically pruned; include their growth in disk monitoring and backup
+capacity planning. Read endpoints do not advance analysis or call models.
+
+## Continuous correlation and scores
+
+The worker starts only for a configured HTTP database. A durable ACK commits
+raw records first; analysis follows asynchronously. Each tick reads up to 200
+new records and, once intake catches up, processes up to 5 affected windows in
+separate transactions. Idle polls are five seconds; catch-up polls are one
+second. Cursor, dirty windows, revisions and notification intent survive a
+restart. A failed window transaction leaves it dirty for retry.
+
+`http-peer-hour-v1` groups a review case by source, service, connection peer
+and **UTC hour**. The existing 300-second sliding rules run over that hour with
+five minutes of context on either side. Only findings touching the core hour
+are retained. Cross-hour findings can appear in both adjacent review cases
+with shared evidence: case counts are not counts of distinct attacks. Late
+records dirty affected windows again, including adjacent hour boundaries.
+For example, late normal responses can invalidate the scan's 80% denied
+threshold and create a new, withdrawn revision with score zero.
+
+| Pattern | Points per case | Interpretation |
+| --- | --- | --- |
+| Sensitive resource | 25 | A named resource was probed |
+| Parent-directory traversal | 35 | The path expresses a traversal attempt |
+| Multi-path scan | 30 | The documented request/path/denial thresholds match |
+
+Each rule contributes once, regardless of request count. Total score is capped
+at 90; P2 starts at 60, P3/console attention at 30, below 30 is low. This policy
+is `http-evidence-v1`, a review aid rather than a calibrated compromise
+probability. Status 200 does not add success points. No automatic response,
+SSH whitelist inference or AI verdict is attached to an HTTP case.
+
+Each analysis window is bounded to 5,000 records **and** 4 MiB of normalized
+context. A truncated sample is never used to decide whether a scan occurred.
+`context_limit` or `expired_context` preserves any previous verified score and
+evidence, visibly marked stale; a new incomplete window appears in status
+without inventing a case or a clean result. The status endpoint shows up to
+50 recent incomplete windows and records lost to raw retention before intake.
+Backlog and collection gaps must be checked before interpreting an empty table.
+These limits need workload acceptance before real-source enrollment.
+
+The incident, immutable revision, evidence membership and source notification
+outbox commit atomically. Evidence APIs pin the revision across page reads;
+old versions remain inspectable when newer evidence changes or withdraws a
+pattern. The HTTP console has its own filters, pagination and nearby drawer;
+overview/evidence tabs avoid scrolling through metadata to reach the evidence
+table. The header counters remain explicitly SSH-scoped.
+
+## Console notifications
+
+Active, complete cases with score at least 30 and an hour ending within the
+last 24 hours enqueue `http_incident` notifications. Historical backfills do
+not flood the inbox. An idempotent bridge remembers imported source revisions
+in the console database, then acknowledges the HTTP outbox; interruption
+between the two commits safely replays. No transaction holds both DB locks.
+The existing queue coalesces updates, retries failures and applies its one-hour
+cooldown; priority escalation can bypass the cooldown. Disabling
+`notifications_enabled` stops the bridge while retaining its outbox.
+
+Withdrawn, stale or low-score revisions cancel pending delivery. Already
+delivered notifications remain historical records and link to the exact HTTP
+revision/evidence that generated them. A later withdrawal does not rewrite that
+history. Delivery can briefly lag the current HTTP revision because the two
+databases and workers synchronize asynchronously. HTTP does not enter the
+SSH-specific delivery revalidation path, controls or AI summary.
+
 
 ## Before production activation
 
 Validate a real source's format, peer semantics, rejected-line rate, rotation,
-catch-up resource use and TLS/source authorization. Complete live correlation,
-versioned findings/evidence, suitable scoring and console/notification display.
+catch-up resource use and TLS/source authorization. Validate analysis latency,
+context bounds, scoring usefulness and alert volume against that workload.
 Extend the environment's backup/recovery mapping to include this independent
 HTTP database and the collector state/spool, then perform a restore rehearsal.
 The existing SSH recovery-package automation does **not** discover these new
@@ -181,5 +257,6 @@ paths automatically. No source is enrolled by merging this increment.
 For code rollback, stop the HTTP collector and drain or retain its pending
 spool, back up the HTTP store/state, remove `http_ingest` from the configuration,
 then switch to the previous release (older config validation rejects unknown
-fields). Retain the independent HTTP database for a future compatible release;
+fields; the receipt-only release also rejects newer analysis tables). Retain
+the independent HTTP database for a future compatible release;
 never reset offsets or delete receipts to make a retry succeed.

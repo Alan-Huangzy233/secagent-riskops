@@ -84,3 +84,43 @@ def register_routes(application, operator):
         stream(request, source_id, service_id)
         return request.app.state.http_store.page(source_id, service_id, after=after, limit=limit,
                                                  snapshot=snapshot, batches=request.url.path.endswith("/batches"))
+
+    @application.get("/api/http/status", dependencies=[Depends(operator)])
+    def analysis_status(request: Request):
+        config = request.app.state.config.http_ingest
+        if config is None:
+            return {"enabled": False}
+        return {"enabled": True, **request.app.state.http_store.analysis_status(),
+                "sources": [{"id": s.id, "hostname": s.hostname, "services": s.services} for s in config.sources],
+                "collection": [{k: row[k] for k in ("source_id", "service_id", "status", "accepted_total", "rejected_total")}
+                               for row in streams(request)["items"]]}
+
+    @application.get("/api/http/incidents", dependencies=[Depends(operator)])
+    def incidents(request: Request, source_id: str | None = Query(None, max_length=64),
+                  service_id: str | None = Query(None, max_length=64),
+                  focus: str = Query("all", pattern="^(all|attention|low|retracted)$"),
+                  page: int = Query(1, ge=1, le=1000000), limit: int = Query(50, ge=1, le=200)):
+        config = enabled(request)
+        if source_id and source_id not in {s.id for s in config.sources}:
+            raise HTTPException(404, "HTTP source is not configured")
+        if service_id and not any(service_id in s.services and (source_id is None or source_id == s.id) for s in config.sources):
+            raise HTTPException(404, "HTTP service is not configured")
+        return request.app.state.http_store.incidents(source_id=source_id, service_id=service_id,
+                                                      focus=focus, page=page, limit=limit)
+
+    @application.get("/api/http/incidents/{identity}", dependencies=[Depends(operator)])
+    def incident(request: Request, identity: str, revision: int | None = Query(None, ge=1, le=2**63-1)):
+        enabled(request)
+        result = request.app.state.http_store.incident(identity, revision)
+        if result is None:
+            raise HTTPException(404, "HTTP incident revision does not exist")
+        return result
+
+    @application.get("/api/http/incidents/{identity}/evidence", dependencies=[Depends(operator)])
+    def evidence(request: Request, identity: str, revision: int | None = Query(None, ge=1, le=2**63-1),
+                 page: int = Query(1, ge=1, le=1000000), limit: int = Query(50, ge=1, le=200)):
+        enabled(request)
+        result = request.app.state.http_store.evidence(identity, revision=revision, page=page, limit=limit)
+        if result is None:
+            raise HTTPException(404, "HTTP incident revision does not exist")
+        return result

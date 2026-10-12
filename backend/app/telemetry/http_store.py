@@ -1,4 +1,4 @@
-"""Opt-in HTTP receipt store. No SSH correlation, scoring or response actions."""
+"""Opt-in HTTP storage, analysis and retained evidence; no response actions."""
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, StrictBool, field_validator
 from typing import Literal
 
 from .http_parse import normalize_http
+from . import http_incidents
 
 IDENTITY = r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
 ReportCode = Literal["rotation_gap", "file_truncated", "file_unavailable", "partial_line",
@@ -65,7 +66,7 @@ class HttpStore:
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         with self.connection() as db:
             tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-            if tables - {"http_batches", "http_receipts", "http_events", "http_streams", "sqlite_sequence"}:
+            if tables - {"http_batches", "http_receipts", "http_events", "http_streams", "sqlite_sequence"} - http_incidents.TABLES:
                 raise ValueError("HTTP storage requires a separate database")
             db.execute("PRAGMA journal_mode=WAL")
             db.executescript("""
@@ -94,6 +95,7 @@ class HttpStore:
                     last_batch_json TEXT NOT NULL, PRIMARY KEY(source_id, service_id)
                 );
             """)
+            http_incidents.initialize(db)
 
     @contextmanager
     def connection(self, write=False):
@@ -204,3 +206,21 @@ class HttpStore:
         with self.connection() as db:
             db.execute("SELECT 1 FROM http_batches LIMIT 1").fetchone()
             return True
+
+    def analysis_status(self):
+        with self.connection() as db:
+            return http_incidents.status(db)
+
+    def incidents(self, **kwargs):
+        with self.connection() as db:
+            db.execute("BEGIN")
+            return http_incidents.list_cases(db, **kwargs)
+
+    def incident(self, identity, revision=None):
+        with self.connection() as db:
+            return http_incidents.get_case(db, identity, revision)
+
+    def evidence(self, identity, **kwargs):
+        with self.connection() as db:
+            db.execute("BEGIN")
+            return http_incidents.evidence(db, identity, **kwargs)

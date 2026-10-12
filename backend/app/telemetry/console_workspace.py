@@ -1,8 +1,11 @@
 """Tabbed console workspace and nearby record details, without external assets."""
 import re
 
+from .http_dashboard import SECTION as HTTP_SECTION, DIALOG as HTTP_DIALOG
+
 
 VIEWS = (("incidents", "告警", "incident-section"), ("events", "日志", "event-section"),
+         ("http", "HTTP 检测", "http-section"),
          ("overview", "来源概览", "overview-section"), ("notifications", "通知与简报", "notification-section"),
          ("collection", "采集记录", "collection-section"), ("ip", "IP 查询", "ip-query-section"),
          ("controls", "响应操作", "control-section"))
@@ -19,7 +22,7 @@ STYLE = r"""
 SCRIPT = r"""
 let workspaceView='incidents',bootstrapPacket=null,bootstrapReceivedAt=0,bootstrapPromise=null,bootstrapTimer=null;
 let detailReturnFocus=null,detailTab='overview',bootstrapBlocked=false,bootstrapBlockedGeneration=null,controlsPromise=null;
-const workspaceViews=['incidents','events','overview','notifications','collection','ip','controls'];
+const workspaceViews=['incidents','events','http','overview','notifications','collection','ip','controls'];
 function setDetailTab(name){
  if(!['overview','evidence','ai'].includes(name))return;detailTab=name;
  for(const key of ['overview','evidence','ai']){$('detail-pane-'+key).hidden=key!==name;$('detail-tab-'+key).setAttribute('aria-selected',String(key===name));$('detail-tab-'+key).tabIndex=key===name?0:-1;}
@@ -38,6 +41,7 @@ function renderRecordOverview(record){
 function setWorkspace(name){
  if(!workspaceViews.includes(name))name='incidents';workspaceView=name;
  for(const key of workspaceViews){$('workspace-'+key).hidden=key!==name;$('workspace-tab-'+key).setAttribute('aria-selected',String(key===name));$('workspace-tab-'+key).tabIndex=key===name?0:-1;}
+ $('source-filter').disabled=name==='http';
  try{sessionStorage.setItem('riskops-workspace',name);}catch{}
 }
 async function selectWorkspace(name,load=true){setWorkspace(name);if(load)await loadWorkspaceView();}
@@ -64,6 +68,7 @@ async function loadWorkspaceView(force=false){
  try{
   if(view==='incidents'){await cachedOrLiveList('incident',force);if(!controlsData&&!controlsPromise){controlsPromise=loadControls();try{await controlsPromise;}finally{controlsPromise=null;}}}
   else if(view==='events')await cachedOrLiveList('event',force);
+  else if(view==='http')await loadHttp();
   else if(view==='notifications')await loadNotifications();
   else if(view==='collection')await loadCollection();
   else if(view==='controls')await loadControls();
@@ -124,6 +129,7 @@ function changeWorkspaceSource(){
  saveView();updateRefreshButton();loadWorkspaceView();scheduleAutoRefresh();
 }
 function initializeWorkspace(){
+ initializeHttp();
  for(const name of workspaceViews){
   const button=$('workspace-tab-'+name);button.addEventListener('click',()=>selectWorkspace(name));
   button.addEventListener('keydown',event=>{const index=workspaceViews.indexOf(name);let next=null;if(['ArrowDown','ArrowRight'].includes(event.key))next=(index+1)%workspaceViews.length;else if(['ArrowUp','ArrowLeft'].includes(event.key))next=(index+workspaceViews.length-1)%workspaceViews.length;else if(event.key==='Home')next=0;else if(event.key==='End')next=workspaceViews.length-1;if(next!==null){event.preventDefault();selectWorkspace(workspaceViews[next]);$('workspace-tab-'+workspaceViews[next]).focus();}});
@@ -153,6 +159,7 @@ def arrange(html):
     assert len(sections) == 8
     sections[0] = sections[0].replace("<section>", '<section id="overview-section">', 1)
     mapped = {re.search(r'id="([^"]+)"', section).group(1): section for section in sections}
+    mapped["http-section"] = HTTP_SECTION
     detail = mapped.pop("detail-section")
     detail = detail.replace('<h2 id="detail-title">记录详情</h2>', '<div class="drawer-heading"><h2 id="detail-title">记录详情</h2><button id="detail-close" type="button" aria-label="关闭详情">关闭 ✕</button></div>', 1)
     original = '<pre id="detail">选择上方记录查看详情。</pre>'
@@ -190,6 +197,6 @@ def arrange(html):
     nav += '<div class="nav-note">证据核对 · 人工处置</div></nav>'
     prefix = prefix.replace('SecAgent RiskOps · 实时日志', '安全运营工作区', 1)
     prefix = prefix.replace('默认手动刷新，保留当前来源、筛选、页码与已打开的详情。日志查询固定在本次快照；点击“获取最新日志”重新查询并回到第一页。自动刷新仅在页面可见且没有读取任务时运行。', '后台同步概览与首页告警。日志翻页固定在本次快照；“获取最新日志”重新读取。自定义视图可选择刷新间隔。')
-    prefix = prefix.replace('<div class="card">', '<div class="card"><span class="muted">全局 · </span>')
+    prefix = prefix.replace('<div class="card">', '<div class="card"><span class="muted">SSH · </span>')
     sync = '<div id="console-sync-line" class="sync-line" data-stale="true"><span class="sync-dot" aria-hidden="true"></span><span id="console-sync" role="status">正在读取服务器准备的数据…</span></div>'
-    return head + '<body><div class="workspace-shell">' + nav + '<main class="workspace-main"><header class="workspace-header">' + prefix + sync + '</header>' + ''.join(panels) + '</main></div><dialog id="detail-dialog" aria-labelledby="detail-title">' + detail + '</dialog><script>' + script
+    return head + '<body><div class="workspace-shell">' + nav + '<main class="workspace-main"><header class="workspace-header">' + prefix + sync + '</header>' + ''.join(panels) + '</main></div><dialog id="detail-dialog" aria-labelledby="detail-title">' + detail + '</dialog>' + HTTP_DIALOG + '<script>' + script

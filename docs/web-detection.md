@@ -3,8 +3,9 @@
 The first non-SSH increment is an **offline structured HTTP access-log parser
 and three request-pattern rules**. An opt-in [durable HTTP collection and
 receipt store](http-ingestion.md) now supports isolated ingestion exercises.
-Continuous rule execution, console incidents, scoring and notifications are
-not connected yet. It does not make model calls. A
+The same rules now feed bounded background correlation, versioned HTTP cases,
+HTTP-specific scores and console notifications; see that ingestion guide for
+window and coverage limits. Neither path makes model calls. A
 real web service and a reviewed collection configuration are needed before
 claiming production HTTP coverage.
 
@@ -62,9 +63,8 @@ requests to forwarded client addresses. See the official
 [realip module](https://nginx.org/en/docs/http/ngx_http_realip_module.html).
 
 Records outside this contract (including malformed request lines with missing
-method/path) fail offline validation. Production ingestion will need explicit
-rejected-record accounting and coverage reporting; silently skipping them is
-not an acceptable integration strategy.
+method/path) fail offline validation. The opt-in collector uses explicit rejected-record receipts and coverage
+reporting; it never treats invalid lines as successfully parsed events.
 
 ## Rules, version 1
 
@@ -95,8 +95,9 @@ need application authentication events or a configured, tested result mapping.
   total; inputs over a limit fail rather than return incomplete findings.
 - Peer grouping behind a proxy can combine many users. Trust-aware attribution,
   service inventories, tuning and operator feedback belong to live integration.
-- Live integration must add an independent collection cursor/receipt protocol,
-  rotation/restart/duplicate handling, coverage reporting, durable evidence and
-  HTTP-specific scoring/notifications without changing existing SSH results.
+- The live path now has independent collection receipts, rotation/restart
+  handling, bounded analysis and versioned evidence. Real-source acceptance,
+  HTTP backup/restore mapping, capacity monitoring and HTTP daily briefings
+  remain follow-up work; synthetic exercises do not establish production coverage.
 - Detection expansion order is HTTP/Web first, connection/DNS/firewall telemetry
   second, Linux host behaviour third. Each requires its own actual data source.
