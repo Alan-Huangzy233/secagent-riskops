@@ -61,6 +61,32 @@ class SourceConfig(BaseModel):
         return value
 
 
+class HttpSourceConfig(SourceConfig):
+    services: tuple[str, ...] = Field(min_length=1, max_length=32)
+
+    @field_validator("services")
+    @classmethod
+    def valid_services(cls, values):
+        import re
+        if len(set(values)) != len(values) or any(not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", v) for v in values):
+            raise ValueError("Invalid or duplicate HTTP service identity")
+        return values
+
+
+class HttpIngestConfig(BaseModel):
+    model_config = {"extra": "forbid", "frozen": True}
+    database_path: str = Field(min_length=1)
+    sources: tuple[HttpSourceConfig, ...] = Field(min_length=1, max_length=200)
+    retention_days: int = Field(default=14, ge=1, le=365)
+
+    @field_validator("database_path")
+    @classmethod
+    def absolute_database(cls, value):
+        if not Path(value).is_absolute():
+            raise ValueError("HTTP database must be an absolute persistent path")
+        return value
+
+
 class LiveConfig(BaseModel):
     model_config = {"extra": "forbid", "frozen": True}
 
@@ -72,6 +98,7 @@ class LiveConfig(BaseModel):
     heartbeat_timeout_seconds: int = Field(default=300, ge=60, le=3600)
     notifications_enabled: bool = True
     console_cache_enabled: bool = False
+    http_ingest: HttpIngestConfig | None = None
     notification_backup_directories: tuple[str, ...] = Field(default=(), max_length=8)
 
     @field_validator("notification_backup_directories")
@@ -100,6 +127,15 @@ class LiveConfig(BaseModel):
             raise ValueError("Duplicate source id")
         if len({source.token_sha256 for source in self.sources}) != len(self.sources):
             raise ValueError("Each source must have an independent token")
+        if self.http_ingest:
+            http_sources = self.http_ingest.sources
+            if len({s.id for s in http_sources}) != len(http_sources):
+                raise ValueError("Duplicate HTTP source identity")
+            all_sources = (*self.sources, *http_sources)
+            if len({s.token_sha256 for s in all_sources}) != len(all_sources):
+                raise ValueError("HTTP sources require independent tokens")
+            if Path(self.http_ingest.database_path).resolve() == Path(self.database_path).resolve():
+                raise ValueError("HTTP storage must be separate from SSH storage")
         return self
 
 

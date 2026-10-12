@@ -1,6 +1,6 @@
 # Production plan and issue tracking
 
-Updated 2026-10-08. Further demo work is paused while development focuses on the
+Updated 2026-10-11. Further demo work is paused while development focuses on the
 independent telemetry pilot. This is a plan, not a statement that the features
 below are implemented or deployed. See [implementation status](./implementation-status.md).
 Historical issue-seeding files in `docs/process/` are provenance, not a live
@@ -28,8 +28,12 @@ by default; real-provider rollout and broader independent validation are still
 pending. Historical demo results retain their original attribution.
 
 The offline HTTP parser, three rules and evidence replay are in
-[merged PR #116](https://github.com/Alan-Huangzy233/secagent-riskops/pull/116). Live HTTP collection/integration and an actual source are
-still needed before claiming production HTTP coverage.
+[merged PR #116](https://github.com/Alan-Huangzy233/secagent-riskops/pull/116).
+The next increment adds [opt-in durable HTTP collection and ingestion](http-ingestion.md),
+with independent storage, retry receipts and an isolated end-to-end simulation.
+Next are continuous correlation, retained incident evidence, HTTP-appropriate
+scoring, console/notification integration, recovery coverage and real-source
+acceptance. Issue #119 remains open; there is no production HTTP coverage claim.
 
 | Work | Issue | Acceptance boundary |
 | --- | --- | --- |
