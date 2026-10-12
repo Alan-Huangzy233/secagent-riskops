@@ -1,0 +1,54 @@
+{
+  "host_id": "example-host",
+  "description": "Example additions for same-host HTTP collection; merge with the deployment's existing component inventory",
+  "recipients": ["REPLACE_WITH_THE_40_HEX_FINGERPRINT_OF_AN_OFF_HOST_KEY"],
+  "components": [
+    {
+      "name": "collector",
+      "kind": "state_dir",
+      "path": "/var/lib/secagent-riskops-collector",
+      "patterns": ["*.state.json", "*.pending.json"]
+    },
+    {
+      "name": "http-collector",
+      "kind": "state_dir",
+      "path": "/var/lib/secagent-riskops-http-collector",
+      "patterns": ["*.state.json", "*.pending.json"]
+    },
+    {
+      "name": "telemetry",
+      "kind": "sqlite",
+      "path": "/var/lib/secagent-riskops/live.sqlite",
+      "description": "SSH data plus HTTP notification inbox/outbox and imported revision checkpoints"
+    },
+    {
+      "name": "http",
+      "kind": "sqlite",
+      "path": "/var/lib/secagent-riskops-http/http.sqlite",
+      "description": "HTTP records, receipts, analysis cursor, revisions, retained evidence and notification intent"
+    },
+    {
+      "name": "control",
+      "kind": "sqlite",
+      "path": "/var/lib/secagent-riskops/control.sqlite"
+    },
+    {
+      "name": "configuration",
+      "kind": "state_dir",
+      "path": "/etc/secagent-riskops",
+      "patterns": ["config.json", "http-collector.json"],
+      "description": "Example names: replace with the actual API/collector config filenames; contains private credentials"
+    },
+    {
+      "name": "release",
+      "kind": "reference",
+      "path": "/opt/secagent-riskops/current"
+    }
+  ],
+  "http_recovery": {
+    "http_database": "http",
+    "console_database": "telemetry",
+    "collector_states": ["http-collector"],
+    "lock_timeout_seconds": 5
+  }
+}

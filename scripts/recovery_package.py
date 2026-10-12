@@ -13,14 +13,17 @@ cursor captured *before* a database snapshot can never point past the events
 that snapshot already contains. Restoring such a pair replays a little journal
 that the receipt table rejects as duplicate; the reverse order would skip
 events for good. The guarantee needs no maintenance window, so building a
-package does not interrupt collection.
+package needs no service shutdown. For HTTP, explicitly pair both WAL databases
+and hold every local collector lock until the read snapshots are pinned; release
+all writer/collector locks before the bulk copies.
 """
 from __future__ import annotations
 
 import argparse
-from contextlib import closing
+from contextlib import closing, contextmanager, ExitStack
 from datetime import datetime, timezone
 import grp
+import fcntl
 import hashlib
 import json
 import os
@@ -29,10 +32,12 @@ import re
 import secrets
 import shutil
 import sqlite3
+import stat
 import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 
 MANIFEST_VERSION = 1
 TOOL_VERSION = 1
@@ -120,12 +125,42 @@ def validate_component(raw: object, seen: set[str]) -> dict:
     return component
 
 
+def validate_http_recovery(raw: object, components: list[dict]) -> dict:
+    """An explicit same-host cohort; it cannot silently omit cursor/spool files."""
+    allowed = {'http_database', 'console_database', 'collector_states', 'lock_timeout_seconds'}
+    if not isinstance(raw, dict) or set(raw) - allowed:
+        raise PackageError('http_recovery has invalid fields')
+    by_name = {item['name']: item for item in components}
+    result = {}
+    for role in ('http_database', 'console_database'):
+        name = raw.get(role)
+        if not isinstance(name, str) or name not in by_name or by_name[name]['kind'] != 'sqlite':
+            raise PackageError(f'http_recovery {role} must name a sqlite component')
+        result[role] = name
+    paths = [Path(by_name[result[role]]['path']).resolve() for role in ('http_database', 'console_database')]
+    if paths[0] == paths[1]:
+        raise PackageError('HTTP and console recovery databases must be separate')
+    states = raw.get('collector_states')
+    if not isinstance(states, list) or not states or any(not isinstance(v, str) for v in states) or len(set(states)) != len(states):
+        raise PackageError('http_recovery needs distinct local collector state components')
+    for name in states:
+        spec = by_name.get(name)
+        if not spec or spec['kind'] != 'state_dir' or set(spec['patterns']) != {'*.state.json', '*.pending.json'}:
+            raise PackageError('HTTP collector components must include exactly *.state.json and *.pending.json')
+    if len({str(Path(by_name[name]['path']).resolve()) for name in states}) != len(states):
+        raise PackageError('HTTP collector state paths must be distinct')
+    seconds = raw.get('lock_timeout_seconds', 5)
+    if type(seconds) is not int or not 1 <= seconds <= 10:
+        raise PackageError('HTTP snapshot lock timeout must be 1-10 seconds')
+    return {**result, 'collector_states': states, 'lock_timeout_seconds': seconds}
+
+
 def load_config(path: Path) -> dict:
     try:
         raw = json.loads(path.read_text(encoding='utf-8'))
     except json.JSONDecodeError as error:
         raise PackageError(f'configuration is not valid JSON: {error}') from error
-    allowed = {'host_id', 'description', 'components', 'recipients'}
+    allowed = {'host_id', 'description', 'components', 'recipients', 'http_recovery'}
     if not isinstance(raw, dict) or set(raw) - allowed:
         raise PackageError(f'configuration must be an object with keys {sorted(allowed)}')
     components, seen = [], set()
@@ -139,9 +174,12 @@ def load_config(path: Path) -> dict:
     recipients = raw.get('recipients', [])
     if not isinstance(recipients, list):
         raise PackageError('recipients must be a list of 40-hex fingerprints')
-    return {'host_id': _text(raw.get('host_id'), 'host_id', NAME_RE),
-            'description': raw.get('description') or '', 'components': components,
-            'recipients': [_fingerprint(item) for item in recipients]}
+    result = {'host_id': _text(raw.get('host_id'), 'host_id', NAME_RE),
+              'description': raw.get('description') or '', 'components': components,
+              'recipients': [_fingerprint(item) for item in recipients]}
+    if 'http_recovery' in raw:
+        result['http_recovery'] = validate_http_recovery(raw['http_recovery'], components)
+    return result
 
 
 def stable_copy(source: Path, target: Path) -> dict:
@@ -187,13 +225,142 @@ def capture_state_dir(spec: dict, contents: Path) -> dict:
             'bytes': sum(entry['bytes'] for entry in files.values())}
 
 
+@contextmanager
+def locked_http_collectors(specs: list[dict]):
+    """Keep cursors/spools stable until both database read snapshots are pinned.
+
+    A rotation creates a random file generation, so an older cursor alone is
+    not enough: replay must not invent a new generation for already-saved rows.
+    These locks are released before copying the databases or encrypting them.
+    """
+    with ExitStack() as stack:
+        for spec in sorted(specs, key=lambda item: item['path']):
+            source = Path(spec['path'])
+            if source.is_symlink() or not source.is_dir():
+                raise PackageError('HTTP collector state directory is unavailable')
+            try:
+                descriptor = os.open(source / 'collector.lock',
+                                     os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
+                lock = stack.enter_context(os.fdopen(descriptor, 'wb'))
+                if not stat.S_ISREG(os.fstat(lock.fileno()).st_mode):
+                    raise OSError('not a regular lock file')
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                raise PackageError('HTTP collector is busy or its lock is unavailable; retry the package') from None
+        yield
+
+
+@contextmanager
+def pinned_http_databases(specs: list[dict], timeout: int):
+    """Pin both WAL read snapshots under brief writer locks, then release writers.
+
+    SQLite's backup API then reads the pinned transactions while collection and
+    delivery continue. Never copy from a connection holding a write transaction.
+    """
+    deadline = time.monotonic() + timeout
+    writers = []
+    with ExitStack() as stack:
+        readers = {}
+        try:
+            files = [Path(spec['path']) for spec in specs]
+            if any(path.is_symlink() or not path.is_file() for path in files):
+                raise PackageError('HTTP recovery needs regular database files')
+            if len({(path.stat().st_dev, path.stat().st_ino) for path in files}) != len(files):
+                raise PackageError('HTTP recovery databases cannot alias the same file')
+            for spec in sorted(specs, key=lambda item: item['path']):
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise PackageError('HTTP snapshot lock deadline exceeded')
+                uri = Path(spec['path']).as_uri()
+                writer = sqlite3.connect(uri + '?mode=rw', uri=True, timeout=remaining, isolation_level=None)
+                writers.append(writer)
+                if writer.execute('PRAGMA journal_mode').fetchone()[0] != 'wal':
+                    raise PackageError('HTTP recovery requires WAL databases')
+                writer.execute('BEGIN IMMEDIATE')
+            for spec in specs:
+                reader = stack.enter_context(closing(sqlite3.connect(
+                    Path(spec['path']).as_uri() + '?mode=ro', uri=True,
+                    timeout=max(0, deadline-time.monotonic()), isolation_level=None)))
+                reader.execute('PRAGMA query_only=ON')
+                reader.execute('BEGIN')
+                reader.execute('SELECT count(*) FROM sqlite_master').fetchone()  # Establish the snapshot now.
+                readers[spec['name']] = reader
+            if time.monotonic() > deadline:
+                raise PackageError('HTTP snapshot lock deadline exceeded')
+            pinned_at = utc_now()
+        except sqlite3.Error:
+            raise PackageError('HTTP snapshot cohort is busy or unavailable; retry the package') from None
+        finally:
+            for writer in reversed(writers):
+                try:
+                    writer.rollback()
+                finally:
+                    writer.close()
+        # The snapshots are simultaneous; writers are free before expensive copying/checks.
+        yield readers, pinned_at
+
+
+def check_http_pair(http: sqlite3.Connection, console: sqlite3.Connection) -> dict:
+    """Detect restore cohorts that would suppress an unsent source revision."""
+    try:
+        row = http.execute("SELECT value FROM http_analysis_meta WHERE name='producer_id'").fetchone()
+        producer = json.loads(row[0]) if row else None
+        if not isinstance(producer, str) or not re.fullmatch('[0-9a-f]{32}', producer):
+            raise ValueError
+        prefix = 'http-import:http:' + producer + ':'
+        imported = 0
+        for topic, revision, pending in http.execute('SELECT topic,revision,pending FROM http_notice_outbox'):
+            if not topic.startswith('http:'+producer+':') or type(revision) is not int or revision < 1 or pending not in (0, 1):
+                raise ValueError
+            row = console.execute('SELECT value FROM notification_meta WHERE name=?', ('http-import:'+topic,)).fetchone()
+            value = json.loads(row[0]) if row else 0
+            if type(value) is not int or not 0 <= value <= revision or (not pending and value != revision):
+                raise ValueError
+            imported += bool(value)
+        for name, in console.execute('SELECT name FROM notification_meta WHERE name LIKE ?', (prefix+'%',)):
+            topic = name.removeprefix('http-import:')
+            if not http.execute('SELECT 1 FROM http_notice_outbox WHERE topic=?', (topic,)).fetchone():
+                raise ValueError
+        # These queues are part of the cohort even if no delivery has occurred yet.
+        console.execute('SELECT 1 FROM notification_inbox LIMIT 1').fetchone()
+        console.execute('SELECT 1 FROM notification_outbox LIMIT 1').fetchone()
+    except (sqlite3.Error, ValueError, TypeError):
+        raise PackageError('HTTP/console notification checkpoints are incompatible') from None
+    return {'producer_id': producer, 'imported_topics': imported, 'notification_checkpoints': 'compatible'}
+
+
+def inspect_http_recovery(manifest: dict, directory: Path) -> dict | None:
+    policy = manifest.get('consistency', {}).get('http_recovery')
+    if policy is None:
+        return None
+    try:
+        specs = {item['name']: item for item in manifest['components']}
+        with ExitStack() as stack:
+            databases = []
+            names = [policy[role] for role in ('http_database', 'console_database')]
+            if names[0] == names[1]:
+                raise ValueError
+            for name in names:
+                spec = specs[name]
+                if spec['kind'] != 'sqlite' or not NAME_RE.fullmatch(name) or spec['stored_as'] != name+'.sqlite':
+                    raise ValueError
+                uri = (directory / spec['stored_as']).as_uri() + '?mode=ro&immutable=1'
+                databases.append(stack.enter_context(closing(sqlite3.connect(uri, uri=True))))
+            checks = check_http_pair(*databases)
+            if checks['producer_id'] != policy['producer_id']:
+                raise ValueError
+            return checks
+    except (KeyError, TypeError, ValueError, sqlite3.Error):
+        raise PackageError('Invalid HTTP recovery cohort metadata') from None
+
+
 def _table_counts(database: sqlite3.Connection) -> dict[str, int]:
     names = [row[0] for row in database.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")]
     return {name: database.execute(f'SELECT count(*) FROM "{name}"').fetchone()[0] for name in names}
 
 
-def snapshot_database(spec: dict, contents: Path, census: bool) -> dict:
+def snapshot_database(spec: dict, contents: Path, census: bool, *, origin=None) -> dict:
     """Copy a live database with the SQLite backup API and describe the result."""
     source = Path(spec['path'])
     if source.is_symlink() or not source.is_file():
@@ -201,7 +368,11 @@ def snapshot_database(spec: dict, contents: Path, census: bool) -> dict:
     stored_as = f'{spec["name"]}.sqlite'
     target = contents / stored_as
     started_at = utc_now()
-    with closing(sqlite3.connect(f'{source.as_uri()}?mode=ro', uri=True)) as origin:
+    with ExitStack() as stack:
+        if origin is None:
+            origin = stack.enter_context(closing(sqlite3.connect(f'{source.as_uri()}?mode=ro', uri=True)))
+            if origin.execute("SELECT 1 FROM sqlite_master WHERE name='http_receipts'").fetchone():
+                raise PackageError('HTTP databases require an explicit http_recovery cohort')
         with closing(sqlite3.connect(target)) as copy:
             origin.backup(copy)
             if copy.execute('PRAGMA quick_check').fetchone()[0] != 'ok':
@@ -387,11 +558,31 @@ def build(args: argparse.Namespace) -> int:
         state_specs = [item for item in config['components'] if item['kind'] == 'state_dir']
         rest = [item for item in config['components'] if item['kind'] != 'state_dir']
         started_at = utc_now()
-        components = [capture_state_dir(spec, contents) for spec in state_specs]
+        policy = config.get('http_recovery')
+        http_states = policy['collector_states'] if policy else []
+        components = [capture_state_dir(spec, contents) for spec in state_specs if spec['name'] not in http_states]
         snapshots_started_at = utc_now()
+        cohort = None
+        captured = set()
+        if policy:
+            by_name = {item['name']: item for item in config['components']}
+            pair = [by_name[policy[role]] for role in ('http_database', 'console_database')]
+            with ExitStack() as collector_locks:
+                local_states = [by_name[name] for name in http_states]
+                collector_locks.enter_context(locked_http_collectors(local_states))
+                components.extend(capture_state_dir(spec, contents) for spec in local_states)
+                with pinned_http_databases(pair, policy['lock_timeout_seconds']) as (readers, pinned_at):
+                    collector_locks.close()  # No new generations between cursor capture and DB snapshot.
+                    checks = check_http_pair(readers[policy['http_database']], readers[policy['console_database']])
+                    cohort = {**policy, **checks, 'pinned_at': pinned_at, 'writers_released_before_copy': True,
+                              'collectors_locked_until_pin': True, 'scope': 'same-host collectors and paired WAL databases'}
+                    for spec in pair:
+                        components.append(snapshot_database(spec, contents, args.census, origin=readers[spec['name']]))
+                        captured.add(spec['name'])
         for spec in rest:
-            components.append(snapshot_database(spec, contents, args.census) if spec['kind'] == 'sqlite'
-                              else capture_reference(spec))
+            if spec['name'] not in captured:
+                components.append(snapshot_database(spec, contents, args.census) if spec['kind'] == 'sqlite'
+                                  else capture_reference(spec))
         manifest = {
             'manifest_version': MANIFEST_VERSION, 'backup_id': backup_id, 'host_id': config['host_id'],
             'description': config['description'], 'created_at': started_at,
@@ -402,6 +593,11 @@ def build(args: argparse.Namespace) -> int:
                             'snapshots_started_at': snapshots_started_at, 'snapshots_finished_at': utc_now(),
                             'collection_paused': False},
             'components': components, 'restore': restore_plan(components)}
+        if cohort:
+            manifest['consistency']['http_recovery'] = cohort
+            manifest['restore']['notes'].append('Restore the HTTP and console databases from this SAME package, '
+                'together with its HTTP cursor/spool files. Keep the collector endpoint, source/service identities '
+                'and log path mapping unchanged. Remote collectors need a separately coordinated recovery plan.')
         inner = contents / MANIFEST_NAME
         inner.write_text(json.dumps(manifest, indent=2, sort_keys=True) + '\n', encoding='utf-8')
         manifest['inner_manifest_sha256'] = digest_file(inner)[0]
@@ -648,6 +844,8 @@ def verify(args: argparse.Namespace) -> int:
                 components.append(inspect_component(component, work))
             report['components'] = components
             report['ok'] = report['ok'] and all(item['ok'] for item in report['components'])
+            if report['ok'] and manifest.get('consistency', {}).get('http_recovery'):
+                report['http_recovery'] = inspect_http_recovery(manifest, work)
             if destination is not None:
                 report['extracted_to'] = str(destination)
         finally:

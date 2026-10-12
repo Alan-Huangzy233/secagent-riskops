@@ -40,6 +40,15 @@ jobs:
       - name: HTTP ingestion, continuous incidents and console notification simulation
         run: PYTHONPATH=backend python scripts/simulate_http_ingest.py
 
+      - name: Real Nginx rotation, encrypted HTTP recovery and replay
+        timeout-minutes: 5
+        run: |
+          sudo apt-get update -qq
+          mkdir -p "$RUNNER_TEMP/riskops-nginx"
+          (cd "$RUNNER_TEMP/riskops-nginx" && apt-get download nginx && dpkg-deb --extract nginx_*.deb root)
+          PYTHONPATH=backend python scripts/simulate_http_recovery.py \
+            --nginx "$RUNNER_TEMP/riskops-nginx/root/usr/sbin/nginx"
+
       - name: Safety demo reproduces the published audit timeline
         run: |
           PYTHONPATH=backend python -m app.safety_demo

@@ -250,7 +250,10 @@ Validate a real source's format, peer semantics, rejected-line rate, rotation,
 catch-up resource use and TLS/source authorization. Validate analysis latency,
 context bounds, scoring usefulness and alert volume against that workload.
 Extend the environment's backup/recovery mapping to include this independent
-HTTP database and the collector state/spool, then perform a restore rehearsal.
+HTTP database, console notification checkpoints and collector state/spool, then
+perform the [paired HTTP recovery rehearsal](http-recovery.md). The same-host
+recovery mapping and an isolated real-Nginx drill are now available; remote
+collectors and full-host restore still need separate acceptance.
 The existing SSH recovery-package automation does **not** discover these new
 paths automatically. No source is enrolled by merging this increment.
 
