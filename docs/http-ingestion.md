@@ -7,7 +7,8 @@ and exposes scored, versioned cases in a separate console table. Qualifying
 HTTP cases use the existing console notification queue. HTTP collection is
 still disabled unless `http_ingest` is configured; this does not enroll a real
 source or complete #119. SSH evidence, scoring, response actions and AI remain
-separate. Daily briefings currently cover SSH only.
+separate. Daily briefings summarize SSH and HTTP separately; see
+[HTTP daily briefings](console-notifications.md#http-daily-briefings).
 
 ## Run the isolated simulation
 
