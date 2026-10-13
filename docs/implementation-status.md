@@ -4,7 +4,7 @@ The other documents in this repository describe the **target design**. This
 page records what is **actually implemented in code** so the two are never
 confused.
 
-Last reviewed: 2026-10-03. The walking skeleton and measured demo baseline are
+Last reviewed: 2026-10-03; HTTP collection/recovery sections updated 2026-10-12. The walking skeleton and measured demo baseline are
 preserved; further demo work is paused. Active development targets the independent
 SSH/auth telemetry pilot. The [production plan](./production-plan.md) tracks
 model comparison and broader detection; planned capabilities are not claims of
@@ -59,7 +59,7 @@ Run it: `make install && make test && make demo`.
 | 中文只读来源、日志和事件页面；无 CDN，日志按文本渲染 | `backend/app/telemetry/dashboard.py` |
 | 固定命令 journal 导出与受限 relay | `scripts/journal_export.py` |
 | 最早未读前缀轮询、本地 spool、持久化确认后推进游标 | `scripts/telemetry_collector.py` |
-| 可选 HTTP 结构化日志本地采集、独立来源凭据/数据库、批次与事件回执、轮转/拒收报告、持久化 ACK 后推进文件游标；隔离入库后规则回放，尚未接持续关联/评分/页面/通知 | `scripts/http_collector.py`, `backend/app/telemetry/http_store.py`, `http_api.py`, [范围与验证](http-ingestion.md) |
+| 可选 HTTP 结构化日志本地采集、独立来源凭据/数据库、批次与事件回执、轮转/拒收报告、持久化 ACK 后推进文件游标；持续关联、版本证据、评分、独立表格与站内通知；真实来源尚需验收 | `scripts/http_collector.py`, `backend/app/telemetry/http_store.py`, `http_api.py`, [范围与验证](http-ingestion.md) |
 | localhost API、VPN socket proxy、采集/备份定时单元 | `deploy/systemd/` |
 | SQLite 一致恢复副本与完整性检查 | `scripts/backup_telemetry.py` |
 | IPv4 / IPv6 离线属地、ASN 查询；DB-IP 月度库原子更新 | `backend/app/telemetry/geoip.py`, `scripts/update_geoip.py` |
@@ -75,11 +75,12 @@ Run it: `make install && make test && make demo`.
 | 目标端固定 helper 只改自有 nft 表的本机入站规则，保护地址检查、到期自动解除、永久与未到期条目开机恢复；普通账号固定 relay 网关 | `scripts/ssh_block_control.py`, `scripts/control_gateway.py`, `deploy/systemd/secagent-riskops-control-restore.service` |
 | 告警处置状态（待处理 / 已知晓 / 已处理）：受限的人工转换、封禁核实后自动标为已处理、新证据自动回到待处理、合并保留较低状态、处置记录与按状态筛选计数 | `backend/app/telemetry/store.py`, `backend/app/live_api.py`, `backend/app/telemetry/dashboard.py`, `docs/ssh-detection.md` |
 | 恢复包：先游标后快照的一致捕获、SHA-256 与 schema 指纹清单、zstd 压缩、gpg 指纹加密与清单签名、原子发布、摘要校验 / 深度校验 / 隔离目录恢复演练 | `scripts/recovery_package.py`, `deploy/recovery-package.example.json` |
+| HTTP 同机恢复：锁定全部本地 collector 至两库 WAL 读快照固定，复制前释放写锁；保存通知修订检查点与游标/spool，校验加密恢复和真实 Nginx 请求/轮转重试 | `scripts/recovery_package.py`, `scripts/simulate_http_recovery.py`, [边界与演练](http-recovery.md) |
 | 备份节点主动拉取：固定命令只允许列出 / 取用清单内文件 / 按自身节点名回执，不接受路径、不开 shell；拉取端逐文件校验后才发布副本并回执；本地轮换只删除"已有独立副本确认且超出保留代数"的包 | `scripts/backup_export.py`, `scripts/pull_recovery_packages.py`, `scripts/recovery_package.py` |
 | 采集完整性：按来源持久记录缺口（覆盖起点、游标丢失、来源日志轮转；区间只算到恢复窗口起点，窗口与已收日志重叠时不算缺口）和延迟（来源读取失败、5 分钟无批次、批次在本地排队、积压追赶），缺口永不覆盖；满页时同一轮有界多页追赶；控制台把在线、采集完整性、延迟 / 追赶分列显示，另有采集记录；恢复包还原后可写入恢复点 | `backend/app/telemetry/collection.py`, `scripts/telemetry_collector.py`, `backend/app/telemetry/dashboard.py`, `scripts/recovery_package.py` |
 | 可选人工 AI 复核：有界别名化摘要预览、可信私有上下文、持久队列 / 租约 / 总额与每日预算、缓存和未知调用恢复、证据版本历史与人工反馈；默认禁用，离线验收 | `backend/app/telemetry/ai_summary.py`, `ai_jobs.py`, `ai_triage.py`, `ai_dashboard.py`, [说明](manual-ai-triage.md) |
 
-试点仅覆盖进入部署者指定 journal 过滤范围的 SSH/auth 日志，不提供全网络活动可见性，
+试点默认覆盖部署者指定 journal 过滤范围的 SSH/auth 日志；可选 HTTP 需单独配置和验收，不提供全网络活动可见性，
 默认不调用模型；可选 AI 模式与外发边界见上表，开发完成不代表已上线。封禁只在单个操作员预览并勾选确认后执行，规则命中不会自动封禁；
 封禁只作用于目标本机入站（不过滤转发流量），是单操作员手动控制，不是完整的角色 / 审批体系。raw events 默认保留 14 天，receipts 和事件证据不会自动
 随之清除。首次覆盖窗口、日志轮转、积压追赶和消息截断会作为缺口、延迟或提示写入采集记录，
@@ -121,14 +122,24 @@ outside write transactions. The console reports queue/worker status and whether
 backup monitoring is configured. External push and per-user inboxes remain
 future work. See [console-notifications.md](./console-notifications.md).
 
-## HTTP detection foundation (offline; not deployed)
+## HTTP detection (opt-in; real-source acceptance pending)
 
-Structured HTTP access records can be replayed through three versioned rules:
-sensitive-resource probes, path-traversal attempts and multi-path scans. Findings
-retain their evidence and never claim an exploit or login succeeded. A synthetic
-fixture and CLI report reproduce in CI; a Nginx JSON-format example is provided.
-Live HTTP ingestion, console integration, scoring and notifications are still
-future work. See [web-detection.md](./web-detection.md).
+Structured HTTP access records feed three versioned rules: sensitive-resource
+probes, path-traversal attempts and multi-path scans. The local collector and
+authenticated API persist receipts before advancing cursors. Bounded workers
+correlate records across batches, retain case/evidence revisions, score request
+patterns and publish to the console's separate HTTP table and notification inbox.
+Findings never claim an exploit or login succeeded. See
+[web-detection.md](web-detection.md) and [http-ingestion.md](http-ingestion.md).
+
+The explicit same-host recovery mapping pins the HTTP and console databases
+with their collector cursor/spool state. CI exercises real loopback Nginx
+requests, rename/reopen, lost ACKs, encrypted/signed restoration, historical
+evidence and idempotent replay. The [recovery runbook](http-recovery.md) documents
+retained log inodes, lock contention and the exact guarantee. Real-source
+TLS/workload acceptance, remote/whole-host recovery, an HTTP restore-history
+marker and HTTP daily briefings remain follow-up work. None of these fixtures
+claims production coverage or measures detection accuracy.
 
 ## Known limitations of the skeleton
 

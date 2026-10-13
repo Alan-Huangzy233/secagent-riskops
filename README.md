@@ -114,7 +114,7 @@ raw logs ─► detection rules ─► alerts ─► dedup ─► correlate ─�
 | Alert reduction: dedup, correlation, explainable score, measured in [EVALUATION.md](./EVALUATION.md) | Approval service with a second approver and authenticated approvers |
 | Configurable model triage APIs with a shared budget; historical Claude results recorded and replayable ([guide](./docs/model-triage.md)) | Typed executors on real hosts (SSH, GitHub); only lab copies today |
 | SSH/auth detection rules: burst, slow scan, multiple accounts, cross-source, success after failures | Web console (SOC inbox, approval queue); `frontend/` is a placeholder |
-| HTTP request-pattern rules plus opt-in durable collection, versioned cases, scoring and console notifications ([guide](./docs/http-ingestion.md)) | HTTP real-source acceptance, recovery mapping and daily briefings |
+| HTTP request-pattern rules, opt-in durable collection, versioned/scored cases, console notifications ([guide](./docs/http-ingestion.md)) and [same-host recovery drill](./docs/http-recovery.md) | HTTP real-source acceptance, remote/whole-host recovery and daily briefings |
 | Evidence-grounded triage agent and skeptic gate | |
 | Fail-closed policy engine that refuses blank and ambiguous scope; hash-bound scope; approvals bound to the plan hash | |
 | Typed `harden_ssh_access` executor on lab copies: independent verification, automatic verified rollback | |
