@@ -203,3 +203,54 @@ def test_encrypted_restore_keeps_history_and_retries_import_without_a_second_not
     manifest['consistency']['http_recovery']['producer_id'] = '0'*32
     with pytest.raises(recovery.PackageError, match='metadata'):
         recovery.inspect_http_recovery(manifest, restored)
+
+
+@pytest.mark.parametrize('phase', ['in_progress', 'imported', 'delivered'])
+def test_paired_restore_resumes_briefing_and_never_delivers_it_twice(deployment, tmp_path, phase):
+    from app.telemetry import http_briefings, http_incidents
+    from test_http_incidents import BASE
+
+    seed(deployment)
+    report_now = max(NOW+1, (int(BASE//86400)+1)*86400+1)
+    http, console = deployment['http'], deployment['console']
+    assert http_briefings.advance(http, report_now, batch_size=3)
+    if phase != 'in_progress':
+        for _ in range(100):
+            if not http_briefings.advance(http, report_now, batch_size=3):
+                break
+        else:
+            pytest.fail('briefing did not finish')
+
+        def crash():
+            raise RuntimeError('lost source acknowledgment after console import')
+
+        with pytest.raises(RuntimeError):
+            publish(http, console, report_now, after_import=crash)
+        if phase == 'delivered':
+            console.run_notifications([], now=report_now)
+    with http.connection() as db:
+        checkpoint = http_incidents.meta(db, 'briefing_work')
+        assert (checkpoint is not None) == (phase == 'in_progress')
+    result = build(deployment, '--allow-unencrypted')
+    restored = tmp_path / 'restored-briefing'
+    verify(result['package'], '--into', str(restored))
+    saved = HttpStore(restored / 'http.sqlite')
+    restored_console = TelemetryStore(restored / 'telemetry.sqlite')
+    with saved.connection() as db:
+        assert http_incidents.meta(db, 'briefing_work') == checkpoint
+    for _ in range(100):
+        if not http_briefings.advance(saved, report_now, batch_size=3):
+            break
+    else:
+        pytest.fail('restored briefing did not finish')
+    for _ in range(2):
+        publish(saved, restored_console, report_now)
+        restored_console.run_notifications([], now=report_now)
+    reports = [n['payload'] for n in restored_console.list_notifications(kind='briefing')['items']
+               if n['payload'].get('report_type') == 'http_daily']
+    assert len(reports) == 1
+    assert reports[0]['counts']['requests'] == 20
+    assert reports[0]['counts']['cases'] == reports[0]['counts']['attention'] == 1
+    assert reports[0]['cutoff'] == report_now
+    with saved.connection() as db, restored_console._connection() as destination:
+        assert recovery.check_http_pair(db, destination)['notification_checkpoints'] == 'compatible'

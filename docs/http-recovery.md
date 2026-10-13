@@ -122,5 +122,6 @@ remote-source acceptance or whole-host disaster recovery. It makes no model
 calls or production writes. CI runs it with an extracted Ubuntu Nginx binary.
 
 Real-source deployment still needs workload/rotation/retention/TLS/capacity
-acceptance. HTTP daily briefings and a visible HTTP restore marker are not
-implemented by this increment; issue #119 remains open.
+acceptance. Separate HTTP daily briefings are documented in the
+[console notification guide](console-notifications.md#http-daily-briefings).
+A visible HTTP restore marker remains follow-up work; issue #119 remains open.
