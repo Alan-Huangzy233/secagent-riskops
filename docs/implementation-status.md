@@ -129,7 +129,9 @@ probes, path-traversal attempts and multi-path scans. The local collector and
 authenticated API persist receipts before advancing cursors. Bounded workers
 correlate records across batches, retain case/evidence revisions, score request
 patterns and publish to the console's separate HTTP table and notification inbox.
-Findings never claim an exploit or login succeeded. See
+Separate UTC HTTP daily briefings resume bounded aggregation after restart and
+preserve the input cutoff and historical case assessments. Findings never claim
+an exploit or login succeeded. See
 [web-detection.md](web-detection.md) and [http-ingestion.md](http-ingestion.md).
 
 The explicit same-host recovery mapping pins the HTTP and console databases
@@ -138,7 +140,7 @@ requests, rename/reopen, lost ACKs, encrypted/signed restoration, historical
 evidence and idempotent replay. The [recovery runbook](http-recovery.md) documents
 retained log inodes, lock contention and the exact guarantee. Real-source
 TLS/workload acceptance, remote/whole-host recovery, an HTTP restore-history
-marker and HTTP daily briefings remain follow-up work. None of these fixtures
+marker remain follow-up work. None of these fixtures
 claims production coverage or measures detection accuracy.
 
 ## Known limitations of the skeleton

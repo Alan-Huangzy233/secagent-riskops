@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, StrictBool, field_validator
 from typing import Literal
 
 from .http_parse import normalize_http
-from . import http_incidents
+from . import http_incidents, http_briefings
 
 IDENTITY = r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
 ReportCode = Literal["rotation_gap", "file_truncated", "file_unavailable", "partial_line",
@@ -96,6 +96,7 @@ class HttpStore:
                 );
             """)
             http_incidents.initialize(db)
+            http_briefings.initialize(db)
 
     @contextmanager
     def connection(self, write=False):
@@ -209,7 +210,7 @@ class HttpStore:
 
     def analysis_status(self):
         with self.connection() as db:
-            return http_incidents.status(db)
+            return {**http_incidents.status(db), **http_briefings.status(db)}
 
     def incidents(self, **kwargs):
         with self.connection() as db:

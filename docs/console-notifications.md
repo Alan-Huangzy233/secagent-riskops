@@ -105,3 +105,60 @@ Validation covers restart/replay, parallel workers, cooldown and escalation,
 handled/merged/stale-score cancellation, partial-write rollback and retries,
 collection/health recovery, UTC totals, paged aggregation with late arrivals,
 authentication/CSRF, and safe rendering/read actions.
+
+## HTTP daily briefings
+
+When HTTP ingestion and console notifications are enabled, the HTTP worker also
+produces a separate report for each completed UTC day. Both protocols appear
+under the existing **Daily briefings** filter, with `HTTP` explicitly in the
+HTTP report title. Existing SSH reports retain their original meaning and shape.
+No external notification service or AI call is involved.
+
+HTTP reports count retained requests by event day and response class; review
+cases by their UTC hour window, including attention, low, retracted and stale
+cases; and collector batches by their locally recorded receipt day, including
+rejected records, reported conditions and backlog. One case can match several
+rules and adjacent cases can share evidence. Condition counts are reporting
+batches, not distinct outages. Missing raw records are explicitly labelled as a
+cumulative detector total, not a daily loss estimate. Zero cases do not establish
+safety or coverage of services that were never enrolled.
+
+The first report covers yesterday. After downtime, reports catch up within the
+raw retention window and disclose skipped days. Each report freezes input
+sequence ceilings and a cutoff, uses event-time/receipt-day indexes, and reads
+at most 1,000 requests or batches, or 100 cases, per tick. Case totals use the
+latest preserved revision at the cutoff, so later retractions do not alter a
+partly generated report. Page aggregation holds no writer lock and has a
+five-second SQLite work deadline. Progress survives restart; compare-and-set
+checkpoints prevent concurrent workers from counting a page twice.
+
+A report notes any outstanding detector work and up to 50 incomplete context
+windows at its cutoff, including windows that could not produce a case. This
+coverage indicator is explicitly global, not a daily count. Retention during
+aggregation can still remove raw logs; late arrivals and later detection are
+not added to an already completed report. These are collection snapshots,
+not accuracy results or evidence of successful exploitation. Raw paths, IPs,
+headers and bodies are not included in the report payload.
+
+Completion and a producer-scoped outbox record commit together. The existing
+HTTP-to-console bridge remembers the source revision, including a crash after
+the console commit. A completed report is immutable. Failed aggregation is
+shown in HTTP status and retried without preventing urgent incident delivery.
+Disabling notifications pauses report generation/import while keeping history.
+`GET /api/http/status` exposes `briefing_in_progress`, `briefing_last_date` and
+`briefing_error`; HTTP reports use the existing authenticated
+`GET /api/notifications?kind=briefing` route.
+
+The only schema addition is an index on HTTP batch receipt day. Ingestion data
+and SSH collection remain readable by earlier releases. Before rolling back to
+a release without HTTP briefings, set `notifications_enabled=false`: its HTTP
+bridge cannot interpret pending daily-report payloads. Keep both databases and
+all checkpoints; re-enable notifications after returning to a release that
+understands the report format. Older dashboards do not render HTTP daily
+reports correctly, so inspect those reports after re-upgrading. Do not delete
+pending reports to force a rollback. Production should retain the newer code
+when continued notification delivery is required.
+
+Backups must continue preserving both HTTP metadata/outbox and console import
+checkpoints together; this change does not enroll sources or configure
+production recovery mappings.

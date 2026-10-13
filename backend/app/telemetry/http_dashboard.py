@@ -30,6 +30,9 @@ function httpHealth(status){
  for(const row of status.collection||[])notes.push(`${row.source_id} / ${row.service_id}：${httpCollection[row.status]||row.status} · 累计接收 ${row.accepted_total}，拒收 ${row.rejected_total}`);
  if(delayed)notes.push('检测任务尚未更新，请检查后台服务。');
  if(status.last_error)notes.push(status.last_error);
+ if(status.briefing_in_progress)notes.push(`正在生成 ${status.briefing_in_progress} HTTP 简报。`);
+ if(status.briefing_last_date)notes.push(`最近 HTTP 简报：${status.briefing_last_date}（UTC）。`);
+ if(status.briefing_error)notes.push(status.briefing_error);
  if(status.missing_raw_records)notes.push(`有 ${status.missing_raw_records} 条日志在分析前已过期；检测覆盖不完整。`);
  if(status.coverage_issues.length)notes.push(`近期有 ${status.coverage_issues.length===50?'至少 50':status.coverage_issues.length} 个关联窗口不完整；相关事件保留上次可核验的结果。`);
  text('http-health',notes.join('\n'));

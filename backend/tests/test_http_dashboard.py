@@ -83,3 +83,17 @@ await $('notification-rows').children[0].children[2].children[2].listeners.click
 assert.equal(httpDetail.revision,1);
 route=()=>response({enabled:false});await loadHttp();assert.match($('http-health').textContent,/尚未配置/);assert.equal($('http-next').disabled,true);
 """)
+
+
+def test_http_briefing_is_distinct_from_ssh_and_renders_untrusted_text_literally():
+    run_dashboard(FIXTURE + r"""
+const payload={report_type:'http_daily',title:'2026-01-02 HTTP 每日简报（UTC）',cutoff:1800000000,counts:{requests:42,cases:3,attention:1,low:1,retracted:0,stale:1,batches:4,rejected:2,reported_batches:1,backlog_batches:1},analysis_pending:true,missing_raw_records_total:7,skipped_days:2,note:'<img src=x onerror=alert(1)>'};
+renderNotifications({items:[{id:2,kind:'briefing',payload,delivered_at:1800000010,read_at:1}],page:1,total_pages:1,total:1,unread:0,pending:0,retrying:0,health:[],enabled:true});
+const text=$('notification-rows').textContent;
+assert.match(text,/HTTP 请求 42 条/);assert.match(text,/证据不完整 1/);assert.match(text,/检测尚未追平/);assert.match(text,/非当日计数/);assert.match(text,/2 天超出/);assert.match(text,/汇总截止/);
+assert.match(text,/<img src=x onerror=alert\(1\)>/);assert.equal($('notification-rows').children[0].children[2].children[1].children.length,0);
+assert.equal(calls.length,0);
+assert.match(notificationText({kind:'briefing',payload:{log_count:10,new_incidents:1,attention:1,low:0,unscored:0,collection_gaps:0,note:'SSH'}}),/已采集日志 10 条/);
+httpHealth({...httpFixture,briefing_in_progress:'2026-01-02',briefing_error:'HTTP 简报汇总暂时失败，将自动重试'});
+assert.match($('http-health').textContent,/正在生成 2026-01-02 HTTP 简报/);assert.match($('http-health').textContent,/将自动重试/);
+""")

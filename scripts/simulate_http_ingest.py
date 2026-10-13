@@ -18,6 +18,7 @@ from tempfile import TemporaryDirectory
 from fastapi.testclient import TestClient
 
 from app.live_api import create_app
+from app.telemetry import http_briefings
 from app.telemetry.ai_triage import Service
 from app.telemetry.config import LiveConfig, hash_operator_password
 from app.telemetry.control import ControlService
@@ -122,12 +123,30 @@ def simulate(fixture: Path):
             assert publish(client.app.state.http_store, ssh, now) == 0
             ssh.run_notifications([], now=now+1)
             assert ssh.list_notifications(kind='http_incident')['total'] == 2
+            # Complete this event day's report on the isolated clock, then
+            # import/deliver it twice to verify the actual console pipeline.
+            report_now = max(now, (start.replace(hour=0, minute=0) + timedelta(days=1, seconds=1)).timestamp())
+            for _ in range(100):
+                if not http_briefings.advance(client.app.state.http_store, report_now, batch_size=7):
+                    break
+            else:
+                raise AssertionError('HTTP daily report did not finish')
+            for _ in range(2):
+                publish(client.app.state.http_store, ssh, report_now)
+                ssh.run_notifications([], now=report_now)
+            briefings = [n['payload'] for n in ssh.list_notifications(kind='briefing')['items']
+                         if n['payload'].get('report_type') == 'http_daily']
+            assert len(briefings) == 1
+            daily = briefings[0]
+            assert daily['counts']['requests'] == 42
+            assert daily['counts']['cases'] == 3 and daily['counts']['attention'] == 2
+            assert daily['counts']['low'] == 1 and not daily['analysis_pending']
             referenced = {eid for f in findings for eid in f.evidence_ids}
             assert referenced == {e['event_id'] for e in retained}
             assert referenced <= {e.event_id for e in events}
             return dict(mode='isolated_http_incident_simulation', records=len(rows), stored_unique_events=len(events),
                         acknowledged_pages=len(results), retry_kept_same_receipt=True,
-                        incidents=cases, console_notifications=len(notices),
+                        incidents=cases, console_notifications=len(notices), http_daily_briefing=daily,
                         findings=[asdict(f) for f in findings],
                         evidence=[asdict(e) for e in events if e.event_id in referenced],
                         production_writes=False, model_calls=0,
