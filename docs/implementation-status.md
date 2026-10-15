@@ -4,7 +4,7 @@ The other documents in this repository describe the **target design**. This
 page records what is **actually implemented in code** so the two are never
 confused.
 
-Last reviewed: 2026-10-03; HTTP collection/recovery sections updated 2026-10-12. The walking skeleton and measured demo baseline are
+Last reviewed: 2026-10-03; HTTP collection/recovery sections updated 2026-10-15. The walking skeleton and measured demo baseline are
 preserved; further demo work is paused. Active development targets the independent
 SSH/auth telemetry pilot. The [production plan](./production-plan.md) tracks
 model comparison and broader detection; planned capabilities are not claims of
@@ -139,8 +139,11 @@ with their collector cursor/spool state. CI exercises real loopback Nginx
 requests, rename/reopen, lost ACKs, encrypted/signed restoration, historical
 evidence and idempotent replay. The [recovery runbook](http-recovery.md) documents
 retained log inodes, lock contention and the exact guarantee. Real-source
-TLS/workload acceptance, remote/whole-host recovery, an HTTP restore-history
-marker remain follow-up work. None of these fixtures
+TLS/workload acceptance and remote/whole-host recovery remain follow-up work.
+After an offline restore, an explicit command verifies both database files against
+the same package before recording a restart-safe marker. The HTTP workspace has
+separate incident and paginated restore-history tabs. History describes paired
+database snapshots and operator marking time, not collector catch-up or log completeness. None of these fixtures
 claims production coverage or measures detection accuracy.
 
 ## Known limitations of the skeleton

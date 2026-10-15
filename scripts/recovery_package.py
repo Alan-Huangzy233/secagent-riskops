@@ -598,6 +598,9 @@ def build(args: argparse.Namespace) -> int:
             manifest['restore']['notes'].append('Restore the HTTP and console databases from this SAME package, '
                 'together with its HTTP cursor/spool files. Keep the collector endpoint, source/service identities '
                 'and log path mapping unchanged. Remote collectors need a separately coordinated recovery plan.')
+            manifest['restore']['notes'].append('Before starting any restored API, collector or worker, run '
+                '`recovery_package.py mark-http-restored <http-database> <console-database> <package>`. '
+                'It checks both database snapshots and records a marker, not collector or log continuity.')
         inner = contents / MANIFEST_NAME
         inner.write_text(json.dumps(manifest, indent=2, sort_keys=True) + '\n', encoding='utf-8')
         manifest['inner_manifest_sha256'] = digest_file(inner)[0]
@@ -987,6 +990,222 @@ def list_packages(args: argparse.Namespace) -> int:
     return 0
 
 
+def _marker_file(path: Path) -> tuple[int, int, int, int, int]:
+    """No following links or creating databases while validating restore inputs."""
+    info = path.lstat()
+    if not stat.S_ISREG(info.st_mode):
+        raise PackageError('HTTP restore marking requires regular files, not symlinks')
+    return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
+
+
+def _marker_timestamp(value: object) -> str:
+    if not isinstance(value, str) or not 20 <= len(value) <= 32:
+        raise ValueError
+    parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
+    if parsed.utcoffset() is None or parsed.utcoffset().total_seconds() != 0:
+        raise ValueError
+    return value
+
+
+def _http_marker_package(package: Path, gpg_binary: str) -> tuple[dict, dict, str]:
+    """Validate names before the shared checksum reader opens package objects."""
+    manifest_path = package / MANIFEST_NAME
+    _marker_file(manifest_path)
+    before = digest_file(manifest_path)
+    manifest = read_manifest(package)
+    try:
+        backup_id = manifest['backup_id']
+        if not isinstance(backup_id, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,127}', backup_id):
+            raise ValueError
+        digest_pattern = re.compile(r'[0-9a-f]{64}')
+        object_pattern = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,127}')
+        for field in ('archive', 'encryption'):
+            sealed = manifest[field]
+            if field == 'encryption' and sealed is None:
+                continue
+            if (not isinstance(sealed, dict) or not isinstance(sealed.get('sha256'), str)
+                    or not digest_pattern.fullmatch(sealed['sha256'])
+                    or type(sealed.get('bytes')) is not int or sealed['bytes'] < 1):
+                raise ValueError
+        stored_object = manifest['stored_object']
+        if not isinstance(stored_object, str) or not object_pattern.fullmatch(stored_object):
+            raise ValueError
+        _marker_file(package / CHECKSUM_NAME)
+        listed = set()
+        for line in (package / CHECKSUM_NAME).read_text(encoding='utf-8').splitlines():
+            if not line.strip():
+                continue
+            digest, separator, name = line.partition('  ')
+            if not separator or not digest_pattern.fullmatch(digest) or not object_pattern.fullmatch(name) or name in listed:
+                raise ValueError
+            listed.add(name)
+            _marker_file(package / name)
+        if not {MANIFEST_NAME, stored_object} <= listed:
+            raise ValueError
+        if (package / SIGNATURE_NAME).exists() or (package / SIGNATURE_NAME).is_symlink():
+            _marker_file(package / SIGNATURE_NAME)
+        components = manifest['components']
+        if not isinstance(components, list):
+            raise ValueError
+        specs = {}
+        for spec in components:
+            if (not isinstance(spec, dict) or not isinstance(spec.get('name'), str)
+                    or not NAME_RE.fullmatch(spec['name']) or spec['name'] in specs
+                    or spec.get('kind') not in KINDS):
+                raise ValueError
+            specs[spec['name']] = spec
+        policy = manifest['consistency']['http_recovery']
+        producer = policy['producer_id']
+        if not isinstance(producer, str) or not re.fullmatch(r'[0-9a-f]{32}', producer):
+            raise ValueError
+        snapshot = _marker_timestamp(policy['pinned_at'])
+        pair = [specs[policy[role]] for role in ('http_database', 'console_database')]
+        if pair[0]['name'] == pair[1]['name']:
+            raise ValueError
+        for spec in pair:
+            if (spec['kind'] != 'sqlite' or spec['stored_as'] != spec['name']+'.sqlite'
+                    or not isinstance(spec.get('sha256'), str) or not digest_pattern.fullmatch(spec['sha256'])
+                    or type(spec.get('bytes')) is not int or spec['bytes'] < 1):
+                raise ValueError
+        states = policy['collector_states']
+        if (not isinstance(states, list) or not states or any(not isinstance(name, str) for name in states)
+                or len(set(states)) != len(states) or any(specs[name]['kind'] != 'state_dir' for name in states)
+                or policy['collectors_locked_until_pin'] is not True):
+            raise ValueError
+    except (KeyError, TypeError, ValueError, OverflowError):
+        raise PackageError('Invalid HTTP restore package metadata') from None
+    if not all(item['sha256_matches'] for item in check_stored_objects(package, manifest)):
+        raise PackageError('HTTP restore package checksum verification failed')
+    signature = verify_signature(package, gpg_binary)
+    if digest_file(manifest_path) != before:
+        raise PackageError('HTTP restore manifest changed during verification')
+    expected = dict(schema_version=1, restore_id=before[0], backup_id=backup_id, producer_id=producer,
+                    snapshot_at=snapshot, http_component=pair[0]['name'], console_component=pair[1]['name'],
+                    http_sha256=pair[0]['sha256'], console_sha256=pair[1]['sha256'],
+                    http_bytes=pair[0]['bytes'], console_bytes=pair[1]['bytes'],
+                    verification_scope='paired_database_snapshots')
+    return expected, manifest, signature
+
+
+def _existing_http_marker(database: sqlite3.Connection, expected: dict) -> dict | None:
+    row = database.execute('SELECT value FROM http_analysis_meta WHERE name=?',
+                           ('restore:'+expected['backup_id'],)).fetchone()
+    if row is None:
+        return None
+    try:
+        record = json.loads(row[0])
+        if not isinstance(record, dict) or any(type(record.get(key)) is not type(value) or record[key] != value
+                                               for key, value in expected.items()):
+            raise ValueError
+        _marker_timestamp(record['marked_at'])
+        if type(record['stream_count']) is not int or record['stream_count'] < 0 or record['signature'] not in ('valid', 'absent'):
+            raise ValueError
+        producer = database.execute("SELECT value FROM http_analysis_meta WHERE name='producer_id'").fetchone()
+        if producer is None or json.loads(producer[0]) != expected['producer_id']:
+            raise ValueError
+    except (KeyError, TypeError, ValueError):
+        raise PackageError('Existing HTTP restore marker conflicts with this package or producer') from None
+    return record
+
+
+def _http_marker_sidecars(paths: list[Path]) -> None:
+    for path in paths:
+        for suffix in ('-wal', '-journal'):
+            sidecar = Path(str(path)+suffix)
+            if sidecar.exists() or sidecar.is_symlink():
+                info = sidecar.lstat()
+                if not stat.S_ISREG(info.st_mode) or info.st_size:
+                    raise PackageError('HTTP restore marking needs empty WAL/journal files; stop services and mark '
+                                       'freshly restored snapshots before any new writes')
+
+
+def mark_http_restored(args: argparse.Namespace) -> int:
+    """Bind an operator's offline restore marker to two exact package snapshots.
+
+    This records neither a collector/file-continuity guarantee nor the actual
+    cutover time. A duplicate returns historical evidence without authenticating
+    the current contents again; new writes after a recorded restore are allowed.
+    """
+    connections = {}
+    recorded = False
+    try:
+        expected, _, signature = _http_marker_package(args.package, args.gpg_binary)
+        paths = [args.http_database.absolute(), args.console_database.absolute()]
+        identities = {path: _marker_file(path) for path in paths}
+        if len(identities) != 2 or len({identity[:2] for identity in identities.values()}) != 2:
+            raise PackageError('HTTP restore databases cannot alias the same file')
+        # Reject unsafe sidecars before SQLite can follow a link or recover a
+        # hot rollback journal. An existing marker may legitimately have WAL.
+        for path in paths:
+            for suffix in ('-wal', '-journal', '-shm'):
+                sidecar = Path(str(path)+suffix)
+                if sidecar.exists() or sidecar.is_symlink():
+                    info = sidecar.lstat()
+                    if not stat.S_ISREG(info.st_mode) or (suffix == '-journal' and info.st_size):
+                        raise PackageError('HTTP restore marking requires safe, empty journal sidecars')
+        # A read-only connection never checkpoints a populated WAL on rejection.
+        with closing(sqlite3.connect(paths[0].as_uri()+'?mode=ro', uri=True, timeout=0)) as reader:
+            existing = _existing_http_marker(reader, expected)
+        if existing is None:
+            _http_marker_sidecars(paths)
+        deadline = time.monotonic()+5
+        for path in sorted(paths):
+            remaining = deadline-time.monotonic()
+            if remaining <= 0:
+                raise PackageError('HTTP restore database lock deadline exceeded')
+            database = sqlite3.connect(path.as_uri()+'?mode=rw', uri=True, timeout=remaining, isolation_level=None)
+            connections[path] = database
+            database.execute('PRAGMA synchronous=FULL')
+            if database.execute('PRAGMA journal_mode').fetchone()[0] != 'wal':
+                raise PackageError('HTTP restore marking requires WAL databases')
+            database.execute('BEGIN IMMEDIATE')
+        if time.monotonic() > deadline:
+            raise PackageError('HTTP restore database lock deadline exceeded')
+        http, console = (connections[path] for path in paths)
+        record = _existing_http_marker(http, expected)
+        if record is None:
+            _http_marker_sidecars(paths)
+            for role, path in zip(('http', 'console'), paths):
+                if _marker_file(path) != identities[path]:
+                    raise PackageError('HTTP restore database changed during verification')
+                if digest_file(path) != (expected[role+'_sha256'], expected[role+'_bytes']):
+                    raise PackageError('HTTP restore database does not match its package snapshot; '
+                                       'mark before starting the API or any worker')
+            checks = check_http_pair(http, console)
+            if checks['producer_id'] != expected['producer_id']:
+                raise PackageError('HTTP restore producer does not match the package')
+            record = {**expected, 'marked_at': utc_now(), 'signature': signature,
+                      'stream_count': http.execute('SELECT count(*) FROM http_streams').fetchone()[0]}
+            # Check replacement/rename races once more immediately before writing.
+            if any(_marker_file(path) != identities[path] for path in paths):
+                raise PackageError('HTTP restore database changed during verification')
+            if digest_file(args.package / MANIFEST_NAME)[0] != expected['restore_id']:
+                raise PackageError('HTTP restore manifest changed during verification')
+            http.execute('INSERT INTO http_analysis_meta(name,value) VALUES(?,?)',
+                         ('restore:'+expected['backup_id'], json.dumps(record, sort_keys=True, separators=(',', ':'))))
+            http.commit()
+            recorded = True
+        else:
+            recorded = False
+        print(json.dumps({'recorded': recorded, 'record': record,
+                          'note': ('Paired snapshot marker recorded; collector state and log continuity are not verified.'
+                                   if recorded else 'Existing historical marker returned; current database contents '
+                                   'were not reauthenticated as these snapshots.')}, indent=2, sort_keys=True))
+        return 0
+    except PackageError:
+        raise
+    except (OSError, sqlite3.Error, UnicodeError, ValueError, TypeError, KeyError):
+        if recorded:
+            raise PackageError('HTTP restore marker committed but its result could not be returned; retry safely') from None
+        raise PackageError('HTTP restore inputs are unavailable, invalid or busy; no marker was recorded') from None
+    finally:
+        for database in reversed(list(connections.values())):
+            try:
+                database.rollback()
+            finally:
+                database.close()
+
+
 def mark_restored(args: argparse.Namespace) -> int:
     """Record a restore point in a telemetry database that is back in service.
 
@@ -1068,6 +1287,13 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
                         help='distinct pulling peers that must have confirmed a copy')
     pruner.add_argument('--apply', action='store_true', help='delete; without it the run only reports')
     pruner.set_defaults(handler=prune)
+
+    http_marker = commands.add_parser('mark-http-restored',
+        help='record an HTTP restore before starting services, after checking both package snapshots')
+    http_marker.add_argument('http_database', type=Path)
+    http_marker.add_argument('console_database', type=Path)
+    http_marker.add_argument('package', type=Path)
+    http_marker.set_defaults(handler=mark_http_restored)
 
     marker = commands.add_parser('mark-restored',
                                  help='record a restore point in a telemetry database that is back in service')

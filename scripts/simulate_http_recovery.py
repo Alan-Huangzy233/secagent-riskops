@@ -274,7 +274,13 @@ def simulate(binary):
                 shutil.copy2(restored / 'configs' / name, configs / name)
             recovered_config = LiveConfig.model_validate_json(live_config.read_text())
             collector = load_config(local_config)
+            marked = package_command(environment, 'mark-http-restored', root / 'http.sqlite',
+                                     root / 'telemetry.sqlite', built['package'])
+            assert marked['recorded'] is True
             with serve(recovered_config, password, port) as (app, console, client, _):
+                history = read(client, '/api/http/restores')
+                assert history['total'] == 1 and history['items'][0]['backup_id'] == marked['record']['backup_id']
+                assert history['items'][0]['verification_scope'] == 'paired_database_snapshots'
                 for case in original_cases:
                     base = '/api/http/incidents/'+case['incident_id']
                     assert read(client, base, revision=case['revision']) == case
@@ -321,10 +327,15 @@ def simulate(binary):
                 assert read(client, '/api/http/incidents')['items'] == final_cases
                 assert not list(state.glob('*.pending.json'))
                 assert console.list_events() == []
+                repeated = package_command(environment, 'mark-http-restored', root / 'http.sqlite',
+                                           root / 'telemetry.sqlite', built['package'])
+                assert repeated['recorded'] is False and repeated['record'] == marked['record']
+                assert read(client, '/api/http/restores') == history
                 return dict(mode='isolated_real_nginx_http_recovery', nginx=version, requests=24, unique_events=24,
                     rules=sorted(rules), incidents=len(final_cases), scores=sorted(c['assessment']['score'] for c in final_cases),
                     notifications=notice_count, encrypted_backup=True, signature=verified['signature'],
                     paired_checkpoints=verified['http_recovery']['notification_checkpoints'],
+                    restore_history_visible=True, restore_marker_idempotent_after_replay=True,
                     restored_pending_bytes_identical=True, retry_returned_original_receipt=True,
                     historical_evidence_preserved=True, rename_reopen_caught_up=True,
                     query_removed_at_nginx=True, repeated_replay_created_duplicates=False,
