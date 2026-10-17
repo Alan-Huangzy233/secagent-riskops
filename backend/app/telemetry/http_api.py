@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import hashlib
 import hmac
+import sqlite3
 
 from fastapi import Depends, HTTPException, Query, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -94,6 +95,15 @@ def register_routes(application, operator):
                 "sources": [{"id": s.id, "hostname": s.hostname, "services": s.services} for s in config.sources],
                 "collection": [{k: row[k] for k in ("source_id", "service_id", "status", "accepted_total", "rejected_total")}
                                for row in streams(request)["items"]]}
+
+    @application.get("/api/http/restores", dependencies=[Depends(operator)])
+    def restores(request: Request, page: int = Query(1, ge=1, le=1000000),
+                 limit: int = Query(20, ge=1, le=100)):
+        enabled(request)
+        try:
+            return request.app.state.http_store.restores(page=page, limit=limit)
+        except (sqlite3.Error, ValueError):
+            raise HTTPException(503, "HTTP restore history unavailable") from None
 
     @application.get("/api/http/incidents", dependencies=[Depends(operator)])
     def incidents(request: Request, source_id: str | None = Query(None, max_length=64),

@@ -76,15 +76,57 @@ that topology. A partial inventory must not be advertised as lossless recovery.
   local drill. Missing/truncated sources must produce explicit gap/degraded
   reports and require review; never claim continuous coverage from a green
   current heartbeat alone.
+- Before starting **any** API, collector or analysis/notification worker, record
+  the restore against the two freshly restored database files. Use their actual
+  cutover paths and the original package directory (not the extracted directory):
+
+  ```sh
+  python scripts/recovery_package.py mark-http-restored \
+    /absolute/restored/http.sqlite \
+    /absolute/restored/telemetry.sqlite \
+    /absolute/recovery-packages/PACKAGE
+  ```
+
+  Require `recorded: true` on the first invocation. The command verifies package
+  checksums and an available manifest signature, then checks that both database
+  byte lengths and SHA-256 digests match the package's named HTTP/console
+  snapshots. It also checks the HTTP producer ID and notification checkpoints.
+  Both writer reservations have a combined acquisition timeout of five seconds;
+  services must remain stopped while the full files are hashed. A missing,
+  aliased or symlinked database, populated WAL/journal, busy lock, incorrect
+  package, or write since restoration causes refusal without a new marker.
+  Even starting an idle analysis worker can change database bytes. If marking
+  was missed, do not erase new records to force a match; retain the operational
+  incident record separately and use this command at the next actual restore.
 - Start the API, verify health and historical case/evidence versions, then
   resume collectors. Check ACK replay, stream totals, catch-up state, analysis
   coverage and console notifications. Repeating a receipt/import must not add
   another record or duplicate delivery; a new case revision may legitimately
   produce a later notification after the cooldown.
 
-`mark-restored` currently records **SSH collection history only**. Do not run it
-against the HTTP database or treat it as an HTTP restore marker. HTTP restore
-visibility and whole-host recovery remain separate follow-up work.
+The HTTP console's **恢复记录** tab lists these markers with their package ID,
+snapshot time, marking time and stream count. `marked_at` is when the command
+recorded the operation; it is not evidence of the exact cutover time. The
+verification scope is **paired database snapshots only**. It does not verify
+that collector cursor/spool/configuration files were restored, that original log
+inodes survive, or that missing requests can be replayed. Continue to inspect
+collector gaps, catch-up and analysis coverage; a restore marker is never a
+claim of continuous coverage or no data loss.
+
+A retry for the same package returns `recorded: false` and the original record
+and marking time, including after normal collection has resumed. This only
+returns existing history; it does **not** reauthenticate the current database
+contents as the old snapshots or assert that a new restoration occurred. A
+matching package ID with a different manifest is rejected. History is retained
+inside the HTTP database and is included in later recovery packages without
+changing receipts, analysis state, evidence, notification deduplication or daily
+briefings. Restoring an older snapshot returns to its history branch: markers
+created after that snapshot do not survive. Preserve external incident records
+when a complete cross-restore audit trail is needed.
+
+The existing `mark-restored` command still records **SSH collection history
+only**; do not run it against the HTTP database. Whole-host recovery remains
+separate follow-up work.
 
 ## Run the isolated real-Nginx exercise
 
@@ -108,8 +150,10 @@ renames/reopens the log and leaves two more requests unread.
 
 A disposable GPG key encrypts/signs the package; deep verification decrypts it
 into a new directory. After stopping the original isolated API, the script
-restores its databases, pending spool and configuration, then restarts at the
-same endpoint. It checks the original ACK, historical revision/evidence,
+restores its databases, pending spool and configuration, records the paired
+database restore before starting workers, then restarts at the same endpoint.
+It checks the paginated restore API and a harmless marker retry after collection
+resumes, along with the original ACK, historical revision/evidence,
 notification import replay, rotation catch-up, 24 unique events and unchanged
 counts after further retries. Logs, keys, listeners and temporary databases
 are removed on exit; only the optional synthetic report is retained.
@@ -124,4 +168,5 @@ calls or production writes. CI runs it with an extracted Ubuntu Nginx binary.
 Real-source deployment still needs workload/rotation/retention/TLS/capacity
 acceptance. Separate HTTP daily briefings are documented in the
 [console notification guide](console-notifications.md#http-daily-briefings).
-A visible HTTP restore marker remains follow-up work; issue #119 remains open.
+HTTP restore markers are visible in the console; issue #119 remains open for
+real-source acceptance and recovery scope beyond the same-host drill.

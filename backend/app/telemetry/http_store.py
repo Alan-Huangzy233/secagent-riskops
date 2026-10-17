@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, StrictBool, field_validator
 from typing import Literal
 
 from .http_parse import normalize_http
-from . import http_incidents, http_briefings
+from . import http_incidents, http_briefings, http_restores
 
 IDENTITY = r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
 ReportCode = Literal["rotation_gap", "file_truncated", "file_unavailable", "partial_line",
@@ -225,3 +225,8 @@ class HttpStore:
         with self.connection() as db:
             db.execute("BEGIN")
             return http_incidents.evidence(db, identity, **kwargs)
+
+    def restores(self, **kwargs):
+        with self.connection() as db:
+            db.execute("BEGIN")
+            return http_restores.list_restores(db, **kwargs)

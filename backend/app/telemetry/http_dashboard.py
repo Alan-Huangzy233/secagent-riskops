@@ -1,10 +1,18 @@
 """HTTP review table and version-pinned evidence drawer, without response actions."""
 SECTION = """<section id="http-section"><h2>HTTP 检测</h2>
+<div class="detail-tabs" role="tablist" aria-label="HTTP 页面"><button id="http-view-incidents" type="button" role="tab" aria-controls="http-pane-incidents" aria-selected="true">事件</button><button id="http-view-restores" type="button" role="tab" aria-controls="http-pane-restores" aria-selected="false" tabindex="-1">恢复记录</button></div>
+<div id="http-pane-incidents" role="tabpanel" aria-labelledby="http-view-incidents">
 <p>按来源、服务、连接 IP 和 UTC 小时关联请求。跨小时模式可能在相邻事件中共用证据；分数表示探测迹象，不能证明入侵成功。</p>
 <p id="http-health" role="status">正在读取 HTTP 检测状态…</p>
 <div class="actions"><label for="http-source">HTTP 来源</label><select id="http-source"><option value="">全部</option></select><label for="http-service">服务</label><select id="http-service"><option value="">全部</option></select><label for="http-focus">事件</label><select id="http-focus"><option value="all">全部</option><option value="attention">需关注（≥30 分）</option><option value="low">低分</option><option value="retracted">已撤回</option></select><button id="http-refresh" type="button">刷新 HTTP</button></div>
 <div class="table-wrap"><table><thead><tr><th>最近证据</th><th>来源 / 服务</th><th>连接 IP</th><th>模式</th><th>评分 / 状态</th><th>详情</th></tr></thead><tbody id="http-rows"></tbody></table></div>
-<div class="pager"><button id="http-prev" type="button" disabled>上一页</button><span id="http-page"></span><button id="http-next" type="button" disabled>下一页</button></div><p id="http-status" role="status"></p></section>"""
+<div class="pager"><button id="http-prev" type="button" disabled>上一页</button><span id="http-page"></span><button id="http-next" type="button" disabled>下一页</button></div><p id="http-status" role="status"></p></div>
+<div id="http-pane-restores" role="tabpanel" aria-labelledby="http-view-restores" hidden>
+<p>这里显示全部 HTTP 数据的恢复标记，不按来源、服务或事件评分筛选。</p>
+<p id="http-restores-note">记录仅核对 HTTP 与控制台双库快照；不代表日志未丢失或已补齐，仍需检查采集回补、缺口与检测覆盖。标记时间是登记这条记录的时间。</p>
+<div class="actions"><button id="http-restores-refresh" type="button">刷新恢复记录</button></div>
+<div class="table-wrap"><table aria-describedby="http-restores-note"><thead><tr><th>标记时间</th><th>备份包</th><th>快照时间</th><th>流数量</th></tr></thead><tbody id="http-restores-rows"></tbody></table></div>
+<div class="pager"><button id="http-restores-prev" type="button" disabled>上一页</button><span id="http-restores-page"></span><button id="http-restores-next" type="button" disabled>下一页</button></div><p id="http-restores-status" role="status" aria-live="polite"></p></div></section>"""
 
 DIALOG = """<dialog id="http-dialog" aria-labelledby="http-detail-title"><div class="http-detail-body"><div class="drawer-heading"><h2 id="http-detail-title">HTTP 事件详情</h2><button id="http-close" type="button" aria-label="关闭 HTTP 详情">关闭 ✕</button></div>
 <p id="http-detail-status" role="status"></p><div class="actions"><button id="http-revision-prev" type="button" disabled>上一版本</button><span id="http-revision"></span><button id="http-revision-next" type="button" disabled>下一版本</button><button id="http-current" type="button">读取当前版本</button></div>
@@ -12,12 +20,14 @@ DIALOG = """<dialog id="http-dialog" aria-labelledby="http-detail-title"><div cl
 <div id="http-pane-overview" class="http-detail-scroll" role="tabpanel" aria-labelledby="http-tab-overview"><dl id="http-fields" class="detail-fields"></dl></div><div id="http-pane-evidence" class="http-detail-scroll" role="tabpanel" aria-labelledby="http-tab-evidence" hidden><h3>该版本的证据</h3><p>路径已移除查询串。响应状态码只描述 HTTP 响应。</p><div class="table-wrap"><table><thead><tr><th>时间</th><th>方法</th><th>路径</th><th>状态码</th></tr></thead><tbody id="http-evidence"></tbody></table></div><div class="pager"><button id="http-evidence-prev" type="button" disabled>上一页</button><span id="http-evidence-page"></span><button id="http-evidence-next" type="button" disabled>下一页</button></div></div></div></dialog>"""
 
 STYLE = """
+#http-pane-restores{min-width:0}#http-pane-restores .table-wrap{max-width:100%}#http-pane-restores table{table-layout:fixed}#http-pane-restores th,#http-pane-restores td{overflow-wrap:anywhere}#http-pane-restores th:last-child{width:12%}#http-section>.detail-tabs{padding-top:0}@media(max-width:850px){#http-pane-restores th,#http-pane-restores td{padding:8px 5px;font-size:12px}#http-section .actions{flex-wrap:wrap}}
 #http-dialog{position:fixed;inset:0 0 0 auto;margin:0;width:min(900px,100vw);max-width:100vw;height:100dvh;max-height:100dvh;box-sizing:border-box;border:0;border-left:1px solid #385475;background:#101d2e;color:#e7edf5;padding:22px}#http-dialog::backdrop{background:#030b17a6}.http-detail-body{height:100%;display:flex;flex-direction:column;gap:12px;min-width:0}.http-detail-scroll{overflow:auto;min-height:0;flex:1}#http-pane-evidence{display:flex;flex-direction:column;overflow:hidden}.http-detail-scroll .table-wrap{overflow:auto;min-height:0;flex:1}.http-detail-scroll .pager{flex-shrink:0}.http-detail-scroll td{overflow-wrap:anywhere;max-width:430px}.http-detail-scroll .pager{display:flex;align-items:center;gap:12px;margin:14px 0}#http-dialog .actions{flex-wrap:wrap}#http-dialog .detail-tabs{margin:0;padding:0 0 10px}#http-detail-status:empty{display:none}#http-health{white-space:pre-line}.http-detail-scroll h3{font-size:16px}@media(max-width:850px){#http-dialog{padding:16px}.http-detail-scroll .table-wrap table{min-width:580px}}
 """
 
 SCRIPT = r"""
 let httpSources=[],httpPage=1,httpPages=1,httpRequest=0,httpDetailRequest=0,httpEvidenceRequest=0;
 let httpDetail=null,httpLatest=0,httpEvidencePage=1,httpEvidencePages=1,httpReturnFocus=null;
+let httpView='incidents',httpRestorePage=1,httpRestorePages=1,httpRestoreRequest=0,httpRestoreLoading=false,httpRestoreAvailable=false;
 const httpCollection={never_seen:'尚未收到日志',stale:'采集心跳过期',delayed:'采集延迟',degraded:'采集有缺口或拒收',current:'采集正常'};
 const httpCoverage={complete:'已核算',context_limit:'上下文超过处理上限',expired_context:'关联上下文已过期'};
 function httpOptions(id,values){const select=$(id),previous=select.value;select.replaceChildren();for(const [value,label] of [['','全部'],...values]){const option=document.createElement('option');option.value=value;option.textContent=label;select.append(option);}select.value=values.some(v=>v[0]===previous)?previous:'';}
@@ -37,12 +47,14 @@ function httpHealth(status){
  if(status.coverage_issues.length)notes.push(`近期有 ${status.coverage_issues.length===50?'至少 50':status.coverage_issues.length} 个关联窗口不完整；相关事件保留上次可核验的结果。`);
  text('http-health',notes.join('\n'));
 }
-async function loadHttp(page=httpPage){
+async function loadHttp(page){return httpView==='restores'?loadHttpRestores(page):loadHttpIncidents(page);}
+async function loadHttpIncidents(page=httpPage){
+ if(httpView!=='incidents')return;
  const request=++httpRequest,source=$('http-source').value,service=$('http-service').value,focus=$('http-focus').value;
  text('http-status','正在读取 HTTP 事件…');
  try{
   const status=await get('/api/http/status');if(request!==httpRequest)return;httpHealth(status);
-  if(!status.enabled){empty($('http-rows'),6,'暂无 HTTP 来源。');text('http-page','');httpPage=httpPages=1;$('http-prev').disabled=$('http-next').disabled=true;text('http-status','');return;}
+  if(!status.enabled){$('http-rows').replaceChildren();empty($('http-rows'),6,'暂无 HTTP 来源。');text('http-page','');httpPage=httpPages=1;$('http-prev').disabled=$('http-next').disabled=true;text('http-status','');return;}
   const query=new URLSearchParams({page:String(page),limit:'50',focus});if(source)query.set('source_id',source);if(service)query.set('service_id',service);
   const data=await get('/api/http/incidents?'+query);if(request!==httpRequest)return;
   if(!Array.isArray(data.items)||!Number.isInteger(data.page)||!Number.isInteger(data.total_pages))throw new Error('HTTP 事件返回异常');
@@ -51,6 +63,39 @@ async function loadHttp(page=httpPage){
   if(!data.items.length)empty(rows,6,'暂无符合条件的 HTTP 事件。');
   text('http-page',`第 ${data.page} / ${data.total_pages} 页 · 共 ${data.total} 个事件`);$('http-prev').disabled=data.page<=1;$('http-next').disabled=data.page>=data.total_pages;text('http-status','');
  }catch(error){if(request===httpRequest)text('http-status',error.message+' 已保留上次读取的 HTTP 事件。');}
+}
+function setHttpView(name){
+ if(!['incidents','restores'].includes(name))return;
+ if(httpView!==name){++httpRequest;++httpRestoreRequest;httpRestoreLoading=false;}
+ httpView=name;
+ for(const key of ['incidents','restores']){$('http-pane-'+key).hidden=key!==name;$('http-view-'+key).setAttribute('aria-selected',String(key===name));$('http-view-'+key).tabIndex=key===name?0:-1;}
+ httpRestorePager();
+}
+async function selectHttpView(name){setHttpView(name);await loadHttp();}
+function httpRestorePager(){
+ $('http-restores-prev').disabled=httpRestoreLoading||!httpRestoreAvailable||httpRestorePage<=1;
+ $('http-restores-next').disabled=httpRestoreLoading||!httpRestoreAvailable||httpRestorePage>=httpRestorePages;
+ $('http-pane-restores').setAttribute('aria-busy',String(httpRestoreLoading));
+}
+async function loadHttpRestores(page=httpRestorePage){
+ if(httpView!=='restores')return;
+ const request=++httpRestoreRequest;httpRestoreLoading=true;httpRestorePager();text('http-restores-status','正在读取 HTTP 恢复记录…');
+ try{
+  const status=await get('/api/http/status');if(request!==httpRestoreRequest)return;
+  if(!status.enabled){httpRestorePage=httpRestorePages=1;httpRestoreAvailable=false;$('http-restores-rows').replaceChildren();empty($('http-restores-rows'),4,'HTTP 来源尚未配置，暂无可查看的恢复记录。');text('http-restores-page','');text('http-restores-status','');return;}
+  const data=await get('/api/http/restores?'+new URLSearchParams({page:String(page),limit:'20'}));if(request!==httpRestoreRequest)return;
+  if(!Array.isArray(data.items)||!Number.isInteger(data.page)||data.page<1||!Number.isInteger(data.total_pages)||data.total_pages<1||!Number.isInteger(data.total)||data.total<0)throw new Error('HTTP 恢复记录返回异常。');
+  if(data.page!==Math.min(page,data.total_pages))throw new Error('HTTP 恢复记录页码已变化，请刷新重试。');
+  const rows=[];
+  for(const item of data.items){
+   if(item.verification_scope!=='paired_database_snapshots'||typeof item.backup_id!=='string'||typeof item.marked_at!=='string'||typeof item.snapshot_at!=='string'||!Number.isInteger(item.stream_count)||item.stream_count<0)throw new Error('HTTP 恢复记录返回异常。');
+   const tr=document.createElement('tr');cell(tr,when(item.marked_at));cell(tr,item.backup_id);cell(tr,when(item.snapshot_at));cell(tr,item.stream_count);rows.push(tr);
+  }
+  const body=$('http-restores-rows');body.replaceChildren(...rows);if(!rows.length)empty(body,4,'尚无 HTTP 恢复记录。');
+  httpRestorePage=data.page;httpRestorePages=data.total_pages;httpRestoreAvailable=data.total>0;
+  text('http-restores-page',`第 ${data.page} / ${data.total_pages} 页 · 共 ${data.total} 条记录`);text('http-restores-status','');
+ }catch(error){if(request===httpRestoreRequest)text('http-restores-status',error.message+' 已保留上次读取的 HTTP 恢复记录。');}
+ finally{if(request===httpRestoreRequest){httpRestoreLoading=false;httpRestorePager();}}
 }
 function renderHttpDetail(item){
  httpDetail=item;const fields=$('http-fields');fields.replaceChildren();
@@ -81,14 +126,19 @@ function setHttpDetailTab(name){
  for(const key of ['overview','evidence']){$('http-pane-'+key).hidden=key!==name;$('http-tab-'+key).setAttribute('aria-selected',String(key===name));$('http-tab-'+key).tabIndex=key===name?0:-1;}
 }
 function initializeHttp(){
- setHttpDetailTab('overview');
+ setHttpView('incidents');setHttpDetailTab('overview');
+ for(const name of ['incidents','restores']){
+  $('http-view-'+name).addEventListener('click',()=>selectHttpView(name));
+  $('http-view-'+name).addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const next=event.key==='Home'?'incidents':event.key==='End'?'restores':name==='incidents'?'restores':'incidents';const pending=selectHttpView(next);$('http-view-'+next).focus();return pending;}});
+ }
+ $('http-restores-refresh').addEventListener('click',()=>loadHttpRestores());$('http-restores-prev').addEventListener('click',()=>loadHttpRestores(httpRestorePage-1));$('http-restores-next').addEventListener('click',()=>loadHttpRestores(httpRestorePage+1));
  for(const name of ['overview','evidence']){
   $('http-tab-'+name).addEventListener('click',()=>setHttpDetailTab(name));
   $('http-tab-'+name).addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const next=event.key==='Home'?'overview':event.key==='End'?'evidence':name==='overview'?'evidence':'overview';setHttpDetailTab(next);$('http-tab-'+next).focus();}});
  }
 
- $('http-source').addEventListener('change',()=>{httpServices();loadHttp(1);});for(const id of ['http-service','http-focus'])$(id).addEventListener('change',()=>loadHttp(1));
- $('http-refresh').addEventListener('click',()=>loadHttp());$('http-prev').addEventListener('click',()=>loadHttp(httpPage-1));$('http-next').addEventListener('click',()=>loadHttp(httpPage+1));
+ $('http-source').addEventListener('change',()=>{httpServices();return loadHttpIncidents(1);});for(const id of ['http-service','http-focus'])$(id).addEventListener('change',()=>loadHttpIncidents(1));
+ $('http-refresh').addEventListener('click',()=>loadHttpIncidents());$('http-prev').addEventListener('click',()=>loadHttpIncidents(httpPage-1));$('http-next').addEventListener('click',()=>loadHttpIncidents(httpPage+1));
  $('http-close').addEventListener('click',()=>{const dialog=$('http-dialog');if(typeof dialog.close==='function')dialog.close();else{dialog.removeAttribute('open');clearHttpDetail();}});$('http-dialog').addEventListener('close',clearHttpDetail);
  $('http-current').addEventListener('click',()=>{if(httpDetail)showHttpIncident(httpDetail.incident_id);});
  $('http-revision-prev').addEventListener('click',()=>{if(httpDetail)showHttpIncident(httpDetail.incident_id,httpDetail.revision-1);});$('http-revision-next').addEventListener('click',()=>{if(httpDetail)showHttpIncident(httpDetail.incident_id,httpDetail.revision+1);});

@@ -97,3 +97,128 @@ assert.match(notificationText({kind:'briefing',payload:{log_count:10,new_inciden
 httpHealth({...httpFixture,briefing_in_progress:'2026-01-02',briefing_error:'HTTP 简报汇总暂时失败，将自动重试'});
 assert.match($('http-health').textContent,/正在生成 2026-01-02 HTTP 简报/);assert.match($('http-health').textContent,/将自动重试/);
 """)
+
+
+RESTORE_FIXTURE = r"""
+const restoreRecord={restore_id:'a'.repeat(64),backup_id:'rp-20261015-example',snapshot_at:'2026-10-15T01:00:00Z',marked_at:'2026-10-15T03:00:00Z',stream_count:2,verification_scope:'paired_database_snapshots'};
+const eventRoute=route;
+route=path=>{
+ if(path.startsWith('/api/http/restores?')){const q=new URLSearchParams(path.split('?')[1]);return response({items:[{...restoreRecord,backup_id:'backup-page-'+q.get('page')}],page:Number(q.get('page')),limit:20,total_pages:2,total:21});}
+ return eventRoute(path);
+};
+"""
+
+
+def test_http_recovery_is_a_separate_accessible_tab_with_limited_claims():
+    html = ControlsHTML()
+    html.feed(DASHBOARD_HTML)
+    assert html.elements['http-view-incidents'][1]['aria-selected'] == 'true'
+    assert html.elements['http-view-restores'][1]['aria-controls'] == 'http-pane-restores'
+    assert html.elements['http-view-restores'][1]['tabindex'] == '-1'
+    assert html.elements['http-pane-restores'][1]['role'] == 'tabpanel'
+    assert html.elements['http-pane-restores'][1]['aria-labelledby'] == 'http-view-restores'
+    assert 'hidden' in html.elements['http-pane-restores'][1]
+    assert 'disabled' in html.elements['http-restores-next'][1]
+    assert '记录仅核对 HTTP 与控制台双库快照' in DASHBOARD_HTML
+    assert '不代表日志未丢失或已补齐' in DASHBOARD_HTML
+    assert '标记时间是登记这条记录的时间' in DASHBOARD_HTML
+
+
+def test_restore_pages_refresh_independently_and_never_inherit_incident_filters():
+    run_dashboard(FIXTURE + RESTORE_FIXTURE + r"""
+await selectWorkspace('http');assert.equal(httpView,'incidents');
+$('http-source').value='web';$('http-service').value='private';$('http-focus').value='attention';currentSource='ssh-source';
+await $('http-view-restores').listeners.click();
+assert.equal($('http-pane-incidents').hidden,true);assert.equal($('http-pane-restores').hidden,false);
+assert.equal($('http-view-restores').attrs['aria-selected'],'true');assert.equal($('http-view-incidents').tabIndex,-1);
+assert.match($('http-restores-rows').textContent,/backup-page-1/);
+await $('http-restores-next').listeners.click();assert.match($('http-restores-page').textContent,/第 2 \/ 2 页/);
+assert.equal($('http-restores-prev').disabled,false);assert.equal($('http-restores-next').disabled,true);
+assert.match(calls[calls.length-1].path,/^\/api\/http\/restores\?page=2&limit=20$/);
+const before=calls.length;await $('http-source').listeners.change();await $('http-service').listeners.change();await $('http-focus').listeners.change();assert.equal(calls.length,before);
+await loadWorkspaceView(true);assert.equal(calls[calls.length-1].path,'/api/http/restores?page=2&limit=20');
+await $('http-restores-prev').listeners.click();await $('http-restores-refresh').listeners.click();assert.match($('http-restores-rows').textContent,/backup-page-1/);
+await $('http-view-incidents').listeners.click();assert.equal($('http-pane-restores').hidden,true);
+assert.match(calls[calls.length-1].path,/focus=attention&source_id=web&service_id=private/);
+assert.equal(calls.every(c=>c.path.startsWith('/api/http/')&&(c.options.method||'GET')==='GET'),true);
+""")
+
+
+def test_restore_tab_keyboard_navigation_updates_focus_and_aria():
+    run_dashboard(FIXTURE + RESTORE_FIXTURE + r"""
+let focused='',prevented=0;
+for(const name of ['incidents','restores'])$('http-view-'+name).focus=()=>{focused=name;};
+await $('http-view-incidents').listeners.keydown({key:'End',preventDefault:()=>prevented++});
+assert.equal(httpView,'restores');assert.equal(focused,'restores');assert.equal($('http-view-restores').tabIndex,0);
+await $('http-view-restores').listeners.keydown({key:'ArrowRight',preventDefault:()=>prevented++});
+assert.equal(httpView,'incidents');assert.equal(focused,'incidents');
+await $('http-view-incidents').listeners.keydown({key:'ArrowLeft',preventDefault:()=>prevented++});
+assert.equal(httpView,'restores');
+await $('http-view-restores').listeners.keydown({key:'Home',preventDefault:()=>prevented++});
+assert.equal(httpView,'incidents');assert.equal(prevented,4);
+""")
+
+
+def test_restore_requests_ignore_late_pages_and_previous_tab_responses():
+    run_dashboard(FIXTURE + RESTORE_FIXTURE + r"""
+await selectHttpView('restores');const normal=route;let finish;
+route=path=>path.startsWith('/api/http/restores?')?new Promise(resolve=>{finish=()=>resolve(response({items:[{...restoreRecord,backup_id:'obsolete'}],page:1,limit:20,total_pages:2,total:21}));}):normal(path);
+const pending=loadHttpRestores(1);for(let i=0;i<15;i++)await Promise.resolve();
+assert.equal($('http-restores-next').disabled,true);assert.equal($('http-pane-restores').attrs['aria-busy'],'true');
+route=normal;await loadHttpRestores(2);finish();await pending;
+assert.match($('http-restores-rows').textContent,/backup-page-2/);assert.doesNotMatch($('http-restores-rows').textContent,/obsolete/);
+route=path=>path.startsWith('/api/http/restores?')?new Promise(resolve=>{finish=()=>resolve(response({items:[{...restoreRecord,backup_id:'wrong-tab'}],page:2,limit:20,total_pages:2,total:21}));}):normal(path);
+const hidden=loadHttpRestores(2);for(let i=0;i<15;i++)await Promise.resolve();
+route=normal;await selectHttpView('incidents');finish();await hidden;
+assert.match($('http-rows').textContent,/198.51.100.23/);assert.doesNotMatch($('http-restores-rows').textContent,/wrong-tab/);
+await selectHttpView('restores');assert.equal($('http-pane-restores').attrs['aria-busy'],'false');
+route=path=>path==='/api/http/status'?new Promise(resolve=>{finish=()=>resolve(response({enabled:false}));}):normal(path);
+const oldStatus=loadHttpRestores();for(let i=0;i<15;i++)await Promise.resolve();
+route=normal;await loadHttpRestores(1);finish();await oldStatus;
+assert.match($('http-restores-rows').textContent,/backup-page-1/);assert.equal($('http-restores-next').disabled,false);
+""")
+
+
+def test_restore_failure_keeps_rows_and_server_can_clamp_expired_page():
+    run_dashboard(FIXTURE + RESTORE_FIXTURE + r"""
+await selectHttpView('restores');await loadHttpRestores(2);const normal=route;
+route=path=>path.startsWith('/api/http/restores?')?({ok:false,status:503,json:async()=>({})}):normal(path);
+await loadHttpRestores(1);assert.match($('http-restores-rows').textContent,/backup-page-2/);assert.match($('http-restores-status').textContent,/503.*已保留/);
+assert.match($('http-restores-page').textContent,/第 2 \/ 2 页/);assert.equal($('http-restores-prev').disabled,false);
+route=path=>{
+ if(path.startsWith('/api/http/restores?'))return response({items:[restoreRecord],page:1,limit:20,total_pages:1,total:1});
+ return normal(path);
+};
+await loadHttpRestores(2);assert.equal(calls[calls.length-1].path,'/api/http/restores?page=2&limit=20');assert.match($('http-restores-page').textContent,/第 1 \/ 1 页/);
+assert.match($('http-restores-rows').textContent,/rp-20261015-example/);assert.equal($('http-restores-prev').disabled,true);assert.equal($('http-restores-next').disabled,true);
+route=path=>path.startsWith('/api/http/restores?')?response({items:[{...restoreRecord,backup_id:'unexpected-page'}],page:2,limit:20,total_pages:2,total:21}):normal(path);
+await loadHttpRestores(1);assert.match($('http-restores-rows').textContent,/rp-20261015-example/);assert.match($('http-restores-status').textContent,/页码已变化/);
+route=path=>path.startsWith('/api/http/restores?')?response({items:[restoreRecord,{...restoreRecord,backup_id:'partial-update',verification_scope:'unknown'}],page:1,limit:20,total_pages:1,total:2}):normal(path);
+await loadHttpRestores(1);assert.equal($('http-restores-rows').children.length,1);assert.doesNotMatch($('http-restores-rows').textContent,/partial-update/);assert.match($('http-restores-status').textContent,/返回异常.*已保留/);
+""")
+
+
+def test_restore_empty_and_unconfigured_states_disable_both_page_buttons():
+    run_dashboard(FIXTURE + RESTORE_FIXTURE + r"""
+await selectHttpView('restores');await loadHttpRestores(2);const normal=route;
+route=path=>path.startsWith('/api/http/restores?')?response({items:[],page:1,limit:20,total_pages:1,total:0}):normal(path);
+await loadHttpRestores(1);assert.match($('http-restores-rows').textContent,/尚无 HTTP 恢复记录/);
+assert.equal($('http-restores-prev').disabled,true);assert.equal($('http-restores-next').disabled,true);
+route=normal;await loadHttpRestores(2);
+route=path=>path==='/api/http/status'?response({enabled:false}):normal(path);
+const before=calls.length;await loadHttpRestores();assert.equal(calls.length,before+1);
+assert.match($('http-restores-rows').textContent,/HTTP 来源尚未配置/);assert.doesNotMatch($('http-restores-rows').textContent,/backup-page/);
+assert.equal($('http-restores-prev').disabled,true);assert.equal($('http-restores-next').disabled,true);assert.equal($('http-restores-page').textContent,'');
+assert.equal($('http-restores-status').textContent,'');assert.equal(httpRestorePage,1);
+""")
+
+
+def test_restore_rows_render_literal_text_without_internal_hashes_or_paths():
+    run_dashboard(FIXTURE + RESTORE_FIXTURE + r"""
+const normal=route,hostile='<img src=x onerror=alert(1)>';
+route=path=>path.startsWith('/api/http/restores?')?response({items:[{...restoreRecord,backup_id:hostile,archive_path:'/private/backup',http_sha256:'secret-hash'}],page:1,limit:20,total_pages:1,total:1}):normal(path);
+await selectHttpView('restores');const rows=$('http-restores-rows');
+assert.match(rows.textContent,/<img src=x onerror=alert\(1\)>/);assert.equal(rows.children[0].children[1].children.length,0);
+assert.doesNotMatch(rows.textContent,/private|secret-hash/);assert.doesNotMatch(rows.textContent,new RegExp('a'.repeat(64)));
+assert.equal(rows.children[0].children.length,4);assert.equal(rows.children[0].children[3].textContent,'2');
+""")
