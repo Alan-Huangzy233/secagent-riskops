@@ -1,12 +1,21 @@
 [Unit]
 Description=Consistent local recovery copy of the RiskOps telemetry database
-After=secagent-riskops.service
+After=secagent-riskops.service systemd-tmpfiles-setup.service
 
 [Service]
 Type=oneshot
+# Created by tmpfiles before either account starts. A missing bind-mounted
+# lock fails unit setup; these checks also reject symlinks and unusable files.
+ExecStartPre=/usr/bin/test -f /run/secagent-riskops-backup/maintenance.lock
+ExecStartPre=/usr/bin/test ! -L /run/secagent-riskops-backup/maintenance.lock
+ExecStartPre=/usr/bin/test -r /run/secagent-riskops-backup/maintenance.lock
+ExecStartPre=/usr/bin/test -w /run/secagent-riskops-backup/maintenance.lock
+# Bound contention only; a large verified backup may legitimately take hours.
+TimeoutStartSec=infinity
+KillMode=control-group
 User=riskops
 Group=riskops
-ExecStart=/usr/bin/python3 /opt/secagent-riskops/current/scripts/backup_telemetry.py --database /var/lib/secagent-riskops/live.sqlite --directory /var/backups/secagent-riskops
+ExecStart=/usr/bin/flock --exclusive --timeout 10800 --conflict-exit-code 75 --no-fork /run/secagent-riskops-backup/maintenance.lock /usr/bin/python3 /opt/secagent-riskops/current/scripts/backup_telemetry.py --database /var/lib/secagent-riskops/live.sqlite --directory /var/backups/secagent-riskops
 UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true
@@ -16,3 +25,5 @@ ProtectHome=true
 # database directory.  The helper opens the database mode=ro and performs no
 # SQL writes; this namespace exception is only for SQLite's local sidecars.
 ReadWritePaths=/var/lib/secagent-riskops /var/backups/secagent-riskops
+# Only this existing file is writable; its root-owned parent stays protected.
+ReadWritePaths=/run/secagent-riskops-backup/maintenance.lock
