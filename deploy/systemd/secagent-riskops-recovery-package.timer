@@ -2,8 +2,8 @@
 Description=Daily RiskOps recovery package
 
 [Timer]
-# After the plain database backup, so the two do not read the same database at
-# the same time.
+# Usually later than the plain backup. The shared service lock serializes
+# overlapping or boot catch-up runs; the timer times alone do not ensure order.
 OnCalendar=*-*-* 03:45:00 UTC
 Persistent=true
 RandomizedDelaySec=600

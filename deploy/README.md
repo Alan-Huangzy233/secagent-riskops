@@ -148,7 +148,12 @@ release/rollback acceptance procedure.
   published object. It cannot supply a path, open a shell or forward a port, and
   its only write is its own confirmation record.
 - `deploy/systemd/secagent-riskops-recovery-package.service` and `.timer` build
-  one package a day after the plain backup and then prune. The unit reads
+  one package a day and then prune. Both backup services use the same local
+  lock, so overlapping scheduled or boot catch-up runs queue during normal
+  command execution; execution order is not guaranteed.
+  Install the shared lock and migrate **all** extra database drop-ins using
+  [backup serialization](../docs/backup-serialization.md) before enabling them.
+  That guide also covers stopping a holder and its waiting job safely. The unit reads
   `/etc/secagent-riskops/recovery-package.json`, encrypts with a public-only
   keyring in `/var/lib/secagent-riskops-recovery/gnupg`, and publishes to
   `/var/backups/secagent-riskops-packages` for the `riskops-backup` group.

@@ -28,6 +28,11 @@ jobs:
       - name: Run tests
         run: python -m pytest
 
+      - name: Backup lock works across service accounts
+        run: >-
+          sudo env PYTHONDONTWRITEBYTECODE=1 "$(command -v python)" -m pytest
+          -p no:cacheprovider backend/tests/test_backup_serialization.py -k cross_account
+
       - name: Run the walking-skeleton flow (smoke)
         run: PYTHONPATH=backend python -m app.demo
 

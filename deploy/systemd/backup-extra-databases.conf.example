@@ -1,0 +1,6 @@
+# Append only the databases that exist and are readable by User=riskops.
+# Replace the former unwrapped control/AI drop-ins; do not install both.
+[Service]
+ExecStart=/usr/bin/flock --exclusive --timeout 10800 --conflict-exit-code 75 --no-fork /run/secagent-riskops-backup/maintenance.lock /usr/bin/python3 /opt/secagent-riskops/current/scripts/backup_telemetry.py --database /var/lib/secagent-riskops/control.sqlite --directory /var/backups/secagent-riskops/control
+# Optional AI queue: confirm this path and access for this installation first.
+# ExecStart=/usr/bin/flock --exclusive --timeout 10800 --conflict-exit-code 75 --no-fork /run/secagent-riskops-backup/maintenance.lock /usr/bin/python3 /opt/secagent-riskops/current/scripts/backup_telemetry.py --database /var/lib/secagent-riskops/ai.sqlite --directory /var/backups/secagent-riskops/ai
