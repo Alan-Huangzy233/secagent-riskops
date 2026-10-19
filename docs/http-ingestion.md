@@ -233,6 +233,13 @@ pattern. The HTTP console has its own filters, pagination and nearby drawer;
 overview/evidence tabs avoid scrolling through metadata to reach the evidence
 table. The header counters remain explicitly SSH-scoped.
 
+The separate [workload and catch-up exercise](http-workload-acceptance.md)
+runs the real collector CLI, TCP API and background worker with production
+record/byte bounds. It checks bounded collection, retained retries, incomplete
+context and expiry while observing process memory, CPU and temporary storage.
+Its synthetic loopback measurements do not establish production throughput;
+collection ACKs and analysis catch-up are measured separately.
+
 ## Console notifications
 
 Active, complete cases with score at least 30 and an hour ending within the
