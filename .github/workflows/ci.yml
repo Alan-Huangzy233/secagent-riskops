@@ -54,6 +54,12 @@ jobs:
           PYTHONPATH=backend python scripts/simulate_http_recovery.py \
             --nginx "$RUNNER_TEMP/riskops-nginx/root/usr/sbin/nginx"
 
+      - name: Real Nginx HTTPS collector, credentials and durable retry
+        timeout-minutes: 5
+        run: |
+          PYTHONPATH=backend python scripts/simulate_http_https.py \
+            --nginx "$RUNNER_TEMP/riskops-nginx/root/usr/sbin/nginx"
+
       - name: Safety demo reproduces the published audit timeline
         run: |
           PYTHONPATH=backend python -m app.safety_demo

@@ -36,6 +36,13 @@ Temporary logs/databases are removed after the run; the optional report is
 synthetic. This is a reproducible functional exercise, not an accuracy estimate
 or a test of a deployed TLS proxy/Nginx rotation.
 
+The separate [HTTPS acceptance exercise](http-https-acceptance.md) runs the
+actual collector CLI through a disposable Nginx TLS proxy to the API. It checks
+certificate failures, redirect and credential boundaries, and retry after a
+committed batch loses its usable acknowledgement. It uses temporary trust
+and synthetic data; it does not validate a deployed source or replace workload
+acceptance.
+
 The older `python -m app.evaluation.web` remains an offline file replay. Its
 snapshot IDs and the durable collector's generation/offset IDs are different
 identity schemes and must not be used interchangeably.
@@ -250,6 +257,12 @@ SSH-specific delivery revalidation path, controls or AI summary.
 Validate a real source's format, peer semantics, rejected-line rate, rotation,
 catch-up resource use and TLS/source authorization. Validate analysis latency,
 context bounds, scoring usefulness and alert volume against that workload.
+Run the [isolated HTTPS acceptance exercise](http-https-acceptance.md), then
+check the actual source's certificate, final endpoint and effective reverse
+proxy authentication separately. A proxy must preserve the source's Bearer
+header and allow it to reach the ingestion route; operator endpoints retain
+their own authentication. The ingestion proxy's peer address is not the
+client address recorded by the monitored website.
 Extend the environment's backup/recovery mapping to include this independent
 HTTP database, console notification checkpoints and collector state/spool, then
 perform the [paired HTTP recovery rehearsal](http-recovery.md). The same-host
