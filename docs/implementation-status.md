@@ -4,7 +4,7 @@ The other documents in this repository describe the **target design**. This
 page records what is **actually implemented in code** so the two are never
 confused.
 
-Last reviewed: 2026-10-03; HTTP collection/recovery sections updated 2026-10-15. The walking skeleton and measured demo baseline are
+Last reviewed: 2026-10-03; HTTP acceptance/network planning sections updated 2026-10-19. The walking skeleton and measured demo baseline are
 preserved; further demo work is paused. Active development targets the independent
 SSH/auth telemetry pilot. The [production plan](./production-plan.md) tracks
 model comparison and broader detection; planned capabilities are not claims of
@@ -138,13 +138,27 @@ The explicit same-host recovery mapping pins the HTTP and console databases
 with their collector cursor/spool state. CI exercises real loopback Nginx
 requests, rename/reopen, lost ACKs, encrypted/signed restoration, historical
 evidence and idempotent replay. The [recovery runbook](http-recovery.md) documents
-retained log inodes, lock contention and the exact guarantee. Real-source
-TLS/workload acceptance and remote/whole-host recovery remain follow-up work.
+retained log inodes, lock contention and the exact guarantee. Isolated
+[real Nginx HTTPS acceptance](http-https-acceptance.md) and
+[bounded workload/resource exercises](http-workload-acceptance.md) now run in CI.
+Real-source TLS/workload acceptance and remote/whole-host recovery remain
+follow-up work.
 After an offline restore, an explicit command verifies both database files against
 the same package before recording a restart-safe marker. The HTTP workspace has
 separate incident and paginated restore-history tabs. History describes paired
 database snapshots and operator marking time, not collector catch-up or log completeness. None of these fixtures
 claims production coverage or measures detection accuracy.
+
+## Network detection (source selected; implementation pending)
+
+A read-only inventory found existing UFW kernel journal records for a first
+host-scoped source. The [network source plan](network-source-plan.md) specifies
+the proposed ingestion contract, a small inbound TCP probe rule and staged
+acceptance. No network collector, persistent network case pipeline or console
+coverage has been implemented or deployed by this planning change. The demo's
+Suricata sample parser and the SSH exporter do not provide that coverage.
+HTTP #119 awaits a real business source; network #120 is the next engineering
+increment, followed by Linux host behavior #121.
 
 ## Known limitations of the skeleton
 
