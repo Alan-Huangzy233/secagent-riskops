@@ -4,17 +4,24 @@
 
 The maintainer has paused further demo work and moved development to the
 independent telemetry pilot. Collection integrity, durable incident scoring,
-console notifications and UTC daily briefings are implemented. Next:
+console notifications and UTC daily briefings are implemented. Current position:
 
-- Compare GPT-6 Luna, DeepSeek Flash and GLM-5.3-Flash on the same labelled,
-  redacted incidents before choosing a production model.
-- Build persistent AI jobs, budgets and evidence validation with offline
-  providers first; introduce real calls through a bounded, manual-trigger pilot.
+- The labelled three-model comparison and persistent AI jobs, budgets and
+  evidence validation are implemented. A bounded manual-trigger pilot is in
+  use in the maintained deployment; broader validation and automatic analysis
+  remain separate gates.
 - Expand detection in order: Web, network, then Linux host behavior. HTTP
   parser/rules and opt-in durable collection, continuous cases, scoring and
   console notifications are implemented ([guide](./docs/http-ingestion.md)).
-  Real-source acceptance, HTTP recovery mapping and daily briefings remain
-  before full production coverage.
+  HTTP daily briefings, same-host recovery/history, isolated Nginx HTTPS and
+  bounded workload acceptance are also implemented. No business website is
+  currently available for real-source acceptance; keep #119 open for that gate.
+- **Next: the first network source (#120).** Start from an existing host's UFW
+  kernel journal, with source-specific provenance, bounded collection and a
+  small rule set. The [network source plan](./docs/network-source-plan.md)
+  separates inventory, implementation and live acceptance. No production
+  network detector is enabled by this plan. Linux host behavior (#121) follows
+  the network increment; HTTP activation resumes when a real service exists.
 
 Acceptance criteria and active issues are in the
 [production plan](./docs/production-plan.md). AI advice does not change incident

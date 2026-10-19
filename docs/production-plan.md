@@ -1,6 +1,6 @@
 # Production plan and issue tracking
 
-Updated 2026-10-11. Further demo work is paused while development focuses on the
+Updated 2026-10-19. Further demo work is paused while development focuses on the
 independent telemetry pilot. This is a plan, not a statement that the features
 below are implemented or deployed. See [implementation status](./implementation-status.md).
 Historical issue-seeding files in `docs/process/` are provenance, not a live
@@ -21,19 +21,23 @@ datasets. A separate [evidence-aware benchmark](triage-evidence.md) adds 72
 built-in SSH/HTTP scenarios, development/holdout families and deterministic
 typed-claim/dismissal checks. A separate new 36-case
 [three-model comparison](eval/triage-pilot-model-comparison.md) supports Luna low
-as the next manual-pilot candidate. The [optional console workflow](manual-ai-triage.md)
+as the bounded manual-pilot candidate. The [optional console workflow](manual-ai-triage.md)
 now implements bounded SSH summaries, private trusted context, durable jobs,
 total/daily budgets, versioned results and human feedback. It remains disabled
-by default; real-provider rollout and broader independent validation are still
-pending. Historical demo results retain their original attribution.
+by default in the repository; the maintained deployment has a bounded manual
+pilot. Broader independent validation and automatic analysis remain pending.
+Historical demo results retain their original attribution.
 
 The offline HTTP parser, three rules and evidence replay are in
 [merged PR #116](https://github.com/Alan-Huangzy233/secagent-riskops/pull/116).
-The next increment adds [opt-in durable HTTP collection and ingestion](http-ingestion.md),
-with independent storage, retry receipts and an isolated end-to-end simulation.
-Next are continuous correlation, retained incident evidence, HTTP-appropriate
-scoring, console/notification integration, recovery coverage and real-source
-acceptance. Issue #119 remains open; there is no production HTTP coverage claim.
+[Opt-in durable HTTP collection and ingestion](http-ingestion.md), independent
+storage, retry receipts, continuous correlation, retained evidence, scoring,
+console notifications and UTC daily briefings are now implemented. Same-host
+recovery/history and isolated [HTTPS](http-https-acceptance.md) and
+[workload](http-workload-acceptance.md) acceptance are also implemented.
+No business website is currently available for real-source acceptance. Issue
+#119 stays open for that deployment gate; isolated acceptance does not establish
+live HTTP coverage or remote/whole-host recovery.
 
 | Work | Issue | Acceptance boundary |
 | --- | --- | --- |
@@ -44,13 +48,16 @@ acceptance. Issue #119 remains open; there is no production HTTP coverage claim.
 | First network source | [#120](https://github.com/Alan-Huangzy233/secagent-riskops/issues/120) | A real observation point and a small validated connection/DNS/firewall rule set |
 | Linux host behavior | [#121](https://github.com/Alan-Huangzy233/secagent-riskops/issues/121) | Source-backed rules for a selected subset of sudo, account/privilege, service or scheduled-task activity |
 
-The immediate console increment is [tabbed views and a server-prepared first page](console-workspace.md),
-with a separate [controlled online-AI proposal](online-ai-pilot.md). Review the
-console changes before deployment; real-provider activation needs an agreed
-production budget and outgoing-field policy. Continue HTTP engineering after
-this console increment. Detection expands in order: **Web → network → Linux host behavior**.
-Source discovery can continue while real HTTP activation waits for an available
-service; offline fixtures never establish live coverage.
+[Tabbed views and a server-prepared first page](console-workspace.md) have
+shipped, alongside the bounded [manual AI workflow](manual-ai-triage.md).
+The [online-AI proposal](online-ai-pilot.md) records the rollout constraints;
+automatic calls and broader outgoing fields are not implied by the manual pilot.
+Detection expands in order: **Web → network → Linux host behavior**.
+The next increment is #120's [first network source](network-source-plan.md):
+an existing UFW kernel journal, source-specific collection and a small validated
+inbound rule. HTTP's missing business source does not block this inventory and
+engineering work. Linux #121 follows the network increment; offline fixtures
+never establish live coverage.
 
 ## Model comparison
 
@@ -99,9 +106,10 @@ fields; planning this comparison does not enable or fund API calls.
    reservations; versioned results and cache invalidation. Test restart,
    concurrency, stale evidence, invalid references, prompt injection, failures
    and uncertain request outcomes with fake/recorded providers.
-2. **Manual-trigger pilot (UI implemented; rollout pending):** review deployment,
-   backup/recovery, outbound fields and production budget, then use the evaluated
-   configuration. Advice and validation/failure states are shown in the console.
+2. **Manual-trigger pilot (implemented; limited deployment active):** each new
+   deployment still requires agreed backup/recovery, outbound fields and budget
+   before using the evaluated configuration. Advice and validation/failure
+   states are shown in the console.
    Preserve rule alerts and manual disposition; collection and human handling
    continue when the provider is unavailable.
 3. **Possible later automatic analysis:** after quality, cost and throughput meet
@@ -129,6 +137,13 @@ The skeleton's Suricata sample parser and a host's SSH journal do not provide
 whole-network or complete host-change visibility. Each increment needs labelled
 positive/negative fixtures, bounded correlation, retained evidence, appropriate
 scores/notifications and existing-source regressions.
+
+The October 19 read-only inventory found existing UFW kernel records suitable
+for the first network increment. A different host's narrow UDP NAT-entry logs
+are not a substitute for general inbound visibility or evidence of a successful
+connection. The [source plan](network-source-plan.md) defines the chosen scope,
+delivery order, resource gates and false-positive cases. Private host identities,
+addresses, routing and raw production samples remain outside the public repo.
 
 ## Issue audit, 2026-09-29
 
