@@ -1,8 +1,10 @@
 # First network source: host firewall observations
 
-Updated 2026-10-19. This is the proposed implementation and acceptance plan for
-[#120](https://github.com/Alan-Huangzy233/secagent-riskops/issues/120), not an
-implemented or deployed network detector. Follow #120 with Linux host behavior
+Updated 2026-10-19. This is the staged implementation and acceptance plan for
+[#120](https://github.com/Alan-Huangzy233/secagent-riskops/issues/120). The first
+[offline parser/rule increment](network-detection.md) is implemented with
+synthetic tests; collection, integration and live acceptance remain pending.
+Follow #120 with Linux host behavior
 [#121](https://github.com/Alan-Huangzy233/secagent-riskops/issues/121).
 HTTP #119 still requires a real business service; that gate does not block this
 increment. Existing SSH collection and demo Suricata parsing do not supply it.
@@ -142,7 +144,7 @@ remains eligible. Do not silently inherit a global SSH whitelist exemption.
 
 ## Small PRs and acceptance gates
 
-1. **Offline parser and one rule:** versioned typed schema, source-profile
+1. **Offline parser and one rule (implemented):** versioned typed schema, source-profile
    validation, the single bounded candidate rule and wholly authored IPv4/IPv6
    positive/negative fixtures. No collector, console, source enrollment or
    production firewall changes.
