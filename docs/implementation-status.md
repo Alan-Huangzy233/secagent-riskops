@@ -4,8 +4,9 @@ The other documents in this repository describe the **target design**. This
 page records what is **actually implemented in code** so the two are never
 confused.
 
-Last reviewed: 2026-10-03; HTTP acceptance/network detection sections updated 2026-10-19. The walking skeleton and measured demo baseline are
-preserved; further demo work is paused. Active development targets the independent
+Last reviewed: 2026-10-03; HTTP acceptance/network detection sections updated
+2026-10-19; network ingestion updated 2026-10-20. The walking skeleton and measured
+demo baseline are preserved; further demo work is paused. Active development targets the independent
 SSH/auth telemetry pilot. The [production plan](./production-plan.md) tracks
 model comparison and broader detection; planned capabilities are not claims of
 implementation or deployment.
@@ -149,7 +150,7 @@ separate incident and paginated restore-history tabs. History describes paired
 database snapshots and operator marking time, not collector catch-up or log completeness. None of these fixtures
 claims production coverage or measures detection accuracy.
 
-## Network detection (offline implementation; live acceptance pending)
+## Network detection and ingestion (live acceptance pending)
 
 The versioned UFW kernel-journal parser and source profile are implemented in
 `backend/app/telemetry/network_parse.py`. The bounded offline detector in
@@ -160,13 +161,31 @@ positive cases, retries, UDP port hopping and malformed/provenance boundaries.
 Run `PYTHONPATH=backend python scripts/simulate_network_detection.py` for a
 self-checking synthetic exercise; see [usage and limits](network-detection.md).
 
-The [network source plan](network-source-plan.md) still requires a dedicated
-collector, durable store/receipts, continuous analysis, console integration and
-passive real-source acceptance. No production network detector is enabled by
-this offline change; synthetic cases do not establish accuracy or live coverage.
-The demo Suricata parser and SSH exporter do not supply this network source.
-HTTP #119 awaits a real business service; continue network #120 before Linux
-host behavior #121.
+The [durable ingestion foundation](network-ingestion.md) is implemented in this
+change, pending PR review: `network_protocol.py`, `network_store.py` and
+`network_api.py` add dedicated source/profile validation, immutable transactional
+receipts, a separate bounded SQLite store and operator read APIs. Dedicated
+`scripts/network_export.py` and `scripts/network_collector.py` provide bounded
+UFW journal reads, durable pending-batch retry and ACK-gated cursor commits.
+`network_ingest` defaults to `null`; no network store or collector is enabled by
+existing configuration. The synthetic `scripts/simulate_network_ingest.py`
+exercises the disposable delivery path without live source access.
+
+The current exporter guards only iptables/ip6tables snapshots. Mixed/native
+nftables producers are unsupported until a full guard; local-input provenance,
+absence of unmanaged producers and profile validity still require operator
+review. Normalized events have bounded retention; compact event identities and
+batch receipts remain until configured capacity stops writes. Expiry remains
+visible after cleanup, and no unsafe receipt pruning is implemented.
+
+Next follow the [network source plan](network-source-plan.md) with continuous
+analysis, versioned evidence, scores and a network read table/detail view.
+Console notifications, passive real-source acceptance, resource measurements
+and network store/spool/cursor backup/restore acceptance remain separate gates.
+This change enables no production network detector; synthetic cases do not
+establish accuracy or live coverage. The demo Suricata parser and SSH exporter
+do not supply this network source. HTTP #119 awaits a real business service;
+continue network #120 before Linux host behavior #121.
 
 ## Known limitations of the skeleton
 

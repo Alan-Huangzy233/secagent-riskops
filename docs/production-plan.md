@@ -56,8 +56,9 @@ Detection expands in order: **Web → network → Linux host behavior**.
 The next increment is #120's [first network source](network-source-plan.md):
 an existing UFW kernel journal, source-specific collection and a small inbound
 rule. The [offline parser and rule](network-detection.md) have synthetic tests;
-dedicated durable transport/storage is next, followed by continuous cases,
-console integration and passive source acceptance. HTTP's missing business
+the [durable transport/storage foundation](network-ingestion.md) is implemented
+pending PR review and disabled by default. Next come continuous cases, console
+integration and passive source acceptance. HTTP's missing business
 source does not block this engineering work. Linux #121 follows the network
 increment; offline fixtures never establish live coverage.
 

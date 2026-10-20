@@ -45,6 +45,10 @@ jobs:
       - name: HTTP ingestion, continuous incidents and console notification simulation
         run: PYTHONPATH=backend python scripts/simulate_http_ingest.py
 
+      - name: Network exporter, durable ingestion and lost receipt replay simulation
+        timeout-minutes: 2
+        run: PYTHONPATH=backend python scripts/simulate_network_ingest.py
+
       - name: HTTP workload bounds, catch-up and resource observations
         timeout-minutes: 5
         run: PYTHONPATH=backend python scripts/simulate_http_workload.py

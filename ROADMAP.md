@@ -18,8 +18,10 @@ console notifications and UTC daily briefings are implemented. Current position:
   currently available for real-source acceptance; keep #119 open for that gate.
 - **In progress: the first network source (#120).** Offline UFW parsing and
   one bounded TCP multi-port rule now have synthetic positive/negative tests
-  ([usage and limits](./docs/network-detection.md)). Next implement dedicated
-  durable collection/storage, then continuous cases and a network console view.
+  ([usage and limits](./docs/network-detection.md)). Dedicated durable
+  collection/storage and operator read APIs are implemented in this change,
+  pending PR review ([ingestion guide](./docs/network-ingestion.md)). Next add
+  continuous cases, versioned evidence and a network read table/detail view.
   The [network source plan](./docs/network-source-plan.md) separates those gates
   from live acceptance. Production network detection remains disabled. Linux host
   behavior (#121) follows the network increment; HTTP activation resumes when a real service exists.

@@ -87,6 +87,46 @@ class HttpIngestConfig(BaseModel):
         return value
 
 
+class NetworkSourceConfig(SourceConfig):
+    # Preserve historical enrolled profiles while pending batches can replay.
+    profiles: tuple[dict, ...] = Field(min_length=1, max_length=16)
+
+    @model_validator(mode="after")
+    def valid_profiles(self):
+        from .network_protocol import profile_from_dict
+        profiles = [profile_from_dict(value) for value in self.profiles]
+        if (any(profile.source_id != self.id for profile in profiles)
+                or len({profile.revision for profile in profiles}) != len(profiles)):
+            raise ValueError("Invalid or duplicate network profile")
+        return self
+
+    def profile_for(self, revision):
+        from .network_protocol import profile_from_dict
+        for value in self.profiles:
+            profile = profile_from_dict(value)
+            if profile.revision == revision:
+                return profile
+        raise ValueError("Network profile is not enrolled")
+
+
+class NetworkIngestConfig(BaseModel):
+    model_config = {"extra": "forbid", "frozen": True}
+    database_path: str = Field(min_length=1)
+    sources: tuple[NetworkSourceConfig, ...] = Field(min_length=1, max_length=16)
+    retention_days: int = Field(default=14, ge=1, le=365, strict=True)
+    max_receipts: int = Field(default=100_000, ge=1, le=1_000_000, strict=True)
+    max_batches: int = Field(default=10_000, ge=1, le=100_000, strict=True)
+    max_storage_bytes: int = Field(default=256 * 1024 * 1024, ge=1024 * 1024,
+                                   le=1024**3, strict=True)
+
+    @field_validator("database_path")
+    @classmethod
+    def absolute_database(cls, value):
+        if not Path(value).is_absolute():
+            raise ValueError("Network database must be an absolute persistent path")
+        return value
+
+
 class LiveConfig(BaseModel):
     model_config = {"extra": "forbid", "frozen": True}
 
@@ -99,6 +139,7 @@ class LiveConfig(BaseModel):
     notifications_enabled: bool = True
     console_cache_enabled: bool = False
     http_ingest: HttpIngestConfig | None = None
+    network_ingest: NetworkIngestConfig | None = None
     notification_backup_directories: tuple[str, ...] = Field(default=(), max_length=8)
 
     @field_validator("notification_backup_directories")
@@ -136,6 +177,19 @@ class LiveConfig(BaseModel):
                 raise ValueError("HTTP sources require independent tokens")
             if Path(self.http_ingest.database_path).resolve() == Path(self.database_path).resolve():
                 raise ValueError("HTTP storage must be separate from SSH storage")
+        if self.network_ingest:
+            network_sources = self.network_ingest.sources
+            if len({s.id for s in network_sources}) != len(network_sources):
+                raise ValueError("Duplicate network source identity")
+            all_sources = (*self.sources, *(self.http_ingest.sources if self.http_ingest else ()),
+                           *network_sources)
+            if len({s.token_sha256 for s in all_sources}) != len(all_sources):
+                raise ValueError("Network sources require independent tokens")
+            other_paths = [Path(self.database_path).resolve()]
+            if self.http_ingest:
+                other_paths.append(Path(self.http_ingest.database_path).resolve())
+            if Path(self.network_ingest.database_path).resolve() in other_paths:
+                raise ValueError("Network storage must be separate from SSH and HTTP storage")
         return self
 
 

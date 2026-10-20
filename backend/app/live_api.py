@@ -178,6 +178,12 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
         http_config = application.state.config.http_ingest
         application.state.http_store = (HttpStore(http_config.database_path, http_config.retention_days)
                                         if http_config else None)
+        from .telemetry.network_store import NetworkStore
+        network_config = application.state.config.network_ingest
+        application.state.network_store = (NetworkStore(network_config.database_path,
+            retention_days=network_config.retention_days, max_receipts=network_config.max_receipts,
+            max_batches=network_config.max_batches, max_storage_bytes=network_config.max_storage_bytes)
+            if network_config else None)
         from .telemetry.control import ControlService
         live_store = application.state.store
 
@@ -244,6 +250,8 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
 
     from .telemetry.http_api import register_routes
     register_routes(application, operator)
+    from .telemetry.network_api import register_routes as register_network_routes
+    register_network_routes(application, operator)
 
     @application.get("/health")
     def health(request: Request):
@@ -251,6 +259,8 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
             ready = request.app.state.store.healthcheck()
             if request.app.state.http_store is not None:
                 ready = ready and request.app.state.http_store.healthcheck()
+            if request.app.state.network_store is not None:
+                ready = ready and request.app.state.network_store.healthcheck()
         except Exception:
             ready = False
         return JSONResponse({"status": "ok" if ready else "unavailable"}, status_code=200 if ready else 503)
