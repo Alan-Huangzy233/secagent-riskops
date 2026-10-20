@@ -16,12 +16,13 @@ console notifications and UTC daily briefings are implemented. Current position:
   HTTP daily briefings, same-host recovery/history, isolated Nginx HTTPS and
   bounded workload acceptance are also implemented. No business website is
   currently available for real-source acceptance; keep #119 open for that gate.
-- **Next: the first network source (#120).** Start from an existing host's UFW
-  kernel journal, with source-specific provenance, bounded collection and a
-  small rule set. The [network source plan](./docs/network-source-plan.md)
-  separates inventory, implementation and live acceptance. No production
-  network detector is enabled by this plan. Linux host behavior (#121) follows
-  the network increment; HTTP activation resumes when a real service exists.
+- **In progress: the first network source (#120).** Offline UFW parsing and
+  one bounded TCP multi-port rule now have synthetic positive/negative tests
+  ([usage and limits](./docs/network-detection.md)). Next implement dedicated
+  durable collection/storage, then continuous cases and a network console view.
+  The [network source plan](./docs/network-source-plan.md) separates those gates
+  from live acceptance. Production network detection remains disabled. Linux host
+  behavior (#121) follows the network increment; HTTP activation resumes when a real service exists.
 
 Acceptance criteria and active issues are in the
 [production plan](./docs/production-plan.md). AI advice does not change incident

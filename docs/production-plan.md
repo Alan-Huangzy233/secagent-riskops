@@ -54,10 +54,12 @@ The [online-AI proposal](online-ai-pilot.md) records the rollout constraints;
 automatic calls and broader outgoing fields are not implied by the manual pilot.
 Detection expands in order: **Web → network → Linux host behavior**.
 The next increment is #120's [first network source](network-source-plan.md):
-an existing UFW kernel journal, source-specific collection and a small validated
-inbound rule. HTTP's missing business source does not block this inventory and
-engineering work. Linux #121 follows the network increment; offline fixtures
-never establish live coverage.
+an existing UFW kernel journal, source-specific collection and a small inbound
+rule. The [offline parser and rule](network-detection.md) have synthetic tests;
+dedicated durable transport/storage is next, followed by continuous cases,
+console integration and passive source acceptance. HTTP's missing business
+source does not block this engineering work. Linux #121 follows the network
+increment; offline fixtures never establish live coverage.
 
 ## Model comparison
 

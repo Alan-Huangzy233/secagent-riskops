@@ -4,7 +4,7 @@ The other documents in this repository describe the **target design**. This
 page records what is **actually implemented in code** so the two are never
 confused.
 
-Last reviewed: 2026-10-03; HTTP acceptance/network planning sections updated 2026-10-19. The walking skeleton and measured demo baseline are
+Last reviewed: 2026-10-03; HTTP acceptance/network detection sections updated 2026-10-19. The walking skeleton and measured demo baseline are
 preserved; further demo work is paused. Active development targets the independent
 SSH/auth telemetry pilot. The [production plan](./production-plan.md) tracks
 model comparison and broader detection; planned capabilities are not claims of
@@ -149,16 +149,24 @@ separate incident and paginated restore-history tabs. History describes paired
 database snapshots and operator marking time, not collector catch-up or log completeness. None of these fixtures
 claims production coverage or measures detection accuracy.
 
-## Network detection (source selected; implementation pending)
+## Network detection (offline implementation; live acceptance pending)
 
-A read-only inventory found existing UFW kernel journal records for a first
-host-scoped source. The [network source plan](network-source-plan.md) specifies
-the proposed ingestion contract, a small inbound TCP probe rule and staged
-acceptance. No network collector, persistent network case pipeline or console
-coverage has been implemented or deployed by this planning change. The demo's
-Suricata sample parser and the SSH exporter do not provide that coverage.
-HTTP #119 awaits a real business source; network #120 is the next engineering
-increment, followed by Linux host behavior #121.
+The versioned UFW kernel-journal parser and source profile are implemented in
+`backend/app/telemetry/network_parse.py`. The bounded offline detector in
+`network_detection.py` retains exact evidence for an observed inbound TCP
+multi-port pattern, deduplicates journal identities, separates boots/profiles
+and reports coverage and clock uncertainty. Authored IPv4/IPv6 scenarios cover
+positive cases, retries, UDP port hopping and malformed/provenance boundaries.
+Run `PYTHONPATH=backend python scripts/simulate_network_detection.py` for a
+self-checking synthetic exercise; see [usage and limits](network-detection.md).
+
+The [network source plan](network-source-plan.md) still requires a dedicated
+collector, durable store/receipts, continuous analysis, console integration and
+passive real-source acceptance. No production network detector is enabled by
+this offline change; synthetic cases do not establish accuracy or live coverage.
+The demo Suricata parser and SSH exporter do not supply this network source.
+HTTP #119 awaits a real business service; continue network #120 before Linux
+host behavior #121.
 
 ## Known limitations of the skeleton
 
