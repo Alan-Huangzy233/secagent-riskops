@@ -161,15 +161,16 @@ remains eligible. Do not silently inherit a global SSH whitelist exemption.
    validation, the single bounded candidate rule and wholly authored IPv4/IPv6
    positive/negative fixtures. No collector, console, source enrollment or
    production firewall changes.
-2. **Durable transport and store (implemented in this change; pending PR review):**
+2. **Durable transport and store (merged):**
    dedicated exporter/collector, independent credentials, bounded batches/spool,
    immutable commit receipts, operator read APIs, event retention and restart/gap
    handling. A disposable synthetic exercise covers the delivery path. Real
    enrollment, receipt compaction and recovery acceptance are not included.
-3. **Continuous analysis and console (next):** integrate the offline rule with durable
-   correlation, versioned evidence, appropriate scores, a separate network view
-   and console notifications. Show
-   data-quality failures independently from attack candidates.
+3. **Continuous analysis and console (implemented for review):** the
+   [bounded worker and console](network-analysis.md) integrate the offline rule
+   with durable correlation, versioned evidence, advisory scores, a separate
+   network table/detail view and console notices. Data-quality failures are
+   displayed separately from attack candidates.
 4. **First-source acceptance:** enroll in passive shadow mode after review;
    privately compare selected journal records with durable receipts and evidence.
    Verify direction/profile assumptions, resource budgets, retention and restore;

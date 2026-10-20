@@ -5,8 +5,9 @@ parses bounded journal records and evaluates one advisory rule. It has no networ
 I/O, firewall changes, collector, database, console or AI dependency. Deployment
 and real-source acceptance remain separate gates in the
 [network source plan](network-source-plan.md). The separate
-[durable ingestion foundation](network-ingestion.md) is now implemented pending
-PR review, disabled by default, and does not run this detector continuously.
+[durable ingestion foundation](network-ingestion.md) is merged and disabled by
+default. The [continuous worker and console](network-analysis.md) are implemented
+in a separate increment for review; this offline entry point remains standalone.
 
 ## Run the synthetic exercise
 

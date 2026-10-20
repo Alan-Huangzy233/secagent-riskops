@@ -97,6 +97,7 @@ def simulate():
             return response.json()
 
         with TestClient(make_app()) as client:
+            client.app.state.network_worker.close()  # Delivery-only exercise; analysis has its own acceptance.
             def send(_endpoint, supplied_token, body, _timeout):
                 response = client.post('/api/network/batches', content=encode(body),
                     headers={'Authorization': 'Bearer ' + supplied_token, 'Content-Type': 'application/json'})
@@ -138,7 +139,7 @@ def simulate():
             assert (source['accepted_total'], source['rejected_total'], source['status']) == (22, 1, 'degraded')
             assert len(events) == len({event.event_id for event in events}) == 22
             assert len(read(client, 'batches', source_id=profile.source_id)['items']) == 2
-            assert read(client, 'status')['analysis_enabled'] is False
+            assert read(client, 'status')['analysis_enabled'] is True
             detection = detect_network(events)
             assert detection.eligible_count == 20 and detection.excluded_count == 2
             assert sorted(len(f.evidence_ids) for f in detection.findings) == [10, 10]
@@ -146,6 +147,7 @@ def simulate():
 
         # Restart the actual application/store, then replay the original request.
         with TestClient(make_app()) as client:
+            client.app.state.network_worker.close()  # Delivery-only exercise; analysis has its own acceptance.
             response = client.post('/api/network/batches', content=encode(attempts[0]),
                 headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
             assert response.status_code == 200 and response.json() == receipts[0]
@@ -157,7 +159,7 @@ def simulate():
                 'stored_unique_events': len(events), 'rejected_records': 1, 'durable_batches': 2,
                 'event_read_pages': page_count, 'lost_ack_replayed_identically': True,
                 'restart_replayed_identically': True, 'cursor_advanced_only_after_ack': True,
-                'continuous_analysis_enabled': False, 'offline_findings': [
+                'continuous_analysis_configured': True, 'continuous_analysis_exercised': False, 'offline_findings': [
                     {'rule_id': f.rule_id, 'evidence_count': len(f.evidence_ids),
                      'distinct_ports': len(f.distinct_dst_ports)} for f in detection.findings],
                 'coverage': list(detection.coverage), 'production_writes': False, 'model_calls': 0,

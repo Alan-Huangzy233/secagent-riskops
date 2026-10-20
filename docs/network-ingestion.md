@@ -1,12 +1,12 @@
 # Network collection and durable ingestion
 
 The second increment of [#120](https://github.com/Alan-Huangzy233/secagent-riskops/issues/120)
-is implemented in this change and awaits PR review. It adds a dedicated UFW
-journal exporter, retrying collector, authenticated protocol, separate SQLite
-store and operator read APIs. `network_ingest` defaults to `null`: no network
+is merged. It adds a dedicated UFW journal exporter, retrying collector,
+authenticated protocol, separate SQLite store and operator read APIs. `network_ingest` defaults to `null`: no network
 store or collector is activated by the existing configuration. This is a
-collection foundation, with no continuous network analysis, network console
-table, notifications or live source enrollment yet. The
+collection foundation. [Continuous analysis, versioned evidence, console views
+and notifications](network-analysis.md) are implemented in the next increment
+for review; live source enrollment remains pending. The
 [offline rule](network-detection.md) remains separately callable.
 
 Implementation, merge, deployment and passive source acceptance are separate
@@ -28,7 +28,9 @@ store. It retains 22 unique normalized events and one redacted rejection in two
 durable batches. It loses the first ACK after commit, verifies identical retry
 and restart receipts, and reads the retained events through four bounded pages.
 The standalone offline rule then finds two 10-event TCP groups and excludes the
-two UDP observations; no continuous worker, console case or notification runs.
+two UDP observations. This delivery exercise does not assert continuous case
+or notification results; use the [analysis exercise](network-analysis.md) for
+that path.
 
 The exercise reads no host journal, contacts no source host and changes no
 production data. Its report is synthetic; it is not a live SSH/TLS,
@@ -208,7 +210,9 @@ Operator authentication protects `GET /api/network/events`,
 `limit` and `snapshot`; they return `next_after` and `has_more`. An event page
 contains retained normalized records; a batch page contains immutable ACKs.
 The source Bearer token permits ingestion only. With ingestion omitted, status
-reports `enabled: false`; enabled status still reports `analysis_enabled: false`.
+reports `enabled: false`; configured status now reports `analysis_enabled: true`
+and includes separate `analysis` progress/coverage. This flag indicates the
+worker is configured, not that it is caught up or accepted for production.
 
 | Signal | Meaning |
 | --- | --- |
@@ -230,10 +234,9 @@ apparent-address attribution remain limitations of the evidence.
 
 ## Next gates
 
-Next implement continuous network correlation with durable analysis checkpoints,
-versioned evidence, scores, a dedicated read table/detail view and console
-notifications. Keep data-quality failures separate from attack candidates.
-Before any real enrollment, complete the supported-source/profile review,
+The [continuous analysis and console](network-analysis.md) increment is
+implemented for review. Data-quality failures remain separate from attack
+candidates. Before any real enrollment, complete the supported-source/profile review,
 passive source comparison, resource measurements and paired store/spool/cursor
 backup and restore acceptance. Do not extend the existing SSH/HTTP recovery
 claim to this new namespace. Keep #120 open; Linux host behavior #121 follows
