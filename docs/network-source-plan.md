@@ -1,9 +1,11 @@
 # First network source: host firewall observations
 
-Updated 2026-10-19. This is the staged implementation and acceptance plan for
-[#120](https://github.com/Alan-Huangzy233/secagent-riskops/issues/120). The first
-[offline parser/rule increment](network-detection.md) is implemented with
-synthetic tests; collection, integration and live acceptance remain pending.
+Updated 2026-10-20. This is the staged implementation and acceptance plan for
+[#120](https://github.com/Alan-Huangzy233/secagent-riskops/issues/120). The
+[offline parser/rule increment](network-detection.md) is implemented. The
+[durable ingestion foundation](network-ingestion.md) is implemented in this
+change, pending PR review; continuous analysis, console integration and live
+acceptance remain pending. Collection is disabled by default.
 Follow #120 with Linux host behavior
 [#121](https://github.com/Alan-Huangzy233/secagent-riskops/issues/121).
 HTTP #119 still requires a real business service; that gate does not block this
@@ -22,7 +24,12 @@ wall-clock and monotonic timestamps, TCP flags and ports. Its bounded sample is
 not a full-day count. Before enrollment, retain a private, versioned source
 profile covering effective rules, hooks, labels, address families, journal
 retention and logging limits. Fingerprint stable configuration, excluding
-dynamic packet/byte counters. Revalidate it after firewall changes.
+dynamic packet/byte counters. Revalidate it after firewall changes. The current
+exporter fingerprints only `iptables-save` and `ip6tables-save`; this is not
+complete effective-firewall attestation. Mixed/native nftables producers remain
+unsupported until a full guard exists. Before enrollment, verify no unmanaged
+or native producers can reuse prefixes or invalidate attribution, and establish
+`profile_valid_from_us` from trusted operator context.
 
 UFW labels can recur in input, forwarding and explicit-deny paths; `BLOCK` text
 alone does not identify the hook or prove the final packet outcome. Validate
@@ -54,7 +61,7 @@ Use these typed fields rather than exporting arbitrary journal dictionaries:
 | `event_id`, `content_hash` | Hash a canonical encoding of source, boot and cursor for identity; separately bind immutable normalized content. Same identity with different content is a conflict. |
 | `journal_realtime_us` | UTC journal receipt time in integer microseconds; not a promise of exact packet occurrence time. |
 | `journal_monotonic_us` | Receipt time usable for ordering within the same boot only. |
-| `collected_at`, `received_at` | Separate collector and server timestamps; do not replace source time with arrival time. |
+| `collected_at_us`, `received_at_us` | Separate collection and server receipt timestamps in integer UTC microseconds; do not replace source time with arrival time. |
 | `transport` | Require trusted journal metadata `_TRANSPORT=kernel`, not a message prefix alone. |
 | `ip_family`, `src_ip`, `dst_ip` | Canonical numeric IPv4/IPv6 addresses with consistent family; reject malformed values. |
 | `protocol`, `src_port`, `dst_port` | Typed protocol; ports are integers in 0–65535 when present, otherwise null. Missing is not port zero. |
@@ -98,9 +105,15 @@ unavailable records and report a gap or uncertain interval instead of silently
 resetting to the newest record. Keep ingest ACK progress separate from analysis
 progress. Expired backlog and incomplete correlation must remain visible.
 
-Proposed initial budgets are 200 records and 1 MiB per batch, at most five pages
-or 20 seconds per run, and a 16 MiB durable spool. Validate and revise these
-explicit limits with the actual source; they are not measured capacity.
+Implemented initial limits are 200 records and 1 MiB per batch, at most five
+pages or 20 seconds per run, and 16 MiB of spool file content including crash
+temporaries and state-write reserve. Default store caps are 100,000 event
+receipts, 10,000 batch receipts and 256 MiB of database/WAL/SHM accounting.
+Normalized events expire after 14 days by server receipt time, with bounded
+cleanup. Receipts remain retained until hard capacity fail-stop; safe compaction
+is a later gate. See the [ingestion guide](network-ingestion.md) for exact limits
+and expiry reports. Validate these limits with the actual source; they are not
+measured capacity.
 Bound line size, API pagination, analysis windows, database growth and worker
 work per iteration. Full spool or storage quotas must pause safely with visible
 health state, preserving retry evidence rather than silently dropping records.
@@ -148,10 +161,12 @@ remains eligible. Do not silently inherit a global SSH whitelist exemption.
    validation, the single bounded candidate rule and wholly authored IPv4/IPv6
    positive/negative fixtures. No collector, console, source enrollment or
    production firewall changes.
-2. **Durable transport and store:** dedicated exporter/collector, credentials,
-   bounded batches/spool, commit receipts, read APIs, retention and restart/gap
-   handling. Exercise a disposable service and collector before real access.
-3. **Continuous analysis and console:** integrate the offline rule with durable
+2. **Durable transport and store (implemented in this change; pending PR review):**
+   dedicated exporter/collector, independent credentials, bounded batches/spool,
+   immutable commit receipts, operator read APIs, event retention and restart/gap
+   handling. A disposable synthetic exercise covers the delivery path. Real
+   enrollment, receipt compaction and recovery acceptance are not included.
+3. **Continuous analysis and console (next):** integrate the offline rule with durable
    correlation, versioned evidence, appropriate scores, a separate network view
    and console notifications. Show
    data-quality failures independently from attack candidates.

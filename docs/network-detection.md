@@ -4,7 +4,9 @@ This first increment of [#120](https://github.com/Alan-Huangzy233/secagent-risko
 parses bounded journal records and evaluates one advisory rule. It has no network
 I/O, firewall changes, collector, database, console or AI dependency. Deployment
 and real-source acceptance remain separate gates in the
-[network source plan](network-source-plan.md).
+[network source plan](network-source-plan.md). The separate
+[durable ingestion foundation](network-ingestion.md) is now implemented pending
+PR review, disabled by default, and does not run this detector continuously.
 
 ## Run the synthetic exercise
 
@@ -36,9 +38,12 @@ authentication mechanism. Resolving reused UFW labels across input, forwarding
 and explicit-deny hooks is a prerequisite for setting `local_input_labels` and
 `local_input_interfaces`. Leave these empty when attribution is uncertain; blank
 `OUT` or `BLOCK` alone never establishes local input. The parser also requires
-journal `_TRANSPORT=kernel`; a future dedicated exporter must obtain that field
-from the journal and authenticate the source. Arbitrary JSON supplied by an
-untrusted client cannot establish kernel origin.
+journal `_TRANSPORT=kernel`; the dedicated exporter must obtain that field
+from the journal and source credentials authenticate its delivery. Arbitrary
+JSON supplied by an untrusted client cannot establish kernel origin. The
+current exporter guards only the iptables/ip6tables snapshot: mixed/native
+nftables producers remain unsupported pending a full guard, and local-input
+attribution still requires operator enrollment review.
 
 The normalized immutable event retains opaque journal cursor, boot identity,
 integer receipt timestamps, canonical same-family IPs, protocol, ports, TCP
@@ -78,7 +83,9 @@ deltas marks that source/boot with `journal_clock_discontinuity`. Detection
 continues on monotonic time. First/last wall timestamps follow monotonic order
 and may decrease after a clock adjustment. This check only observes changes
 between supplied records; it cannot establish that their absolute UTC time is
-correct. Future collection must track delay, missing history and profile drift.
+correct. The collection foundation records delay, missing-cursor reports and
+profile drift; a continuous correlator must still carry those limitations into
+future cases.
 
 Input is capped at 10,000 records including duplicates and 16 MiB of normalized
 JSON. Invalid events, conflicting identities or either cap abort the whole call
@@ -113,9 +120,11 @@ the later integration increment.
 
 ## Remaining gates
 
-Next build the dedicated exporter/collector and durable storage: bounded pending
-batches, source-bound credentials, commit receipts, cursor recovery, rejection/
-gap history and explicit retention. Then integrate continuous versioned cases,
-scores, network tables and console notifications. Passive source enrollment,
-resource measurements and backup/restore acceptance precede live coverage claims
-or closing #120. Existing SSH, HTTP and the manual AI pilot remain independent.
+The [dedicated exporter/collector and durable store](network-ingestion.md) are
+implemented pending PR review, with bounded pending batches, source-bound
+credentials, immutable receipts, cursor recovery and visible rejection/expiry
+history. They are disabled by default. Next integrate continuous versioned cases,
+scores, a network read table/detail view and console notifications. Passive
+source enrollment, resource measurements and backup/restore acceptance precede
+live coverage claims or closing #120. Existing SSH, HTTP and the manual AI pilot
+remain independent.
