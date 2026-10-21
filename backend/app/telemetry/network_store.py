@@ -6,6 +6,7 @@ identities or batch receipts; safely compacting those is a later protocol change
 from __future__ import annotations
 
 from contextlib import contextmanager
+from functools import lru_cache
 import json
 import os
 from pathlib import Path
@@ -15,9 +16,10 @@ import time
 
 from .network_parse import SourceProfile
 from .network_protocol import encode, fingerprint, validate_batch
+from . import network_incidents
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 APPLICATION_ID = 0x4E455431
 MAX_PAGE_LIMIT = 200
 RETENTION_BATCH = 1000
@@ -91,6 +93,24 @@ def _storage_error(error: sqlite3.Error) -> NetworkStoreError:
     return NetworkStoreError("network_storage_unavailable")
 
 
+def _schema_sql(db):
+    return {(row[0], row[1]): re.sub(r"\s+", " ", row[2].strip())
+            for row in db.execute("SELECT type,name,sql FROM sqlite_master "
+                                  "WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'")}
+
+
+@lru_cache(maxsize=2)
+def _expected_schema_sql(version):
+    # Compare actual constraints and index definitions, not only their names.
+    # A same-column foreign schema must not become eligible for migration.
+    db = sqlite3.connect(":memory:")
+    try:
+        db.executescript(_SCHEMA + (network_incidents.SCHEMA if version == SCHEMA_VERSION else ""))
+        return _schema_sql(db)
+    finally:
+        db.close()
+
+
 class NetworkStore:
     def __init__(self, path: str | Path, *, retention_days: int = 14,
                  max_receipts: int = 100000, max_batches: int = 10000,
@@ -115,7 +135,8 @@ class NetworkStore:
         with self.connection() as db:
             tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             if tables:
-                self._validate_schema(db)
+                existing_version = db.execute("PRAGMA user_version").fetchone()[0]
+                self._validate_schema(db, version=existing_version)
             elif (db.execute("PRAGMA application_id").fetchone()[0]
                   or db.execute("PRAGMA user_version").fetchone()[0]
                   or db.execute("SELECT 1 FROM sqlite_master LIMIT 1").fetchone()):
@@ -127,12 +148,33 @@ class NetworkStore:
             if not tables:
                 db.execute("BEGIN IMMEDIATE")
                 try:
+                    if self._disk_usage()["wal"] > 32:
+                        raise NetworkStoreError("network_storage_busy")
                     for statement in _SCHEMA.split(";"):
                         if statement.strip():
                             db.execute(statement)
+                    network_incidents.initialize(db)
                     db.execute("INSERT INTO network_meta VALUES('schema_version',?)", (str(SCHEMA_VERSION),))
                     db.execute(f"PRAGMA application_id={APPLICATION_ID}")
                     db.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+                    db.commit()
+                except BaseException:
+                    db.rollback()
+                    raise
+            elif existing_version == 1:
+                # Only an exact known v1 schema may migrate, atomically.
+                self._checkpoint(db)
+                db.execute("BEGIN IMMEDIATE")
+                try:
+                    if self._disk_usage()["wal"] > 32:
+                        raise NetworkStoreError("network_storage_busy")
+                    current = db.execute("PRAGMA user_version").fetchone()[0]
+                    self._validate_schema(db, version=current)
+                    if current == 1:
+                        network_incidents.initialize(db)
+                        db.execute("UPDATE network_meta SET value=? WHERE key='schema_version'",
+                                   (str(SCHEMA_VERSION),))
+                        db.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
                     db.commit()
                 except BaseException:
                     db.rollback()
@@ -141,7 +183,7 @@ class NetworkStore:
             self._checkpoint(db)
 
     @contextmanager
-    def connection(self):
+    def connection(self, *, write=False):
         db = None
         try:
             db = sqlite3.connect(self.path, timeout=5, isolation_level=None)
@@ -150,7 +192,20 @@ class NetworkStore:
             db.execute("PRAGMA trusted_schema=OFF")
             db.execute("PRAGMA cache_spill=OFF")
             db.execute("PRAGMA wal_autocheckpoint=0")
+            if write:
+                self._checkpoint(db)
+                self._page_limit(db)
+                db.execute("BEGIN IMMEDIATE")
+                # A competing writer may have committed after the checkpoint.
+                if self._disk_usage()["wal"] > 32:
+                    raise NetworkStoreError("network_storage_busy")
             yield db
+            if write:
+                db.commit()
+                try:
+                    self._checkpoint(db)
+                except NetworkStoreError:
+                    pass
         except sqlite3.Error as error:
             if db is not None:
                 db.rollback()
@@ -163,21 +218,31 @@ class NetworkStore:
             if db is not None:
                 db.close()
 
-    def _validate_schema(self, db):
+    def write_connection(self):
+        return self.connection(write=True)
+
+    def _validate_schema(self, db, *, version=SCHEMA_VERSION):
+        if version not in (1, SCHEMA_VERSION):
+            raise NetworkStoreError("network_store_schema_mismatch")
+        expected_columns = (_TABLE_COLUMNS if version == 1 else
+                            {**_TABLE_COLUMNS, **network_incidents.TABLE_COLUMNS})
+        expected_indexes = _INDEXES if version == 1 else _INDEXES | network_incidents.INDEXES
         objects = db.execute("SELECT type,name FROM sqlite_master").fetchall()
         tables = {row[1] for row in objects if row[0] == "table"}
-        if (tables != set(_TABLE_COLUMNS) | {"sqlite_sequence"}
+        if (tables != set(expected_columns) | {"sqlite_sequence"}
                 or db.execute("PRAGMA application_id").fetchone()[0] != APPLICATION_ID
-                or db.execute("PRAGMA user_version").fetchone()[0] != SCHEMA_VERSION
+                or db.execute("PRAGMA user_version").fetchone()[0] != version
                 or any(kind in ("trigger", "view") for kind, _ in objects)
                 or {name for kind, name in objects if kind == "index" and not name.startswith("sqlite_autoindex_")}
-                != _INDEXES):
+                != expected_indexes):
             raise NetworkStoreError("network_store_schema_mismatch")
-        for table, columns in _TABLE_COLUMNS.items():
+        for table, columns in expected_columns.items():
             if tuple(row[1] for row in db.execute(f"PRAGMA table_info({table})")) != columns:
                 raise NetworkStoreError("network_store_schema_mismatch")
+        if _schema_sql(db) != _expected_schema_sql(version):
+            raise NetworkStoreError("network_store_schema_mismatch")
         row = db.execute("SELECT value FROM network_meta WHERE key='schema_version'").fetchone()
-        if row is None or row[0] != str(SCHEMA_VERSION):
+        if row is None or row[0] != str(version):
             raise NetworkStoreError("network_store_schema_mismatch")
 
     def _page_limit(self, db):
@@ -401,3 +466,22 @@ class NetworkStore:
             return True
         except (NetworkStoreError, OSError):
             return False
+
+    def analysis_status(self):
+        with self.connection() as db:
+            db.execute("BEGIN")
+            return network_incidents.status(db)
+
+    def incidents(self, **kwargs):
+        with self.connection() as db:
+            db.execute("BEGIN")
+            return network_incidents.list_cases(db, **kwargs)
+
+    def incident(self, identity, revision=None):
+        with self.connection() as db:
+            return network_incidents.get_case(db, identity, revision)
+
+    def evidence(self, identity, **kwargs):
+        with self.connection() as db:
+            db.execute("BEGIN")
+            return network_incidents.evidence(db, identity, **kwargs)

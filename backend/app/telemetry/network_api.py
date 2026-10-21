@@ -2,6 +2,7 @@
 import hashlib
 import hmac
 import time
+from typing import Literal
 
 from fastapi import Depends, HTTPException, Query, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -107,7 +108,47 @@ def register_routes(application, operator):
         if request.app.state.config.network_ingest is None:
             return {"enabled": False}
         try:
-            return {"enabled": True, "analysis_enabled": False,
-                    **request.app.state.network_store.status(), "sources": source_status(request)}
+            return {"enabled": True, "analysis_enabled": True,
+                    **request.app.state.network_store.status(), "sources": source_status(request),
+                    "analysis": request.app.state.network_store.analysis_status()}
         except Exception:
             raise HTTPException(503, "Network storage status unavailable") from None
+
+
+    @application.get("/api/network/incidents", dependencies=[Depends(operator)])
+    def incidents(request: Request, page: int = Query(1, ge=1, le=1_000_000),
+                  limit: int = Query(20, ge=1, le=100), source_id: str | None = Query(None, max_length=64),
+                  focus: Literal["all", "attention", "low", "retracted", "stale"] = "all"):
+        config = enabled(request)
+        if source_id is not None and not any(source.id == source_id for source in config.sources):
+            raise HTTPException(404, "Network source is not configured")
+        try:
+            return request.app.state.network_store.incidents(page=page, limit=limit,
+                                                             source_id=source_id, focus=focus)
+        except Exception:
+            raise HTTPException(503, "Network incidents unavailable") from None
+
+    @application.get("/api/network/incidents/{identity}", dependencies=[Depends(operator)])
+    def incident(request: Request, identity: str,
+                 revision: int | None = Query(None, ge=1, le=2**31-1)):
+        enabled(request)
+        try:
+            result = request.app.state.network_store.incident(identity, revision=revision)
+        except Exception:
+            raise HTTPException(503, "Network incident unavailable") from None
+        if result is None:
+            raise HTTPException(404, "Network incident revision not found")
+        return result
+
+    @application.get("/api/network/incidents/{identity}/evidence", dependencies=[Depends(operator)])
+    def evidence(request: Request, identity: str,
+                 revision: int | None = Query(None, ge=1, le=2**31-1),
+                 page: int = Query(1, ge=1, le=1_000_000), limit: int = Query(50, ge=1, le=100)):
+        enabled(request)
+        try:
+            result = request.app.state.network_store.evidence(identity, revision=revision, page=page, limit=limit)
+        except Exception:
+            raise HTTPException(503, "Network evidence unavailable") from None
+        if result is None:
+            raise HTTPException(404, "Network incident revision not found")
+        return result

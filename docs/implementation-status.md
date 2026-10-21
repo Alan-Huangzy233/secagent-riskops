@@ -5,7 +5,7 @@ page records what is **actually implemented in code** so the two are never
 confused.
 
 Last reviewed: 2026-10-03; HTTP acceptance/network detection sections updated
-2026-10-19; network ingestion updated 2026-10-20. The walking skeleton and measured
+2026-10-19; network ingestion/analysis updated 2026-10-20. The walking skeleton and measured
 demo baseline are preserved; further demo work is paused. Active development targets the independent
 SSH/auth telemetry pilot. The [production plan](./production-plan.md) tracks
 model comparison and broader detection; planned capabilities are not claims of
@@ -161,8 +161,7 @@ positive cases, retries, UDP port hopping and malformed/provenance boundaries.
 Run `PYTHONPATH=backend python scripts/simulate_network_detection.py` for a
 self-checking synthetic exercise; see [usage and limits](network-detection.md).
 
-The [durable ingestion foundation](network-ingestion.md) is implemented in this
-change, pending PR review: `network_protocol.py`, `network_store.py` and
+The [durable ingestion foundation](network-ingestion.md) is merged: `network_protocol.py`, `network_store.py` and
 `network_api.py` add dedicated source/profile validation, immutable transactional
 receipts, a separate bounded SQLite store and operator read APIs. Dedicated
 `scripts/network_export.py` and `scripts/network_collector.py` provide bounded
@@ -178,10 +177,14 @@ review. Normalized events have bounded retention; compact event identities and
 batch receipts remain until configured capacity stops writes. Expiry remains
 visible after cleanup, and no unsafe receipt pruning is implemented.
 
-Next follow the [network source plan](network-source-plan.md) with continuous
-analysis, versioned evidence, scores and a network read table/detail view.
-Console notifications, passive real-source acceptance, resource measurements
-and network store/spool/cursor backup/restore acceptance remain separate gates.
+[Continuous analysis](network-analysis.md) is implemented in this increment for
+review: bounded receipt/batch checkpoints, monotonic-hour cases, versioned scores
+and evidence, a paginated network table/detail view and console notices. Late
+observations revise cases; incomplete context preserves prior evidence visibly
+stale. The strict network schema migration preserves existing delivery ACKs.
+Passive real-source acceptance, resource measurements, long-term capacity and
+network store/spool/cursor backup/restore acceptance remain separate gates in
+the [network source plan](network-source-plan.md).
 This change enables no production network detector; synthetic cases do not
 establish accuracy or live coverage. The demo Suricata parser and SSH exporter
 do not supply this network source. HTTP #119 awaits a real business service;

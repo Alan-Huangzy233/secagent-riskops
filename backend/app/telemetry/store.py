@@ -327,7 +327,8 @@ class TelemetryStore:
         if isinstance(page, bool) or not isinstance(page, int) or page < 1:
             raise ValueError("page must be a positive integer")
         self._page(limit, 0)
-        if kind not in (None, "incident", "http_incident", "collection", "health", "briefing"):
+        if kind not in (None, "incident", "http_incident", "network_incident", "network_collection",
+                        "collection", "health", "briefing"):
             raise ValueError("invalid notification kind")
         with self._connection() as db:
             return notifications.snapshot(db, page=page, limit=limit, unread=unread, kind=kind)

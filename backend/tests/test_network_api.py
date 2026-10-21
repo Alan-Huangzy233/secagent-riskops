@@ -139,7 +139,7 @@ def test_replay_restart_and_operator_pagination_return_committed_evidence(config
         assert frozen['items'] == []
         assert len(read(client, 'events', source_id='net-a').json()['items']) == 2
         assert read(client, 'events', source_id='net-a', limit=201).status_code == 422
-        assert read(client, 'status').json()['analysis_enabled'] is False
+        assert read(client, 'status').json()['analysis_enabled'] is True
         assert read(client, 'sources').json()['items'][0]['status'] == 'current'
     with TestClient(app(config)) as client:
         assert post(client, first).json() == receipt

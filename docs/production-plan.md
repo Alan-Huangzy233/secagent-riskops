@@ -1,6 +1,6 @@
 # Production plan and issue tracking
 
-Updated 2026-10-19. Further demo work is paused while development focuses on the
+Updated 2026-10-20. Further demo work is paused while development focuses on the
 independent telemetry pilot. This is a plan, not a statement that the features
 below are implemented or deployed. See [implementation status](./implementation-status.md).
 Historical issue-seeding files in `docs/process/` are provenance, not a live
@@ -56,9 +56,10 @@ Detection expands in order: **Web → network → Linux host behavior**.
 The next increment is #120's [first network source](network-source-plan.md):
 an existing UFW kernel journal, source-specific collection and a small inbound
 rule. The [offline parser and rule](network-detection.md) have synthetic tests;
-the [durable transport/storage foundation](network-ingestion.md) is implemented
-pending PR review and disabled by default. Next come continuous cases, console
-integration and passive source acceptance. HTTP's missing business
+the [durable transport/storage foundation](network-ingestion.md) is merged and
+disabled by default. [Continuous analysis and console integration](network-analysis.md)
+are implemented for review. Next come complete source provenance, passive
+acceptance, resource calibration and paired network recovery. HTTP's missing business
 source does not block this engineering work. Linux #121 follows the network
 increment; offline fixtures never establish live coverage.
 

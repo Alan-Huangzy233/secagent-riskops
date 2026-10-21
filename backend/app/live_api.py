@@ -217,6 +217,15 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
                                      notify=application.state.config.notifications_enabled)
             http_worker.start()
         application.state.http_worker = http_worker
+        from .telemetry.network_worker import NetworkWorker
+        network_worker = None
+        if application.state.network_store is not None:
+            network_worker = NetworkWorker(application.state.network_store, live_store,
+                sources=network_config.sources,
+                heartbeat_timeout=application.state.config.heartbeat_timeout_seconds,
+                notify=application.state.config.notifications_enabled)
+            network_worker.start()
+        application.state.network_worker = network_worker
         application.state.console_cache = ConsoleCache(
             lambda: build_bootstrap(live_store, application.state.config, application.state.control),
             enabled=application.state.config.console_cache_enabled)
@@ -224,6 +233,8 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
         try:
             yield
         finally:
+            if network_worker:
+                await run_in_threadpool(network_worker.close)
             if http_worker:
                 await run_in_threadpool(http_worker.close)
             await run_in_threadpool(application.state.console_cache.close)
@@ -451,7 +462,8 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
     @application.get("/api/notifications", dependencies=[Depends(operator)])
     def notification_inbox(request: Request, page: int = Query(1, ge=1, le=1_000_000_000),
                            limit: int = Query(20, ge=1, le=100), unread: bool = False,
-                           kind: Literal["incident", "http_incident", "collection", "health", "briefing"] | None = None):
+                           kind: Literal["incident", "http_incident", "network_incident", "network_collection",
+                                         "collection", "health", "briefing"] | None = None):
         result = request.app.state.store.list_notifications(page=page, limit=limit, unread=unread, kind=kind)
         return {**result, "enabled": request.app.state.config.notifications_enabled,
                 "backup_monitor_configured": bool(request.app.state.config.notification_backup_directories)}
