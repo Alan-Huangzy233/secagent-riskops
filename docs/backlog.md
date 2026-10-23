@@ -12,17 +12,19 @@ public tracking.
 ## Delivery order
 
 1. Make exact-IP search visible in SSH alerts/logs and add network→SSH pivots.
-2. Add grouped network/HTTP IP lookup in bounded increments; raw cross-store
-   search needs its own indexes/migrations and does not block retained-evidence
-   correlation.
-3. Build SSH + network joint cases, then manual AI review of those versioned
-   dossiers. Search matches alone do not identify one actor or prove a chain.
+2. Build SSH + network joint cases. Search matches alone do not identify one
+   actor or prove an attack chain.
+3. Add manual AI review of those versioned joint dossiers.
 4. Continue Linux host evidence after the network foundation. Source inventory
    can run alongside investigation work; a pending AI data/budget decision need
    not block already-authorized Linux engineering.
 5. Qualify optional automatic analysis separately from policy-controlled
    automatic response. Formal product identity, approvals and real executors
    remain distinct later increments.
+
+Grouped network/HTTP IP lookup (#146) can ship alongside investigation work;
+its raw cross-store search needs separate indexes/migrations and does not block
+retained-evidence correlation.
 
 Network sustained operation and storage/resource work run alongside these steps;
 necessary reliability fixes take priority. HTTP real-source activation still
