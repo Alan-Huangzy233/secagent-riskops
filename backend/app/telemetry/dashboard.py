@@ -33,7 +33,7 @@ const $=id=>document.getElementById(id);
 let currentSource='', refreshRequestId=0, summaryController=null, summaryPending=false;
 let sourceRowsKey=null, autoRefreshTimer=null, refreshRunning=false;
 let ipRequestId=0, ipController=null, abuseRequestId=0, abuseController=null, abuseIP=null;
-let eventFilters={},eventSnapshot=null,detailRequestId=0,detailController=null,detailIncident=null,evidencePage=1,evidenceTotalPages=1;
+let eventFilters={},incidentFilters={},searchSources=null,searchWindows={event:'24h',incident:'24h'},eventSnapshot=null,detailRequestId=0,detailController=null,detailIncident=null,evidencePage=1,evidenceTotalPages=1;
 let controlsData=null,controlBusy=false,controlPlan=null,controlRevision=0,controlPollTimer=null,controlPollId=0,controlReadId=0;
 let incidentTriage='pending',incidentFocus='all',incidentSort='score',triageBusy=false;
 const scoreFilters=['all','attention','low','unscored'],scoreSorts=['score','recent'];
@@ -50,13 +50,25 @@ function updateRefreshButton(){const busy=isBusy();$('refresh').disabled=busy;te
 function clearDetails(){aiClear();++detailRequestId;if(detailController)detailController.abort();detailIncident=null;$('detail-fields').replaceChildren();$('evidence-view').hidden=true;text('detail-title','记录详情');text('detail','选择上方记录查看详情。');}
 function cell(row,value){const td=document.createElement('td');td.textContent=String(value??'—');row.append(td);return td;}
 function empty(tbody,span,message){const tr=document.createElement('tr');const td=cell(tr,message);td.colSpan=span;tbody.append(tr);}
-async function get(path,signal){const response=await fetch(path,{credentials:'same-origin',cache:'no-store',signal});if(!response.ok)throw new Error(response.status===401?'登录已失效，请刷新页面重新登录。':`读取失败（${response.status}）。请检查中控服务。`);return response.json();}
+async function get(path,signal){
+ const response=await fetch(path,{credentials:'same-origin',cache:'no-store',signal});
+ if(!response.ok){
+  let message=response.status===401?'登录已失效，请刷新页面重新登录。':`读取失败（${response.status}）。请检查中控服务。`;
+  if([422,503].includes(response.status)&&(path.startsWith('/api/events?')||path.startsWith('/api/incidents?'))){
+   const data=await response.json().catch(()=>null);
+   if(response.status===422)message=typeof data?.detail==='string'?data.detail:'查询条件无效：请输入完整 IPv4 / IPv6 地址（不支持 CIDR）和有效时间范围。';
+   else if(data?.code==='search_temporarily_unavailable')message=typeof data.detail==='string'?data.detail:'查询暂不可用，请缩短时间范围或稍后重试。';
+  }
+  throw new Error(message);
+ }
+ return response.json();
+}
 function details(record,title){clearDetails();text('detail-title',title);text('detail',JSON.stringify(record,null,2));renderRecordOverview(record);openRecordDrawer();}
 function filterKey(){return JSON.stringify({filters:eventFilters,snapshot:eventSnapshot});}
-function listKey(kind){return kind==='event'?filterKey():JSON.stringify([incidentTriage,incidentFocus,incidentSort]);}
-function saveView(){try{sessionStorage.setItem('riskops-view',JSON.stringify({source:currentSource,filters:eventFilters,snapshot:eventSnapshot,eventPage:pages.event.page,incidentPage:pages.incident.page,incidentTriage,incidentFocus,incidentSort}));}catch{}}
-function setFilterInputs(){for(const key of ['ip','username','event_type','q','start','end']){let value=eventFilters[key]||'';if(value&&(key==='start'||key==='end')){const d=new Date(value);if(!Number.isNaN(d.valueOf())){const local=new Date(d.valueOf()-d.getTimezoneOffset()*60000);value=local.toISOString().slice(0,16);}}$('search-'+key).value=value;}}
-function queryLogsForIP(ip){eventFilters={...eventFilters,ip:String(ip)};eventSnapshot=null;setFilterInputs();saveView();selectWorkspace('events',false);loadList('event',1);}
+function listKey(kind){return kind==='event'?filterKey():JSON.stringify([incidentTriage,incidentFocus,incidentSort,incidentFilters]);}
+function saveView(){try{sessionStorage.setItem('riskops-view',JSON.stringify({source:currentSource,filters:eventFilters,snapshot:eventSnapshot,eventPage:pages.event.page,incidentPage:pages.incident.page,incidentTriage,incidentFocus,incidentSort,incidentFilters,searchWindows}));}catch{}}
+function setFilterInputs(){for(const key of ['username','event_type','q'])$('search-'+key).value=eventFilters[key]||'';syncIPInputs('event');}
+function queryLogsForIP(ip){return searchSSHFromIP('event',String(ip));}
 async function showIncident(incident){
  clearDetails();const id=incident.incident_id;if(!id){details(incident,'SSH 认证告警与原始证据');return;}
  detailIncident=String(id);const requestId=++detailRequestId;detailController=new AbortController();text('detail-title','SSH 认证告警与原始证据');text('detail','正在读取事件详情…');renderRecordOverview(incident);openRecordDrawer();
@@ -136,7 +148,7 @@ async function lookupIp(value){
  }catch(error){if(requestId!==ipRequestId||error.name==='AbortError')return;text('ip-status',error instanceof TypeError?'无法连接属地查询服务，请检查网络后重试。':error.message);$('ip-status').className='error';}
  finally{if(requestId===ipRequestId){$('ip-query-section').setAttribute('aria-busy','false');text('ip-query-button','查询属地');}}
 }
-function sourceQuery(page,source,kind='incident'){const query=new URLSearchParams({limit:String(pageSize),page:String(page)});if(source)query.set('source_id',source);if(kind==='event')appendEventQuery(query);else{query.set('include_evidence','false');query.set('triage',incidentTriage);query.set('focus',incidentFocus);query.set('sort',incidentSort);}return query;}
+function sourceQuery(page,source,kind='incident'){const query=new URLSearchParams({limit:String(pageSize),page:String(page)});if(source)query.set('source_id',source);if(kind==='event')appendEventQuery(query);else{query.set('include_evidence','false');query.set('triage',incidentTriage);query.set('focus',incidentFocus);query.set('sort',incidentSort);for(const [key,value] of Object.entries(incidentFilters))if(value)query.set(key,value);}return query;}
 function appendEventQuery(query){for(const [key,value] of Object.entries(eventFilters))if(value)query.set(key,value);if(eventSnapshot!==null)query.set('snapshot',String(eventSnapshot));}
 function targetKey(target){return JSON.stringify([target.source_id,target.ip]);}
 function incidentTargets(incident){const ip=incident.src_ip||incident.peer_ip;if(!ip)return [];const sources=currentSource?[currentSource]:(Array.isArray(incident.source_ids)&&incident.source_ids.length?incident.source_ids:[incident.source_id]);return [...new Set(sources.filter(Boolean))].map(source_id=>({source_id,ip:String(ip)}));}
@@ -230,6 +242,7 @@ async function loadCollection(page=collectionPage){const requestId=++collectionR
   if(!data.items.length)empty(rows,7,'没有缺口或延迟记录。');text('collection-page',`第 ${collectionPage} / ${collectionPages} 页，共 ${data.total} 条`);text('collection-status','');$('collection-prev').disabled=collectionPage<=1;$('collection-next').disabled=collectionPage>=collectionPages;}
  catch(error){if(requestId===collectionRequestId)text('collection-status',`${error.message} 已保留上次读取的采集记录。`);}}
 function renderSummary(data){
+ searchSources=Array.isArray(data.sources)?data.sources:null;renderIPScopes();
  text('event-total',data.totals.events);text('failure-total',data.totals.ssh_failures);text('success-total',data.totals.ssh_successes);
  if(data.triage_counts)renderTriageCounts(data.triage_counts,'summary');else text('incident-total',data.totals.incidents);
  text('updated',`概览更新于 ${when(data.generated_at)} · 原始日志保留 ${data.retention_days} 天`);
@@ -244,7 +257,7 @@ function renderSummary(data){
 function renderEvents(data){
  const rows=$('events');rows.replaceChildren();
  for(const event of data){const tr=document.createElement('tr');tr.className='selectable';tr.tabIndex=0;cell(tr,when(event.timestamp));cell(tr,event.source_id);cell(tr,event.event_kind||event.event_type);ipCell(tr,event.src_ip||event.peer_ip);cell(tr,event.message);tr.addEventListener('click',()=>details(event,'日志详情'));tr.addEventListener('keydown',e=>{if(e.target===tr&&e.key==='Enter'){e.preventDefault();details(event,'日志详情');}});rows.append(tr);}
- if(!data.length)empty(rows,5,'此页没有已接收的日志。');
+ if(!data.length)empty(rows,5,Object.values(eventFilters).some(Boolean)?'当前查询范围没有匹配的 SSH 日志；保留与采集覆盖可能不完整，不能据此判断安全。':'此页没有已接收的日志。');
 }
 const detectionRuleLabels={burst:'短时密集失败',slow_scan:'慢速扫描',multi_account:'多账号尝试',cross_source:'跨服务器尝试',success_after_failures:'多次失败后成功'};
 function incidentSources(incident){
@@ -275,7 +288,7 @@ function renderAssessment(parent,assessment){
 }
 function renderScoreCounts(counts){
  if(!counts){text('incident-score-counts','');return;}
- text('incident-score-counts',`当前来源 / 处置状态：优先核查 ${counts.attention??0} · 低分 ${counts.low??0} · 未评分 ${counts.unscored??0} · 合计 ${counts.total??0}`);
+ text('incident-score-counts',`当前查询 / 处置状态：优先核查 ${counts.attention??0} · 低分 ${counts.low??0} · 未评分 ${counts.unscored??0} · 合计 ${counts.total??0}`);
 }
 function renderIncidents(data){
  const rows=$('incidents');rows.replaceChildren();
@@ -294,7 +307,7 @@ function renderIncidents(data){
   if(incident.triage_updated_at){const stamp=document.createElement('small');stamp.className='muted triage-time';stamp.textContent=`更新于 ${when(incident.triage_updated_at)}`;statusCell.append(stamp);}
   appendIncidentSelection(statusCell,incident);appendTriageActions(statusCell,incident,state);tr.addEventListener('click',()=>showIncident(incident));tr.addEventListener('keydown',e=>{if(e.target===tr&&e.key==='Enter'){e.preventDefault();showIncident(incident);}});rows.append(tr);
  }
- if(!data.length)empty(rows,6,incidentFocus!=='all'?'当前评分筛选没有匹配事件；可切换全部查看。':incidentTriage==='all'?'尚未发现达到阈值的 SSH 认证告警。':`没有${triageLabels[incidentTriage]||''}状态的告警；可切换处置状态查看其他告警。`);
+ if(!data.length)empty(rows,6,Object.values(incidentFilters).some(Boolean)?'当前查询范围没有匹配的 SSH 告警；无告警不等于无活动，可查日志或扩大时间范围。':incidentFocus!=='all'?'当前评分筛选没有匹配事件；可切换全部查看。':incidentTriage==='all'?'尚未发现达到阈值的 SSH 认证告警。':`没有${triageLabels[incidentTriage]||''}状态的告警；可切换处置状态查看其他告警。`);
 }
 function updatePager(kind){
  const state=pages[kind];$(kind+'-prev').disabled=state.page<=1;$(kind+'-next').disabled=state.totalPages===null||state.page>=state.totalPages;
@@ -304,15 +317,15 @@ function updatePager(kind){
 }
 function beginList(kind,page){
  const state=pages[kind],source=currentSource,started=performance.now();const requestId=++state.requestId;if(state.controller)state.controller.abort();state.controller=new AbortController();
- const queryKey=listKey(kind),previous=state.displayed,sameView=state.visible&&state.visible.source===source&&state.visible.page===page&&state.visible.queryKey===queryKey;
+ renderIPScopes();const queryKey=listKey(kind),previous=state.displayed,sameView=state.visible&&state.visible.source===source&&state.visible.page===page&&state.visible.queryKey===queryKey;
  state.page=page;state.pending=true;updatePager(kind);updateRefreshButton();
  const rows=$(kind==='event'?'events':'incidents');
- if(!sameView){state.visible=null;rows.replaceChildren();showListSkeleton(rows,kind==='incident'?6:5);text(kind+'-updated','');clearDetails();}
+ if(!sameView){state.visible=null;state.total=0;state.totalPages=null;updatePager(kind);if(kind==='incident'){text('incident-triage-counts','');text('incident-score-counts','');}rows.replaceChildren();showListSkeleton(rows,kind==='incident'?6:5);text(kind+'-updated','');clearDetails();}
  $(kind+'-section').setAttribute('aria-busy','true');$(kind+'-status').className='list-status muted';
  text(kind+'-status',sameView?`正在更新第 ${page} 页，保留当前显示…`:`正在读取第 ${page} 页…`);$(kind+'-jump').removeAttribute('aria-invalid');
  return {kind,state,source,page,started,requestId,previous,sameView,rows,queryKey};
 }
-function isCurrent(view){return view.requestId===view.state.requestId&&view.source===currentSource;}
+function isCurrent(view){return view.requestId===view.state.requestId&&view.source===currentSource&&view.queryKey===listKey(view.kind);}
 async function acceptList(view,data){
   if(!isCurrent(view))return;const {kind,state,source,started,previous,sameView}=view;
   if(!data||!Array.isArray(data.items)||!Number.isInteger(data.total_pages)||data.total_pages<0||!Number.isInteger(data.total)||data.total<0||!Number.isInteger(data.page)||data.page<1)throw new Error('分页数据返回异常，请刷新重试。');
@@ -321,7 +334,7 @@ async function acceptList(view,data){
   const itemsKey=JSON.stringify(data.items),unchanged=sameView&&previous.page===data.page&&previous.itemsKey===itemsKey;
   state.page=data.page;if(!unchanged){if(kind==='event')renderEvents(data.items);else renderIncidents(data.items);}
   if(kind==='event'&&data.snapshot!==undefined){eventSnapshot=data.snapshot;updateLatestLabel();}
-  if(kind==='incident'){if(data.triage_counts)renderTriageCounts(data.triage_counts,currentSource?'list':'all');renderScoreCounts(data.score_counts);}
+  if(kind==='incident'){if(data.triage_counts)renderTriageCounts(data.triage_counts,currentSource||Object.values(incidentFilters).some(Boolean)?'list':'all');renderScoreCounts(data.score_counts);}
   state.displayed={source,page:state.page,queryKey:listKey(kind),total:state.total,totalPages:state.totalPages,items:data.items,itemsKey,updatedAt:new Date().toISOString(),elapsed:duration(started)};state.visible=state.displayed;saveView();
   updatePager(kind);text(kind+'-updated',`更新于 ${when(state.displayed.updatedAt)} · 用时 ${state.displayed.elapsed}`);text(kind+'-status',unchanged?'已是最新，内容无变化。':'');
 }
@@ -332,7 +345,7 @@ function failList(view,error){
    state.page=previous.page;state.total=previous.total;state.totalPages=previous.totalPages;state.displayed=previous;state.visible=previous;retained=true;
    if(!sameView){if(kind==='event')renderEvents(previous.items);else renderIncidents(previous.items);}
    text(kind+'-updated',`更新于 ${when(previous.updatedAt)} · 用时 ${previous.elapsed}`);
-  }else{state.displayed=null;state.visible=null;rows.replaceChildren();empty(rows,kind==='incident'?6:5,'此来源暂时无法读取，请刷新重试。');}
+  }else{state.displayed=null;state.visible=null;state.total=0;state.totalPages=null;rows.replaceChildren();empty(rows,kind==='incident'?6:5,'当前查询失败，未显示其他查询的旧结果。');}
   updatePager(kind);const message=error instanceof TypeError?'网络连接失败，请刷新重试。':error.message;
   text(kind+'-status',message+(retained?` 已保留第 ${state.page} 页上次成功读取的数据。`:''));$(kind+'-status').className='list-status error';
 }
@@ -426,8 +439,8 @@ $('incident-triage').addEventListener('change',()=>{const value=$('incident-tria
 $('ip-show-events').addEventListener('click',()=>{const ip=$('ip-input').value.trim();if(ip)queryLogsForIP(ip);else text('ip-status','请先输入要查日志的 IP。');});
 $('ip-add-control').addEventListener('click',()=>{$('control-ip').value=$('ip-input').value.trim();selectWorkspace('controls');});
 $('source-filter').addEventListener('change',changeWorkspaceSource);
-$('search-form').addEventListener('submit',event=>{event.preventDefault();const next={};for(const key of ['ip','username','event_type','q','start','end']){const value=$('search-'+key).value.trim();if(!value)continue;if(key==='start'||key==='end'){const date=new Date(value);if(Number.isNaN(date.valueOf())){text('event-status','请输入有效的起止时间。');return;}next[key]=date.toISOString();}else next[key]=value;}if(next.start&&next.end&&next.start>next.end){text('event-status','开始时间不能晚于结束时间。');return;}eventFilters=next;eventSnapshot=null;saveView();loadList('event',1);});
-$('search-clear').addEventListener('click',()=>{eventFilters={};eventSnapshot=null;setFilterInputs();saveView();loadList('event',1);});
+$('search-form').addEventListener('submit',event=>{event.preventDefault();submitIPSearch('event');});
+$('search-clear').addEventListener('click',()=>clearIPSearch('event'));
 $('event-latest').addEventListener('click',()=>{eventSnapshot=null;saveView();loadList('event',1);});
 $('evidence-prev').addEventListener('click',()=>loadEvidence(Math.max(1,evidencePage-1)));
 $('evidence-next').addEventListener('click',()=>loadEvidence(Math.min(evidenceTotalPages,evidencePage+1)));
@@ -442,7 +455,7 @@ for(const kind of ['event','incident']){
  $(kind+'-jump-form').addEventListener('submit',event=>{event.preventDefault();navigate(kind,$(kind+'-jump').value);});
 }
 try{const saved=localStorage.getItem('riskops-refresh-minutes');if(['0','1','5','15'].includes(saved))$('refresh-interval').value=saved;}catch{}
-try{const saved=JSON.parse(sessionStorage.getItem('riskops-view')||'null');if(saved&&typeof saved==='object'){currentSource=typeof saved.source==='string'?saved.source:'';if(saved.filters&&typeof saved.filters==='object')for(const key of ['ip','username','event_type','q','start','end'])if(typeof saved.filters[key]==='string')eventFilters[key]=saved.filters[key];eventSnapshot=typeof saved.snapshot==='string'?saved.snapshot:null;if(triageFilters.includes(saved.incidentTriage))incidentTriage=saved.incidentTriage;if(scoreFilters.includes(saved.incidentFocus))incidentFocus=saved.incidentFocus;if(scoreSorts.includes(saved.incidentSort))incidentSort=saved.incidentSort;for(const kind of ['event','incident'])if(Number.isSafeInteger(saved[kind+'Page'])&&saved[kind+'Page']>0)pages[kind].page=saved[kind+'Page'];setFilterInputs();}}catch{}
+try{const saved=JSON.parse(sessionStorage.getItem('riskops-view')||'null');if(saved&&typeof saved==='object'){currentSource=typeof saved.source==='string'?saved.source:'';if(saved.filters&&typeof saved.filters==='object')for(const key of ['ip','username','event_type','q','start','end'])if(typeof saved.filters[key]==='string')eventFilters[key]=saved.filters[key];if(saved.incidentFilters&&typeof saved.incidentFilters==='object')for(const key of ['ip','start','end'])if(typeof saved.incidentFilters[key]==='string')incidentFilters[key]=saved.incidentFilters[key];if(saved.searchWindows&&typeof saved.searchWindows==='object')for(const kind of ['event','incident'])if(['24h','custom','all'].includes(saved.searchWindows[kind]))searchWindows[kind]=saved.searchWindows[kind];eventSnapshot=typeof saved.snapshot==='string'?saved.snapshot:null;if(triageFilters.includes(saved.incidentTriage))incidentTriage=saved.incidentTriage;if(scoreFilters.includes(saved.incidentFocus))incidentFocus=saved.incidentFocus;if(scoreSorts.includes(saved.incidentSort))incidentSort=saved.incidentSort;for(const kind of ['event','incident'])if(Number.isSafeInteger(saved[kind+'Page'])&&saved[kind+'Page']>0)pages[kind].page=saved[kind+'Page'];setFilterInputs();}}catch{}
 $('incident-triage').value=incidentTriage;$('incident-focus').value=incidentFocus;$('incident-sort').value=incidentSort;
 refresh();
 """

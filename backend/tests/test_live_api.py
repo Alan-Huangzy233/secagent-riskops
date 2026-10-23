@@ -348,3 +348,41 @@ def test_real_collector_payload_retry_and_heartbeat_contract(client, tmp_path):
     source = client.get("/api/summary", auth=("operator", PASSWORD)).json()["sources"][0]
     assert source["connection_status"] == "online"
     assert source["event_count"] == 3
+
+
+def test_incident_ip_time_search_and_dashboard_filters_are_independent(client):
+    at = datetime.now(timezone.utc) - timedelta(minutes=10)
+    for peer, identity in (("2001:db8::a", "v6"), ("198.51.100.23", "v4")):
+        rows = [{"event_id": f"{identity}-{n}", "timestamp": (at + timedelta(seconds=n * 120)).isoformat(),
+                 "message": f"Failed password for root from {peer} port 42000 ssh2", "identifier": "sshd"}
+                for n in range(3)]
+        assert send(client, batch(batch_id=identity, records=rows)).status_code == 200
+    auth = ("operator", PASSWORD)
+    params = {"ip": "2001:0DB8:0000:0000:0000:0000:0000:000A", "start": (at + timedelta(seconds=60)).isoformat(),
+              "end": (at + timedelta(seconds=180)).isoformat(), "page": 1, "limit": 1}
+    response = client.get("/api/incidents", params=params, auth=auth)
+    assert response.status_code == 200
+    result = response.json()
+    assert result["total"] == result["triage_counts"]["total"] == result["score_counts"]["total"] == 1
+    assert result["items"][0]["peer_ip"] == "2001:db8::a"
+    legacy = client.get("/api/incidents", params={key: value for key, value in params.items() if key != "page"}, auth=auth)
+    assert legacy.status_code == 200 and legacy.json()[0]["peer_ip"] == "2001:db8::a"
+    snapshot = client.get("/api/dashboard", params={"incident_ip": params["ip"], "incident_start": params["start"],
+                           "incident_end": params["end"], "ip": "198.51.100.23"}, auth=auth)
+    assert snapshot.status_code == 200
+    data = snapshot.json()
+    assert data["incidents"]["total"] == 1 and data["incidents"]["items"][0]["peer_ip"] == "2001:db8::a"
+    assert data["events"]["total"] == 3 and all(row["peer_ip"] == "198.51.100.23" for row in data["events"]["items"])
+    assert data["summary"]["totals"]["events"] == 6
+
+
+@pytest.mark.parametrize("params", [
+    {"ip": "198.51.100.23/32"}, {"ip": "2001:db8:::1"}, {"ip": "fe80::1%eth0"},
+    {"ip": "' OR 1=1 --"}, {"ip": ""}, {"start": "2026-10-23T08:00:00"},
+    {"start": "2026-10-23T08:01:00Z", "end": "2026-10-23T08:00:00Z"},
+])
+def test_incident_search_api_rejects_invalid_filters(client, params):
+    auth = ("operator", PASSWORD)
+    assert client.get("/api/incidents", params={"page": 1, **params}, auth=auth).status_code == 422
+    assert client.get("/api/incidents", params=params, auth=auth).status_code == 422
+    assert client.get("/api/dashboard", params={f"incident_{key}": value for key, value in params.items()}, auth=auth).status_code == 422

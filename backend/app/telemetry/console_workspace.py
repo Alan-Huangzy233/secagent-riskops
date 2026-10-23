@@ -15,7 +15,8 @@ VIEWS = (("incidents", "告警", "incident-section"), ("events", "日志", "even
 STYLE = r"""
 [hidden]{display:none!important}body{margin:0;padding:0;max-width:none;height:100dvh;overflow:hidden}
 .workspace-shell{display:flex;height:100dvh;min-height:0}.workspace-nav{width:174px;flex-shrink:0;background:#0b1523;border-right:1px solid #263a53;padding:26px 14px;display:flex;flex-direction:column;gap:7px}.workspace-brand{font-size:19px;font-weight:700;padding:0 12px 28px;letter-spacing:.04em}.workspace-brand small{display:block;font-size:12px;color:#8ca4c3;font-weight:400;margin-top:7px;letter-spacing:0}.workspace-nav button{text-align:left;border-color:transparent;background:transparent;border-radius:7px;padding:12px;font-size:14px;color:#9cafc7}.workspace-nav button[aria-selected=true]{background:#183456;color:#d8eaff;border-color:#315680}.workspace-nav button:hover{background:#152942}.workspace-nav .nav-note{margin-top:auto;padding:18px 12px 0;font-size:12px;color:#8196b1}
-.workspace-main{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column}.workspace-header{padding:22px 26px 12px}.workspace-header h1{font-size:23px;margin:0 0 6px}.workspace-header>p{color:#9cafc7;font-size:13px;margin:4px 0 16px}.workspace-header .toolbar{margin:12px 0 8px;gap:10px}#error:empty{display:none}.workspace-header .cards{gap:10px;margin-top:14px}.workspace-header .card{padding:12px 16px;margin:0;font-size:12px}.workspace-header .number{font-size:24px;margin:4px 0 0}.workspace-header #refresh-help{font-size:12px;margin:8px 0;color:#8ca4c3}.sync-line{display:flex;align-items:center;gap:10px;font-size:12px;min-height:22px;color:#9bb8da}.sync-dot{width:7px;height:7px;background:#73c6b5;border-radius:50%;flex-shrink:0}.sync-line[data-stale=true] .sync-dot{background:#dfb26a}.workspace-panel{min-height:0;flex:1;overflow:auto;padding:0 26px 24px}.workspace-panel>section{margin:0;min-height:100%;box-sizing:border-box;padding:18px}.workspace-panel h2{font-size:18px;margin-top:0}.workspace-panel p{font-size:13px;line-height:1.6}.workspace-panel .table-wrap{max-height:calc(100dvh - 440px);min-height:120px;overflow:auto;border:1px solid #263a53;border-radius:7px;margin-top:12px}.workspace-panel thead{position:sticky;top:0;z-index:1;background:#17273b}.workspace-panel .pager{position:sticky;bottom:0;background:#111e30;padding-top:14px}.workspace-panel .help-note{margin:8px 0;color:#a9bacd;font-size:12px}.workspace-panel .help-note>p{margin:8px 0}.workspace-panel .table-wrap table{margin:0}.workspace-panel td{padding-top:10px;padding-bottom:10px}.workspace-panel .list-status:empty{display:none}.search-options>summary{font-size:13px;cursor:pointer;padding:8px 0;color:#adc4df}
+.workspace-main{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column}.workspace-header{padding:22px 26px 12px}.workspace-header h1{font-size:23px;margin:0 0 6px}.workspace-header>p{color:#9cafc7;font-size:13px;margin:4px 0 16px}.workspace-header .toolbar{margin:12px 0 8px;gap:10px}#error:empty{display:none}.workspace-header .cards{gap:10px;margin-top:14px}.workspace-header .card{padding:12px 16px;margin:0;font-size:12px}.workspace-header .number{font-size:24px;margin:4px 0 0}.workspace-header #refresh-help{font-size:12px;margin:8px 0;color:#8ca4c3}.sync-line{display:flex;align-items:center;gap:10px;font-size:12px;min-height:22px;color:#9bb8da}.sync-dot{width:7px;height:7px;background:#73c6b5;border-radius:50%;flex-shrink:0}.sync-line[data-stale=true] .sync-dot{background:#dfb26a}.workspace-panel{min-height:0;flex:1;overflow:auto;padding:0 26px 24px}.workspace-panel>section{margin:0;min-height:100%;box-sizing:border-box;padding:18px}.workspace-panel h2{font-size:18px;margin-top:0}.workspace-panel p{font-size:13px;line-height:1.6}.workspace-panel .table-wrap{max-height:calc(100dvh - 440px);min-height:120px;overflow:auto;border:1px solid #263a53;border-radius:7px;margin-top:12px}.workspace-panel thead{position:sticky;top:0;z-index:1;background:#17273b}.workspace-panel .pager{position:sticky;bottom:0;background:#111e30;padding-top:14px}.workspace-panel .help-note{margin:8px 0;color:#a9bacd;font-size:12px}.workspace-panel .help-note>p{margin:8px 0}.workspace-panel .table-wrap table{margin:0}.workspace-panel td{padding-top:10px;padding-bottom:10px}.workspace-panel .list-status:empty{display:none}.local-ip-search{margin:12px 0}.local-ip-search .actions{margin-top:8px}.local-ip-search .ip-form input{min-width:160px}.local-ip-search .search-fields{margin-top:10px;grid-template-columns:repeat(2,minmax(0,1fr))}.search-scope{white-space:pre-line;overflow-wrap:anywhere;margin:8px 0;color:#b4c9e0;font-size:12px}.ip-search-link{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}.ip-search-link button{font-size:12px;padding:4px 7px}@media(max-width:480px){.local-ip-search .search-fields{grid-template-columns:1fr}.local-ip-search select{max-width:100%}}
+.search-options>summary{font-size:13px;cursor:pointer;padding:8px 0;color:#adc4df}
 .workspace-skeleton{display:grid;gap:12px;padding:18px 0}.skeleton-line{height:14px;max-width:100%;border-radius:4px;background:linear-gradient(90deg,#15263c 20%,#253e5b 50%,#15263c 80%);background-size:200% 100%;animation:workspace-shimmer 1.5s infinite}.skeleton-line:nth-child(2){width:72%}.skeleton-line:nth-child(3){width:88%}@keyframes workspace-shimmer{to{background-position:-200% 0}}@media(prefers-reduced-motion:reduce){.skeleton-line{animation:none}}
 #detail-dialog{position:fixed;inset:0 0 0 auto;margin:0;width:min(820px,100vw);max-width:100vw;height:100dvh;max-height:100dvh;border:0;border-left:1px solid #385475;background:#101d2e;color:#e7edf5;padding:0;box-shadow:-16px 0 55px #0006}#detail-dialog::backdrop{background:#030b17a6}#detail-dialog[open]{display:flex;flex-direction:column}#detail-section{display:flex;flex-direction:column;min-height:0;width:100%;height:100%;margin:0;border:0;border-radius:0;padding:22px}.drawer-heading{display:flex;align-items:center;justify-content:space-between;gap:14px}.drawer-heading h2{font-size:19px;margin:0}.drawer-heading button{flex-shrink:0}.detail-tabs{display:flex;gap:8px;border-bottom:1px solid #30445f;padding:17px 0 10px;margin-bottom:16px}.detail-tabs button[aria-selected=true]{border-color:#568aca;background:#1c3b60}.detail-pane{min-height:0;overflow:auto;flex:1;padding:0 2px 18px}.detail-fields{display:grid;grid-template-columns:120px minmax(0,1fr);font-size:14px;gap:14px 12px;margin:4px 0 22px}.detail-fields dt{color:#95abc6}.detail-fields dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}.detail-pane pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;max-height:55vh;overflow:auto}.detail-pane #evidence-view .table-wrap{max-width:100%;overflow:auto}.detail-pane #ai-panel{margin:0}.detail-pane details summary{cursor:pointer;font-size:13px;color:#9cb6d5;padding:12px 0}
 @media(max-width:850px){.workspace-shell{flex-direction:column}.workspace-nav{width:auto;padding:10px 12px;flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid #263a53;gap:4px}.workspace-brand,.workspace-nav .nav-note{display:none}.workspace-nav button{white-space:nowrap;padding:10px}.workspace-main{min-height:0}.workspace-header{padding:14px 14px 10px}.workspace-header h1{font-size:19px}.workspace-header>p{display:none}.workspace-header .cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.workspace-header .card{padding:9px 11px}.workspace-header .number{font-size:21px}.workspace-header #refresh-help{display:none}.workspace-header .toolbar{gap:6px;font-size:12px}.workspace-header .toolbar button,.workspace-header .toolbar select{padding:6px 8px;font-size:12px}.workspace-header #source-filter{max-width:215px}.workspace-header #refresh-interval{max-width:135px}.workspace-header .card small{font-size:10px}.workspace-header .card{font-size:11px}.workspace-header .number{font-size:20px}.workspace-panel .pager{position:static;gap:8px;font-size:12px}.workspace-panel{padding:0 12px 12px}.workspace-panel>section{padding:13px}.workspace-panel .table-wrap{max-height:48dvh}.detail-fields{grid-template-columns:90px minmax(0,1fr);font-size:13px}#detail-section{padding:16px}.workspace-header #updated{display:none}}
@@ -25,6 +26,79 @@ SCRIPT = r"""
 let workspaceView='incidents',bootstrapPacket=null,bootstrapReceivedAt=0,bootstrapPromise=null,bootstrapTimer=null;
 let detailReturnFocus=null,detailTab='overview',bootstrapBlocked=false,bootstrapBlockedGeneration=null,controlsPromise=null;
 const workspaceViews=['incidents','events','http','network','overview','notifications','collection','ip','controls'];
+function searchPrefix(kind){return kind==='event'?'search':'incident-search';}
+function searchFilters(kind){return kind==='event'?eventFilters:incidentFilters;}
+function localInput(value){const date=new Date(value);if(!value||Number.isNaN(date.valueOf()))return '';return new Date(date.valueOf()-date.getTimezoneOffset()*60000).toISOString().slice(0,19);}
+function syncIPInputs(kind){
+ const prefix=searchPrefix(kind),filters=searchFilters(kind);$(prefix+'-ip').value=filters.ip||'';
+ for(const key of ['start','end'])$(prefix+'-'+key).value=localInput(filters[key]);
+ $(kind+'-search-window').value=searchWindows[kind];$(kind+'-search-dates').hidden=searchWindows[kind]!=='custom';
+}
+function renderIPScopes(){
+ for(const kind of ['event','incident']){
+  const filters=searchFilters(kind),range=filters.start||filters.end?`${filters.start?when(filters.start):'保留起点未知'} 至 ${filters.end?when(filters.end):'最新保留记录'}`:'全部保留时间（实际边界未知）';
+  const source=currentSource?`来源 ${currentSource}`:'全部 SSH 来源',ip=filters.ip?`完整来源 IP ${filters.ip}`:'全部来源 IP';
+  const state=kind==='incident'?` · ${incidentTriage==='all'?'全部处置状态':triageLabels[incidentTriage]} · ${incidentFocus==='all'?'全部评分':incidentFocus==='attention'?'优先核查 + 未评分':incidentFocus==='low'?'低分':'未评分'}`:'';
+  const advanced=kind==='event'&&['username','event_type','q'].some(key=>filters[key])?' · 已应用高级筛选':'';
+  text(kind+'-search-scope',`当前查询：${ip} · ${source}${state}${advanced}\n${range}（浏览器本地时间）；${kind==='incident'?'按告警证据时段重叠匹配':'按日志时间匹配'}。`);
+  let coverage='采集与保留边界未知；仅查询当前已保留记录。';
+  if(searchSources){const sources=currentSource?searchSources.filter(source=>source.source_id===currentSource):searchSources;
+   if(!sources.length)coverage='当前未登记匹配的 SSH 来源；已保留记录仍可查询。';
+   else{const gaps=sources.filter(source=>source.collection?.gaps_since_coverage>0).length,unknown=sources.filter(source=>!source.collection||!source.collection.coverage_start||source.collection.coverage_note).length,delayed=sources.filter(source=>source.connection_status!=='online'||source.collection?.caught_up===false).length;
+    coverage=`${sources.length} 个登记来源；${gaps?`${gaps} 个来源有已知采集缺口；`:''}${delayed?`${delayed} 个来源离线或待追赶；`:''}${unknown?'部分采集覆盖未知；':''}实际保留边界未知。可在“概览 / 采集记录”核对覆盖。`;
+   }
+  }
+  text(kind+'-search-coverage',coverage+' 无匹配不代表安全或没有活动。');
+ }
+}
+function searchWindow(kind){
+ const mode=$(kind+'-search-window').value||'24h',prefix=searchPrefix(kind);
+ if(mode==='all')return {mode,filters:{}};
+ if(mode==='24h'){const end=new Date();return {mode,filters:{start:new Date(end.valueOf()-86400000).toISOString(),end:end.toISOString()}};}
+ const start=new Date($(prefix+'-start').value),end=new Date($(prefix+'-end').value);
+ if(!$(prefix+'-start').value||!$(prefix+'-end').value||Number.isNaN(start.valueOf())||Number.isNaN(end.valueOf())||start>end)throw new Error('请输入有效的开始、结束时间，开始时间不能晚于结束时间。');
+ return {mode:'custom',filters:{start:start.toISOString(),end:end.toISOString()}};
+}
+function applyIPSearch(kind,filters,mode){
+ if(kind==='event'){eventFilters=filters;eventSnapshot=null;setFilterInputs();}else incidentFilters=filters;
+ searchWindows[kind]=mode;syncIPInputs(kind);pages[kind].page=1;saveView();renderIPScopes();return loadList(kind,1);
+}
+function submitIPSearch(kind){
+ try{const window=searchWindow(kind),filters={...window.filters},ip=$(searchPrefix(kind)+'-ip').value.trim();if(ip)filters.ip=ip;
+  if(kind==='event')for(const key of ['username','event_type','q']){const value=$('search-'+key).value.trim();if(value)filters[key]=value;}
+  return applyIPSearch(kind,filters,window.mode);
+ }catch(error){text(kind+'-status',error.message);$(kind+'-status').className='list-status error';}
+}
+function clearIPSearch(kind){
+ if(kind==='event'){eventFilters={};eventSnapshot=null;setFilterInputs();}else incidentFilters={};
+ searchWindows[kind]='24h';syncIPInputs(kind);pages[kind].page=1;saveView();return loadList(kind,1);
+}
+function searchSSHFromIP(kind,ip,first=null,last=null){
+ const start=new Date(first),end=new Date(last),hasWindow=first&&last&&Number.isFinite(start.valueOf())&&Number.isFinite(end.valueOf())&&start<=end;
+ const finish=hasWindow?end.valueOf()+1800000:Date.now(),begin=hasWindow?start.valueOf()-1800000:finish-86400000;
+ currentSource='';$('source-filter').value='';incidentTriage='all';incidentFocus='all';incidentSort='recent';
+ $('incident-triage').value=incidentTriage;$('incident-focus').value=incidentFocus;$('incident-sort').value=incidentSort;
+ eventFilters={};incidentFilters={};eventSnapshot=null;setFilterInputs();syncIPInputs('incident');
+ for(const key of ['event','incident']){const state=pages[key];++state.requestId;if(state.controller)state.controller.abort();state.pending=false;state.page=1;state.totalPages=null;state.total=0;state.visible=null;state.displayed=null;updatePager(key);}
+ closeRecordDrawer();const dialog=$('network-dialog');if(dialog.open){if(typeof dialog.close==='function')dialog.close();else{dialog.removeAttribute('open');clearNetworkDetail();}}
+ selectWorkspace(kind==='event'?'events':'incidents',false);
+ if(controlsData){$('control-sources').dataset.key='';renderControlSources(controlsData.sources||[]);}
+ const task=applyIPSearch(kind,{ip:String(ip),start:new Date(begin).toISOString(),end:new Date(finish).toISOString()},hasWindow?'custom':'24h');
+ $(searchPrefix(kind)+'-ip').focus?.();return task;
+}
+function networkSSHSearchActions(item){
+ const actions=document.createElement('div');actions.className='ip-search-link';
+ for(const [kind,label] of [['incident','查 SSH 告警'],['event','查 SSH 日志']]){const button=document.createElement('button');button.type='button';button.textContent=label;button.setAttribute('aria-label',`${label}：${item.src_ip}`);button.title='查询全部 SSH 来源和处置状态，默认网络证据前后各 30 分钟；不代表事件已关联。';button.addEventListener('click',event=>{event.stopPropagation();return searchSSHFromIP(kind,item.src_ip,item.first_seen,item.last_seen);});actions.append(button);}return actions;
+}
+function initializeIPSearch(){
+ for(const kind of ['event','incident']){
+  syncIPInputs(kind);$(kind+'-ip-form').addEventListener('submit',event=>{event.preventDefault();return submitIPSearch(kind);});
+  $(kind+'-ip-clear').addEventListener('click',()=>clearIPSearch(kind));
+  $(kind+'-search-window').addEventListener('change',()=>{$(kind+'-search-dates').hidden=$(kind+'-search-window').value!=='custom';});
+  $(kind+'-search-all').addEventListener('click',()=>{const filters={...searchFilters(kind)};delete filters.start;delete filters.end;return applyIPSearch(kind,filters,'all');});
+ }
+ renderIPScopes();
+}
 function setDetailTab(name){
  if(!['overview','evidence','ai'].includes(name))return;detailTab=name;
  for(const key of ['overview','evidence','ai']){$('detail-pane-'+key).hidden=key!==name;$('detail-tab-'+key).setAttribute('aria-selected',String(key===name));$('detail-tab-'+key).tabIndex=key===name?0:-1;}
@@ -57,7 +131,7 @@ function cachedListAvailable(kind){
  if(bootstrapBlocked||!bootstrapPacket?.data||bootstrapPacket.stale||currentSource)return false;
  const age=Number(bootstrapPacket.age_seconds)+(performance.now()-bootstrapReceivedAt)/1000;
  if(age>bootstrapPacket.max_age_seconds)return false;
- if(kind==='incident')return pages.incident.page===1&&incidentTriage==='pending'&&incidentFocus==='all'&&incidentSort==='score';
+ if(kind==='incident')return pages.incident.page===1&&incidentTriage==='pending'&&incidentFocus==='all'&&incidentSort==='score'&&Object.values(incidentFilters).every(value=>!value);
  return pages.event.page===1&&Object.values(eventFilters).every(value=>!value)&&(eventSnapshot===null||eventSnapshot===bootstrapPacket.data.events.snapshot);
 }
 async function cachedOrLiveList(kind,force=false){
@@ -132,6 +206,7 @@ function changeWorkspaceSource(){
  saveView();updateRefreshButton();loadWorkspaceView();scheduleAutoRefresh();
 }
 function initializeWorkspace(){
+ initializeIPSearch();
  initializeHttp();
  initializeNetwork();
  for(const name of workspaceViews){
@@ -149,10 +224,16 @@ function initializeWorkspace(){
  setDetailTab('overview');
  // A new visit starts with current logs. Pagination within this visit still
  // preserves its receipt boundary; saved search fields remain available.
- eventSnapshot=null;pages.event.page=1;$('event-search-options').open=Object.values(eventFilters).some(Boolean);$('incident-options').open=incidentTriage!=='pending'||incidentFocus!=='all'||incidentSort!=='score';
+ eventSnapshot=null;pages.event.page=1;$('event-search-options').open=['username','event_type','q'].some(key=>Boolean(eventFilters[key]));$('incident-options').open=incidentTriage!=='pending'||incidentFocus!=='all'||incidentSort!=='score';
  showListSkeleton($('incidents'),6);showListSkeleton($('events'),5);
 }
 """
+
+
+def ip_search_form(kind):
+    prefix = "search" if kind == "event" else "incident-search"
+    label = "日志" if kind == "event" else "告警"
+    return f'''<form id="{kind}-ip-form" class="local-ip-search"><div class="ip-form"><label for="{prefix}-ip">搜索来源 IP</label><input id="{prefix}-ip" type="text" maxlength="128" placeholder="输入完整 IPv4 / IPv6" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="{kind}-search-scope {kind}-search-coverage"><button type="submit">搜索 SSH {label}</button><button id="{kind}-ip-clear" type="button">清空搜索</button></div><div class="actions"><label for="{kind}-search-window">查询时间</label><select id="{kind}-search-window"><option value="24h">最近 24 小时</option><option value="custom">自定义 / 网络事件时段</option><option value="all">全部保留时间</option></select><button id="{kind}-search-all" type="button">扩展到全部保留时间</button></div><div id="{kind}-search-dates" class="search-fields" hidden><label for="{prefix}-start">开始时间（本地）<input id="{prefix}-start" type="datetime-local" step="1"></label><label for="{prefix}-end">结束时间（本地）<input id="{prefix}-end" type="datetime-local" step="1"></label></div></form><p id="{kind}-search-scope" class="search-scope" role="status" aria-live="polite"></p><p id="{kind}-search-coverage" class="muted search-scope"></p>'''
 
 
 def arrange(html):
@@ -193,10 +274,14 @@ def arrange(html):
             section = section.replace(selected, '', 1)
             section = section.replace('<div class="actions">', '<details id="incident-options" class="search-options"><summary>筛选与处置选项</summary><div class="actions">', 1)
             section = section.replace('</div><p id="incident-score-counts"', '</div></details>' + selected + '<p id="incident-score-counts"', 1)
+            section = section.replace('</h2>', '</h2>' + ip_search_form('incident'), 1)
         if key == 'events':
+            for field in ('ip', 'start', 'end'):
+                section = re.sub(r'<label>[^<]*<input id="search-' + field + r'"[^>]*></label>', '', section, count=1)
+            section = section.replace('</h2>', '</h2>' + ip_search_form('event'), 1)
             latest = '<button id="event-latest" type="button">获取最新日志</button>'
             section = section.replace(latest, '', 1)
-            section = section.replace('<form id="search-form">', '<details id="event-search-options" class="search-options"><summary>筛选日志</summary><form id="search-form">', 1)
+            section = section.replace('<form id="search-form">', '<details id="event-search-options" class="search-options"><summary>高级筛选：账号、事件类型、消息关键字</summary><form id="search-form">', 1)
             section = section.replace('</form><p><small id="event-updated">', '</form></details>' + latest + '<p><small id="event-updated">', 1)
         panels.append(f'<div id="workspace-{key}" class="workspace-panel" role="tabpanel" aria-labelledby="workspace-tab-{key}"' + ('' if active else ' hidden') + '>' + section + '</div>')
     nav += '<div class="nav-note">证据核对 · 人工处置</div></nav>'

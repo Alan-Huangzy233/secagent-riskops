@@ -249,6 +249,14 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
 
     application = FastAPI(title="SecAgent RiskOps live telemetry", lifespan=lifespan,
                           docs_url=None, redoc_url=None, openapi_url=None)
+
+    from .telemetry.store import SearchQueryUnavailable
+
+    @application.exception_handler(SearchQueryUnavailable)
+    async def search_unavailable(_request: Request, _exc: SearchQueryUnavailable):
+        return JSONResponse({"code": "search_temporarily_unavailable",
+                             "detail": "查询耗时过长或数据库暂忙，请缩短时间范围或稍后重试；未返回部分结果。"},
+                            status_code=503, headers={"Retry-After": "2"})
     application.add_middleware(RequestBoundaryMiddleware)
 
     def operator(request: Request, credentials: HTTPBasicCredentials | None = Depends(_basic)) -> None:
@@ -338,18 +346,30 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
             raise HTTPException(422, "处置状态筛选无效")
         return triage
 
+    def incident_search_filters(ip: str | None = Query(None, max_length=64),
+                                start: str | None = Query(None, max_length=64),
+                                end: str | None = Query(None, max_length=64)):
+        filters = {"ip": ip, "start": start, "end": end}
+        from .telemetry.store import TelemetryStore
+        try:
+            TelemetryStore._incident_filter(None, **filters)
+        except (ValueError, OverflowError, TypeError):
+            raise HTTPException(422, "告警查询参数无效，请检查完整 IP 和带时区的时间范围") from None
+        return filters
+
     @application.get("/api/incidents", dependencies=[Depends(operator)])
     def incidents(request: Request, source_id: str | None = Query(None, max_length=64),
                   limit: int = Query(100, ge=1, le=200), offset: int = Query(0, ge=0),
                   page: int | None = Query(None, ge=1, le=1_000_000_000),
                   include_evidence: bool = Query(True), triage: str | None = Depends(triage_filter),
                   focus: Literal["all", "attention", "low", "unscored"] = "all",
-                  sort: Literal["recent", "score"] = "recent"):
+                  sort: Literal["recent", "score"] = "recent",
+                  filters: dict = Depends(incident_search_filters)):
         if page is not None:
             result = request.app.state.store.paginate_incidents(source_id=source_filter(request, source_id), limit=limit, page=page,
-                                                              include_evidence=include_evidence, triage=triage, focus=focus, sort=sort)
+                                                              include_evidence=include_evidence, triage=triage, focus=focus, sort=sort, **filters)
         else:
-            result = request.app.state.store.list_incidents(source_id=source_filter(request, source_id), limit=limit, offset=offset, triage=triage, focus=focus, sort=sort)
+            result = request.app.state.store.list_incidents(source_id=source_filter(request, source_id), limit=limit, offset=offset, triage=triage, focus=focus, sort=sort, **filters)
         return with_source_context(result, request.app.state.control)
 
     @application.get("/api/dashboard", dependencies=[Depends(operator)])
@@ -360,16 +380,20 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
                            filters: dict = Depends(search_filters),
                            incident_triage: str | None = Query(None, max_length=16),
                            incident_focus: Literal["all", "attention", "low", "unscored"] = "all",
-                           incident_sort: Literal["recent", "score"] = "recent"):
+                           incident_sort: Literal["recent", "score"] = "recent",
+                           incident_ip: str | None = Query(None, max_length=64),
+                           incident_start: str | None = Query(None, max_length=64),
+                           incident_end: str | None = Query(None, max_length=64)):
         # One authenticated HTTP request avoids three expensive password checks
         # when the operator returns after the short verification cache expires.
         selected = source_filter(request, source_id)
+        incident_filters = incident_search_filters(incident_ip, incident_start, incident_end)
         store = request.app.state.store
         return {"summary": summary(request),
                 "events": store.paginate_events(source_id=selected, limit=limit, page=event_page, **filters),
                 "incidents": with_source_context(store.paginate_incidents(source_id=selected, limit=limit, page=incident_page,
                                                       include_evidence=False, triage=triage_filter(incident_triage),
-                                                      focus=incident_focus, sort=incident_sort), request.app.state.control)}
+                                                      focus=incident_focus, sort=incident_sort, **incident_filters), request.app.state.control)}
 
     @application.get("/api/incidents/{incident_id}", dependencies=[Depends(operator)])
     def incident_detail(request: Request, incident_id: str):
