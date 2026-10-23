@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager, ExitStack
+from datetime import datetime, timedelta, timezone
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -48,17 +49,37 @@ def certificates(root):
             '-keyout', root / 'ca.key', '-out', ca)
     openssl('req', '-new', '-newkey', 'rsa:2048', '-nodes', '-subj', '/CN=localhost',
             '-keyout', key, '-out', root / 'server.csr')
-    for serial, (name, san, days) in enumerate([
-        ('valid', 'IP:127.0.0.1,DNS:localhost', '2'),
-        ('wrong_hostname', 'DNS:other.invalid', '2'),
-        ('expired', 'IP:127.0.0.1,DNS:localhost', '-1'),
+    for serial, (name, san) in enumerate([
+        ('valid', 'IP:127.0.0.1,DNS:localhost'),
+        ('wrong_hostname', 'DNS:other.invalid'),
+        ('expired', 'IP:127.0.0.1,DNS:localhost'),
     ], start=1):
         extension = root / (name+'.ext')
         extension.write_text('basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\n'
                              'extendedKeyUsage=serverAuth\nsubjectAltName='+san+'\n')
-        openssl('x509', '-req', '-in', root / 'server.csr', '-CA', ca, '-CAkey', root / 'ca.key',
-                '-set_serial', str(serial), '-days', days, '-extfile', extension,
-                '-out', root / (name+'.pem'))
+        if name == 'expired':
+            # Negative x509 -days is rejected by some OpenSSL releases and
+            # otherwise creates notAfter < notBefore. Sign an ordered validity
+            # interval entirely in the past, using the portable ca interface.
+            (root / 'index.txt').write_text('')
+            (root / 'serial').write_text(f'{serial:02X}\n')
+            config = root / 'ca.conf'
+            config.write_text('[ca]\ndefault_ca=fixture\n[fixture]\n'
+                              f'database="{root / "index.txt"}"\n'
+                              f'serial="{root / "serial"}"\n'
+                              f'new_certs_dir="{root}"\n'
+                              'default_md=sha256\npolicy=subject_policy\n'
+                              '[subject_policy]\ncommonName=supplied\n')
+            now = datetime.now(timezone.utc)
+            openssl('ca', '-batch', '-notext', '-config', config, '-cert', ca,
+                    '-keyfile', root / 'ca.key', '-in', root / 'server.csr',
+                    '-startdate', (now-timedelta(days=2)).strftime('%Y%m%d%H%M%SZ'),
+                    '-enddate', (now-timedelta(days=1)).strftime('%Y%m%d%H%M%SZ'),
+                    '-extfile', extension, '-out', root / (name+'.pem'))
+        else:
+            openssl('x509', '-req', '-in', root / 'server.csr', '-CA', ca, '-CAkey', root / 'ca.key',
+                    '-set_serial', str(serial), '-days', '2', '-extfile', extension,
+                    '-out', root / (name+'.pem'))
     for path in root.iterdir():
         path.chmod(0o600)
     return ca
