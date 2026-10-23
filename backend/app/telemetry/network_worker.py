@@ -64,6 +64,24 @@ def source_health(store, console, sources, heartbeat_timeout, now):
                  "note": "采集状态与安全事件分别展示；历史缺口仍保留在网络检测状态中。"}, now)
 
 
+def capacity_health(store, console, now):
+    """Warn before permanent receipt history fills; never prune replay evidence."""
+    status = store.status()
+    ratios = {name: status["counts"][name] / status["limits"][name]
+              for name in ("events", "receipts", "batches")}
+    ratios["storage"] = status["storage_bytes"] / status["limits"]["storage_bytes"]
+    # The database's write budget reserves room for its WAL and SHM files.
+    ratios["database_pages"] = status["page_count"] / status["page_limit"]
+    nearing = sorted(name for name, ratio in ratios.items() if ratio >= .7)
+    with console._connection(write=True) as db:
+        notifications._condition(db, "network-capacity", "network_collection", bool(nearing),
+            {"title": "网络采集容量接近上限" if nearing else "网络采集容量已恢复",
+             "conditions": ["capacity_" + name for name in nearing],
+             "usage_percent": {name: round(value * 100, 1) for name, value in ratios.items()},
+             "exhausted": status["exhausted"],
+             "note": "达到配额后会保留待发送数据并停止新增写入；请先处理容量，勿删除采集游标或去重记录。"}, now)
+
+
 class NetworkWorker:
     def __init__(self, store, console, *, sources=(), heartbeat_timeout=180,
                  notify=True, interval=5):
@@ -85,10 +103,21 @@ class NetworkWorker:
     def tick(self, now=None):
         with self.lock:
             moment = time.time() if now is None else now
+            capacity_error = None
+            if self.notify:
+                # Full network storage must still report through the console.
+                # A broken notice destination must not prevent local analysis.
+                try:
+                    capacity_health(self.store, self.console, moment)
+                except Exception:
+                    capacity_error = "网络容量通知暂时失败，将自动重试"
             result = network_incidents.process(self.store, moment)
             if self.notify:
                 publish(self.store, self.console, moment)
                 source_health(self.store, self.console, self.sources, self.heartbeat_timeout, moment)
+            if capacity_error:
+                with self.store.write_connection() as db:
+                    network_incidents.set_meta(db, "last_error", capacity_error)
             return result
 
     def _run(self):

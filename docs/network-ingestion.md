@@ -66,18 +66,19 @@ MAC values and packet payload are never sent or spooled. A malformed packet
 with usable journal identity becomes a redacted rejection; unusable identity
 aborts the page without advancing a cursor.
 
-**The current rules fingerprint covers only `iptables-save` and
-`ip6tables-save`.** It ignores generated comment lines and dynamic chain
-counters while retaining rule contents. It does not inspect every native
-nftables table, other log producer or effective firewall hook. Mixed/native
-nftables producers are unsupported until a complete guard is implemented.
-Before any real enrollment, the operator must verify that there are no
-unmanaged/native producers that can reuse the labels or invalidate attribution,
-resolve every enrolled prefix to the intended local-input hook and interface
-shape, and establish the profile's valid-from time. A matching fingerprint is
-not automatic attestation of the complete effective firewall configuration.
-The [Netfilter manual](https://netfilter.org/projects/nftables/manpage.html)
-describes the separate nftables families and hooks that this guard does not enumerate.
+New real sources must explicitly use the [full Netfilter guard](network-source-guard.md).
+It binds a reviewed validity time and checks nftables plus default/nft/legacy
+iptables views before and after reading a page. The legacy `iptables-v1` mode
+retains its old revision contract but covers only `iptables-save` and
+`ip6tables-save`; it does not justify mixed/native source enrollment. Full-guard
+native prefixes are retained as unknown-direction, non-rejection observations.
+
+Before real enrollment, the operator must still verify that no unrelated
+producer reuses an enrolled label, trace every intended hook/interface, and
+establish the profile's valid-from time. A matching complete fingerprint is an
+equality check, not automatic attestation of provenance or historical rules.
+See the [source guard](network-source-guard.md) and
+[enrollment procedure](network-enrollment.md) for drift and compatibility limits.
 
 Do not infer local input from `BLOCK` or an empty `OUT` field alone. If the
 operator cannot establish unambiguous provenance, leave local-input profile
@@ -234,8 +235,9 @@ apparent-address attribution remain limitations of the evidence.
 
 ## Next gates
 
-The [continuous analysis and console](network-analysis.md) increment is
-implemented for review. Data-quality failures remain separate from attack
+The [continuous analysis and console](network-analysis.md) increment is merged.
+[Enrollment preparation](network-enrollment.md) and [paired recovery](network-recovery.md)
+are implemented for review; live source acceptance remains separate. Data-quality failures remain separate from attack
 candidates. Before any real enrollment, complete the supported-source/profile review,
 passive source comparison, resource measurements and paired store/spool/cursor
 backup and restore acceptance. Do not extend the existing SSH/HTTP recovery

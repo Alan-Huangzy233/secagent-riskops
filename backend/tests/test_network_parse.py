@@ -300,3 +300,73 @@ def test_hash_binding_ignores_unretained_noise_and_does_not_reinterpret_time():
     for field in ("__REALTIME_TIMESTAMP", "__MONOTONIC_TIMESTAMP"):
         changed = parse_ufw(record(**{field: "1"}), profile=profile())
         assert changed.key == initial.key and changed.content_hash != initial.content_hash
+
+
+def test_legacy_profile_revision_remains_the_original_serialized_contract():
+    from app.telemetry.network_protocol import fingerprint, profile_from_dict
+    old = asdict(profile())
+    del old['guard_version']
+    del old['profile_valid_from_us']
+    for key in ('log_labels', 'ip_families', 'rejection_labels', 'local_input_labels', 'local_input_interfaces'):
+        old[key] = sorted(old[key])
+    # Golden digest from the merged pre-guard implementation, not recalculated
+    # by the new profile method. Existing receipt keys must remain readable.
+    assert profile().revision == '22c49d848200f822755eed4953ad9ac057ddff6e69dd95d644622833af04c902'
+    assert profile().revision == fingerprint(old)
+    assert profile_from_dict(old).revision == profile().revision
+
+
+def strong_profile(**changes):
+    values = dict(guard_version='netfilter-full-v1', profile_valid_from_us=1789999999000000)
+    values.update(changes)
+    return profile(**values)
+
+
+def test_strong_guard_and_validity_time_are_bound_to_new_revision():
+    enrolled = strong_profile()
+    assert enrolled.revision != profile().revision
+    assert replace(enrolled, profile_valid_from_us=enrolled.profile_valid_from_us + 1).revision != enrolled.revision
+    assert parse_ufw(record(), profile=enrolled).parser_version == 'netfilter-kernel-v2'
+
+
+@pytest.mark.parametrize('changes', [
+    {'guard_version': 'guessed'}, {'guard_version': 'netfilter-full-v1'},
+    {'guard_version': 'netfilter-full-v1', 'profile_valid_from_us': True},
+    {'guard_version': 'netfilter-full-v1', 'profile_valid_from_us': -1},
+    {'profile_valid_from_us': 0},
+])
+def test_guard_context_is_explicit_and_cannot_be_mixed_with_legacy(changes):
+    with pytest.raises(NetworkParseError):
+        profile(**changes)
+
+
+def test_native_prefix_preserves_observations_without_becoming_tcp_scan_evidence():
+    from app.telemetry.network_detection import detect_network
+    enrolled = strong_profile(log_labels=('sample-observation:',), rejection_labels=(),
+                              local_input_labels=(), local_input_interfaces=())
+    events = []
+    for i in range(12):
+        message = record()['MESSAGE'].replace('[UFW BLOCK]', 'sample-observation:').replace('DPT=443', f'DPT={2000+i}')
+        events.append(parse_ufw(record(message, __CURSOR=f'native-{i}'), profile=enrolled))
+    assert all(event.log_label == 'sample-observation:' and event.direction == 'unknown'
+               and not event.rejection_related for event in events)
+    report = detect_network(events)
+    assert report.eligible_count == 0 and not report.findings
+    udp = record('sample-observation: IN=eth0 OUT= SRC=198.51.100.19 DST=192.0.2.8 LEN=60 PROTO=UDP SPT=40000 DPT=5678 LEN=40')
+    assert parse_ufw(udp, profile=enrolled).protocol == 'UDP'
+
+
+@pytest.mark.parametrize('label', ['space label:', 'x=:', 'x;:', 'x.*:', 'é:', 'x:\n', 'a' * 60 + ':'])
+def test_native_prefix_is_a_bounded_literal_token(label):
+    with pytest.raises(NetworkParseError):
+        strong_profile(log_labels=(label,), rejection_labels=(), local_input_labels=(), local_input_interfaces=())
+
+
+def test_native_prefix_requires_strong_guard_and_cannot_be_attributed_or_rejection():
+    base = dict(log_labels=('sample:',), rejection_labels=(), local_input_labels=(), local_input_interfaces=())
+    with pytest.raises(NetworkParseError):
+        profile(**base)
+    for fields in ({'rejection_labels': ('sample:',)},
+                   {'local_input_labels': ('sample:',), 'local_input_interfaces': ('eth0',)}):
+        with pytest.raises(NetworkParseError):
+            strong_profile(**(base | fields))

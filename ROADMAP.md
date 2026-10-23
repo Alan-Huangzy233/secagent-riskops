@@ -21,8 +21,9 @@ console notifications and UTC daily briefings are implemented. Current position:
   ([usage and limits](./docs/network-detection.md)). Dedicated durable
   collection/storage and operator read APIs are merged ([ingestion guide](./docs/network-ingestion.md)).
   [Continuous cases, versioned evidence, scores, console table/details and notices](./docs/network-analysis.md)
-  are implemented in this increment for review. Next complete source provenance,
-  passive acceptance, resource and paired recovery gates.
+  are merged. [Source enrollment preparation](./docs/network-enrollment.md) now adds
+  full-firewall provenance checks, native observations, paired recovery and capacity
+  warnings for review. Per-source passive acceptance and sustained operation remain.
   The [network source plan](./docs/network-source-plan.md) separates those gates
   from live acceptance. Production network detection remains disabled. Linux host
   behavior (#121) follows the network increment; HTTP activation resumes when a real service exists.

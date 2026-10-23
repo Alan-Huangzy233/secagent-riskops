@@ -42,9 +42,9 @@ and explicit-deny hooks is a prerequisite for setting `local_input_labels` and
 journal `_TRANSPORT=kernel`; the dedicated exporter must obtain that field
 from the journal and source credentials authenticate its delivery. Arbitrary
 JSON supplied by an untrusted client cannot establish kernel origin. The
-current exporter guards only the iptables/ip6tables snapshot: mixed/native
-nftables producers remain unsupported pending a full guard, and local-input
-attribution still requires operator enrollment review.
+legacy exporter guards only the iptables/ip6tables snapshot. New real sources
+require the [full Netfilter guard](network-source-guard.md); native prefixes are
+observation-only, and local-input attribution still requires operator review.
 
 The normalized immutable event retains opaque journal cursor, boot identity,
 integer receipt timestamps, canonical same-family IPs, protocol, ports, TCP
