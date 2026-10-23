@@ -26,7 +26,9 @@ quality rather than fabricating a score to populate the table.
 
 Start the profile's validity at the completed current review. Do not backdate it
 based on a sample of old logs. Read the complete guard twice around enrollment;
-any semantic drift requires review. The collector must not automatically replace
+any semantic drift requires review. For reviewed terminal address sets whose membership changes during normal
+operation, select the explicit bounded policy in the [source guard](network-source-guard.md).
+The collector must not automatically replace
 a digest, delete a pending batch or rebind its identity to make an error disappear.
 
 ## Dedicated delivery
@@ -53,7 +55,8 @@ source activation, after verifying the exact reviewed code.
 The example [service](../deploy/systemd/secagent-riskops-network-collector@.service)
 and [timer](../deploy/systemd/secagent-riskops-network-collector@.timer) are
 opt-in templates. They require the `riskops-network-collector` system account,
-installed Python environment and private per-source configuration. Start with
+installed Python environment and private per-source configuration. Include every imported
+source module, including `network_guard.py`, in the versioned exporter bundle. Start with
 one source and bounded single runs; inspect durable ACK, cursor, analysis and
 source quality before enabling its timer or proceeding to the next source.
 The template uses about one poll per minute, a 35-second service deadline,

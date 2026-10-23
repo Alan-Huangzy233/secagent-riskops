@@ -66,8 +66,20 @@ def app(config):
 
 
 def post(client, body, token=NET_TOKEN):
-    return client.post('/api/network/batches', content=encode(body),
-        headers={'Authorization': 'Bearer '+token, 'Content-Type': 'application/json'})
+    # The real worker runs in these API tests. Its checkpoint may race an
+    # ingest, whose contract permits a busy response before conflict checks.
+    # Retry only that response with the identical body and a finite bound;
+    # capacity, unavailable storage and all other errors remain observable.
+    deadline = time.monotonic() + 6
+    raw = encode(body)
+    for attempt in range(5):
+        response = client.post('/api/network/batches', content=raw,
+            headers={'Authorization': 'Bearer '+token, 'Content-Type': 'application/json'})
+        if (response.status_code != 503 or response.json().get('detail') != 'network_storage_busy'
+                or attempt == 4 or time.monotonic() >= deadline):
+            return response
+        time.sleep(0.05)
+
 
 
 def read(client, endpoint, **params):

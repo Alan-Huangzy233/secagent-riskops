@@ -60,7 +60,9 @@ the [durable transport/storage foundation](network-ingestion.md) is merged and
 disabled by default. [Continuous analysis and console integration](network-analysis.md)
 are merged. [Enrollment preparation](network-enrollment.md) adds full-firewall
 guards, native observations, paired recovery, capacity warnings and a synthetic
-workload exercise for review. Per-source passive acceptance and sustained
+workload exercise for review. Quiet-journal handling and an explicit, narrowly
+validated dynamic terminal-set guard address source-acceptance boundaries.
+These additions do not enable any source by themselves. Per-source passive acceptance and sustained
 capacity calibration remain required. HTTP's missing business
 source does not block this engineering work. Linux #121 follows the network
 increment; offline fixtures never establish live coverage.

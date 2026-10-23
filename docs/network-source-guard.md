@@ -1,21 +1,24 @@
 # Reviewed firewall sources and native observation prefixes
 
-Real source enrollment uses `guard_version: "netfilter-full-v1"` explicitly.
-This guard is an equality check against an operator-reviewed snapshot; it does
+Real source enrollment explicitly selects `netfilter-full-v1` or the bounded
+`netfilter-terminal-v2` guard described below. Both compare against an
+operator-reviewed snapshot; selecting a guard does
 not establish provenance, rule meaning or historical correctness on its own.
 Keep hostnames, credentials, rulesets and enrollment timestamps in private
 configuration and acceptance evidence.
 
 ## Guarded profile and compatibility
 
-The `SourceProfile` adds two fields:
+The `SourceProfile` carries these guard fields:
 
 | Field | Contract |
 | --- | --- |
-| `guard_version` | Legacy default `iptables-v1`, or explicit `netfilter-full-v1`. |
-| `profile_valid_from_us` | Required integer UTC microseconds for the full guard. Must equal the exporter configuration's outer field of the same name. Legacy profiles must leave this field null/omitted. |
+| `guard_version` | Legacy default `iptables-v1`, static `netfilter-full-v1`, or explicit `netfilter-terminal-v2`. |
+| `profile_valid_from_us` | Required integer UTC microseconds for both Netfilter guards. Must equal the exporter configuration's outer field of the same name. Legacy profiles must leave this field null/omitted. |
 
-Both new fields enter a full profile's revision. Changing the reviewed snapshot
+| `dynamic_terminal_sets` | Nonempty exact `family/table/set` allowlist for `netfilter-terminal-v2`; empty for older guards. |
+
+All applicable fields enter the profile's revision. Changing the reviewed snapshot
 or validity time creates a new profile revision. The existing API enrollment,
 collector mapping and durable receipts continue to bind that revision. Do not
 silently update a profile, erase pending batches or reset a checkpoint to make
@@ -24,10 +27,14 @@ handoff while preserving pending evidence and older enrolled revisions.
 
 Legacy profiles retain their **exact original revision calculation** and
 `ufw-kernel-v1` event version. Omitting the new fields still decodes old profiles;
-legacy collector identity and persisted receipts are unchanged. That mode only
+legacy collector identity and persisted receipts are unchanged. The default empty
+dynamic-set field is also excluded from existing `netfilter-full-v1` revisions.
+That legacy mode only
 guards `iptables-save` and `ip6tables-save`: it cannot justify enrolling a mixed
 or native nftables source. Full profiles produce `netfilter-kernel-v2` events,
-which use the same typed event schema. Older deployed binaries do not understand
+which use the same typed event schema. Terminal-set profiles use
+`netfilter-kernel-v3` and require `dynamic_terminal_filtering` in their coverage.
+Older deployed binaries do not understand
 these new profiles/events; reverting code after enrollment must account for
 that compatibility boundary while retaining the current evidence and state.
 
@@ -40,7 +47,7 @@ planned rule changes, review the new context and use a new validity boundary.
 
 ## Fixed complete Netfilter views
 
-The full guard runs these fixed commands before reading the journal and again
+Both Netfilter guards run these fixed commands before reading the journal and again
 before releasing the page:
 
 ```text
@@ -73,10 +80,10 @@ the packet/byte values of named counter objects. A field called `counter` or
 iptables views preserve rule tokens and remove generated comments and chain
 packet/byte counters; the full mode also checks the save-format structure.
 
-Set membership changes, fail2ban changes, quota usage or dynamic expiry fields
-can cause conservative drift. They are retained because omitting semantic state
-would weaken the guard. This implementation does not promise continuous
-availability on a host whose firewall state changes frequently.
+Under `netfilter-full-v1`, set membership changes, fail2ban changes, quota usage
+or dynamic expiry fields cause conservative drift. That mode retains its exact
+static-snapshot contract. Frequently changing address sets require the separate
+reviewed policy below; neither guard automatically accepts a changed ruleset.
 
 A changed digest reports `profile_drift`, discards the whole page and preserves
 the input cursor. Missing tools report `firewall_guard_tool_unavailable`;
@@ -114,3 +121,36 @@ local-input assertions. Review every producer of that prefix, including
 forwarding and explicit-deny rules, before making those assertions. Keep log
 rate and retention limits explicit. Complete passive comparison, resource and
 paired recovery acceptance separately before treating a source as operational.
+
+## Explicit dynamic terminal address sets
+
+`netfilter-terminal-v2` permits membership changes only for exact sets listed in
+`dynamic_terminal_sets`. The operator reviews these sets alongside the complete
+logging provenance. Every pre/post snapshot validates the set type, definition
+and **all** references before normalizing the permitted membership. Only the
+supported plain IP address members are eligible. A reference must be a narrow
+source-address membership match in a rule ending in DROP or REJECT, with no
+logging, jump, NAT or other side effect. Unsupported definitions, elements,
+references and expressions fail closed. Maps, verdicts and arbitrary dynamic
+firewall state are outside this exception.
+
+The guard still hashes the full rule and hook graph, set definitions, log
+producers, other sets and all compatibility views. Changing the allowlist also
+changes the profile revision. It never refreshes the expected digest, rewrites
+a live profile or discards a pending batch. Existing full-v1 and legacy sources
+retain their original behavior. A new guard/profile requires an explicit
+enrollment transition; older binaries cannot consume its new event version.
+
+Membership changes can alter which packets reach a logger. Every event under
+this policy therefore carries `dynamic_terminal_filtering`; the console displays
+that observation limit. This is neither complete traffic visibility nor a claim
+about the final verdict of an unobserved packet. Native UDP observations remain
+excluded from the inbound TCP rule.
+
+## Quiet journals
+
+A fixed filtered journal query may return exit status 1 without stdout or stderr
+when there are no matching records. Only that exact empty result is treated as
+an empty page. Other nonzero exits, nonempty diagnostics or output are failures;
+SSH and firewall commands retain strict success checks. An empty heartbeat can
+verify delivery and source health, but does not establish real-event coverage.
