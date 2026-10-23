@@ -11,7 +11,7 @@ SECTION = """<section id="network-section" aria-busy="false"><h2>网络检测</h
 DIALOG = """<dialog id="network-dialog" aria-labelledby="network-detail-title"><div class="network-detail-body"><div class="drawer-heading"><h2 id="network-detail-title">网络事件详情</h2><button id="network-close" type="button" aria-label="关闭网络详情">关闭 ✕</button></div>
 <p id="network-detail-status" role="status" aria-live="polite"></p><div class="actions"><button id="network-revision-prev" type="button" disabled>上一版本</button><span id="network-revision"></span><button id="network-revision-next" type="button" disabled>下一版本</button><button id="network-current" type="button" disabled>读取当前版本</button></div>
 <div class="detail-tabs" role="tablist" aria-label="网络详情内容"><button id="network-tab-overview" type="button" role="tab" aria-controls="network-pane-overview" aria-selected="true">概览</button><button id="network-tab-evidence" type="button" role="tab" aria-controls="network-pane-evidence" aria-selected="false" tabindex="-1">证据</button></div>
-<div id="network-pane-overview" class="network-detail-scroll" role="tabpanel" aria-labelledby="network-tab-overview"><dl id="network-fields" class="detail-fields"></dl><details><summary>版本与关联标识</summary><dl id="network-provenance" class="detail-fields"></dl></details></div>
+<div id="network-pane-overview" class="network-detail-scroll" role="tabpanel" aria-labelledby="network-tab-overview"><div id="network-ssh-search"></div><p>查证入口查询全部 SSH 来源及处置状态，默认网络证据前后各 30 分钟，可在搜索页调整；命中相同 IP 不代表已确认关联。</p><dl id="network-fields" class="detail-fields"></dl><details><summary>版本与关联标识</summary><dl id="network-provenance" class="detail-fields"></dl></details></div>
 <div id="network-pane-evidence" class="network-detail-scroll" role="tabpanel" aria-labelledby="network-tab-evidence" hidden><p>只显示该版本保存的规范化证据。时间来自来源主机日志，可能发生时钟跳变；关联使用同一次启动内的单调时钟。拒绝相关日志标签不证明最终防火墙处置结果。</p><div class="table-wrap"><table><thead><tr><th>日志时间</th><th>源 IP / 端口</th><th>目的 IP / 端口</th><th>协议 / 标志</th><th>采集位置 / 限制</th></tr></thead><tbody id="network-evidence"></tbody></table></div><div class="pager"><button id="network-evidence-prev" type="button" disabled>上一页</button><span id="network-evidence-page"></span><button id="network-evidence-next" type="button" disabled>下一页</button><button id="network-evidence-retry" type="button" disabled>重试证据</button></div><p id="network-evidence-status" role="status" aria-live="polite"></p></div></div></dialog>"""
 
 STYLE = """
@@ -73,7 +73,7 @@ async function loadNetwork(page=networkPage){
   const query=new URLSearchParams({page:String(page),limit:'50',focus:$('network-focus').value||'all'});if($('network-source').value)query.set('source_id',$('network-source').value);
   const data=await get('/api/network/incidents?'+query);if(request!==networkRequest)return;
   if(!networkPageValid(data,page)||!data.items.every(networkItemValid))throw new Error('网络事件返回异常，请刷新重试。');
-  const rows=[];for(const item of data.items){const tr=document.createElement('tr');cell(tr,when(item.last_seen));cell(tr,item.source_id);cell(tr,`${item.src_ip} → ${item.dst_ip}`);cell(tr,item.rules.map(rule=>rule.label).join('、')||'模式已撤回');cell(tr,`${item.assessment.score} 分 · ${item.stale?'待重新核验':item.active?(item.assessment.priority||'低分'):'已撤回'}`);const button=document.createElement('button');button.type='button';button.textContent='查看详情';button.addEventListener('click',()=>showNetworkIncident(item.incident_id,item.revision));cell(tr,'').append(button);rows.push(tr);}
+  const rows=[];for(const item of data.items){const tr=document.createElement('tr');cell(tr,when(item.last_seen));cell(tr,item.source_id);const peers=cell(tr,`${item.src_ip} → ${item.dst_ip}`);peers.append(networkSSHSearchActions(item));cell(tr,item.rules.map(rule=>rule.label).join('、')||'模式已撤回');cell(tr,`${item.assessment.score} 分 · ${item.stale?'待重新核验':item.active?(item.assessment.priority||'低分'):'已撤回'}`);const button=document.createElement('button');button.type='button';button.textContent='查看详情';button.addEventListener('click',()=>showNetworkIncident(item.incident_id,item.revision));cell(tr,'').append(button);rows.push(tr);}
   $('network-rows').replaceChildren(...rows);if(!rows.length)empty($('network-rows'),6,'暂无符合条件的事件；没有命中不代表安全或完整覆盖。');
   networkPage=data.page;networkPages=data.total_pages;networkAvailable=data.total>0;text('network-page',`第 ${data.page} / ${data.total_pages} 页 · 共 ${data.total} 个事件`);text('network-status','');
  }catch(error){if(request===networkRequest)text('network-status',error.message+' 已保留上次读取的网络事件与页码；可能不符合新筛选条件。');}
@@ -81,6 +81,7 @@ async function loadNetwork(page=networkPage){
 }
 function renderNetworkDetail(item){
  networkDetail=item;
+ $('network-ssh-search').replaceChildren(networkSSHSearchActions(item));
  networkFields('network-fields',[
   ['标题',item.title],['来源',item.source_id],['源 IP → 目的 IP',`${item.src_ip} → ${item.dst_ip}`],
   ['日志显示时段',`${when(item.first_seen)} — ${when(item.last_seen)}`],['版本',`${item.revision} · ${when(item.updated_at)}`],
@@ -117,7 +118,7 @@ async function loadNetworkEvidence(page=1){
 async function showNetworkIncident(identity,revision=null){
  const dialog=$('network-dialog');if(!dialog.open){networkReturnFocus=document.activeElement;setNetworkDetailTab('overview');if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','');}
  const request=++networkDetailRequest;++networkEvidenceRequest;networkDetail=null;networkEvidencePage=networkEvidencePages=1;networkEvidenceLoading=false;networkEvidenceAvailable=false;
- for(const id of ['network-fields','network-provenance','network-evidence'])$(id).replaceChildren();for(const id of ['network-revision','network-evidence-page','network-evidence-status'])text(id,'');
+ for(const id of ['network-fields','network-provenance','network-evidence','network-ssh-search'])$(id).replaceChildren();for(const id of ['network-revision','network-evidence-page','network-evidence-status'])text(id,'');
  for(const id of ['network-revision-prev','network-revision-next','network-current'])$(id).disabled=true;networkEvidencePager();text('network-detail-status','正在读取网络事件版本…');
  try{
   const path='/api/network/incidents/'+encodeURIComponent(identity),latest=await get(path);if(request!==networkDetailRequest)return;

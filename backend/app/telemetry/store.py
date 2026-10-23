@@ -32,6 +32,32 @@ _SNAPSHOT_COUNT_TAIL_LIMIT = 10_000
 # A daily expiry backlog must not hold the batch ACK's write lock unboundedly.
 _INGEST_CLEANUP_LIMIT = 1000
 _SLOW_TRANSACTION_SECONDS = 2
+# Only explicit operator searches use this cooperative SQL-work budget. Default
+# cached pages, ingestion and maintenance keep their existing connection policy.
+_SEARCH_DEADLINE_SECONDS = 5.0
+_SEARCH_LOCK_WAIT_SECONDS = 0.25
+_SEARCH_PROGRESS_STEPS = 1000
+_search_now = time.monotonic
+
+
+class SearchQueryUnavailable(RuntimeError):
+    """A filtered read exhausted its deadline or could not acquire a DB lock."""
+
+
+class _SearchConnection(sqlite3.Connection):
+    search_deadline: float | None = None
+
+    def check_search_deadline(self) -> None:
+        if self.search_deadline is not None and _search_now() >= self.search_deadline:
+            raise SearchQueryUnavailable("Filtered search is temporarily unavailable")
+
+    def execute(self, *args, **kwargs):
+        # The progress callback bounds long statements; this check also catches
+        # sequences of small count/item/facet reads below the callback interval.
+        self.check_search_deadline()
+        return super().execute(*args, **kwargs)
+
+
 logger = logging.getLogger(__name__)
 _SSH_PREFIX = re.compile(
     r"^(?:\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\S+\s+)?"
@@ -210,6 +236,10 @@ class TelemetryStore:
                     ON incidents(last_ts DESC, incident_id) WHERE status!='merged';
                 CREATE INDEX IF NOT EXISTS incidents_source_paging
                     ON incidents(source_id, last_ts DESC, incident_id) WHERE status!='merged';
+                -- Across-source IP pivots must seek directly to a peer rather
+                -- than scan every incident; raw events/evidence are untouched.
+                CREATE INDEX IF NOT EXISTS incidents_ip_paging
+                    ON incidents(src_ip, last_ts DESC, incident_id, first_ts) WHERE status!='merged';
                 CREATE TABLE IF NOT EXISTS incident_evidence (
                     source_id TEXT NOT NULL, event_id TEXT NOT NULL,
                     incident_id TEXT NOT NULL REFERENCES incidents(incident_id),
@@ -268,12 +298,17 @@ class TelemetryStore:
 
     @contextmanager
     def _connection(self, *, write: bool = False, transaction: bool = True,
-                    operation: str = "telemetry") -> Iterator[sqlite3.Connection]:
+                    operation: str = "telemetry", search: bool = False) -> Iterator[sqlite3.Connection]:
         started = time.monotonic()
         ready = worked = None
         outcome = "failed"
-        db = sqlite3.connect(self.path, timeout=30, isolation_level=None)
+        deadline = _search_now() + _SEARCH_DEADLINE_SECONDS if search else None
+        db = sqlite3.connect(self.path, timeout=_SEARCH_LOCK_WAIT_SECONDS if search else 30,
+                             isolation_level=None, factory=_SearchConnection if search else sqlite3.Connection)
         db.row_factory = sqlite3.Row
+        if search:
+            db.search_deadline = deadline
+            db.set_progress_handler(lambda: int(_search_now() >= deadline), _SEARCH_PROGRESS_STEPS)
         try:
             db.execute("PRAGMA foreign_keys=ON")
             db.execute("PRAGMA synchronous=FULL")
@@ -284,14 +319,27 @@ class TelemetryStore:
                 yield db
             finally:
                 worked = time.monotonic()
+            if search:
+                db.check_search_deadline()
             if transaction:
                 db.commit()
             outcome = "ok"
-        except BaseException:
+        except BaseException as exc:
+            # An expired callback must not interrupt rollback/cleanup, and no
+            # connection is shared with the collector or a subsequent request.
+            if search:
+                db.set_progress_handler(None, 0)
+                db.search_deadline = None
             if transaction:
                 db.rollback()
+            if search and isinstance(exc, sqlite3.OperationalError) and (getattr(exc, "sqlite_errorcode", 0) & 255) in (
+                    sqlite3.SQLITE_INTERRUPT, sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED):
+                raise SearchQueryUnavailable("Filtered search is temporarily unavailable") from None
             raise
         finally:
+            if search:
+                db.set_progress_handler(None, 0)
+                db.search_deadline = None
             db.close()
             finished = time.monotonic()
             if finished - started >= _SLOW_TRANSACTION_SECONDS:
@@ -657,35 +705,55 @@ class TelemetryStore:
 
     def list_events(self, source_id: str | None = None, limit: int = 100, offset: int = 0, **filters) -> list[dict[str, Any]]:
         self._page(limit, offset)
-        with self._connection() as db:
+        with self._connection(search=self._has_search(filters)) as db:
             return self._events(db, source_id, limit, offset, **filters)
+
+    @staticmethod
+    def _has_search(filters: dict) -> bool:
+        return any(filters.get(key) is not None for key in ("ip", "start", "end", "username", "event_type", "q"))
+
+    @staticmethod
+    def _search_ip(value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str) or not value or len(value) > 64 or "%" in value:
+            raise ValueError("Search requires a complete IP without a zone identifier")
+        return str(ipaddress.ip_address(value))
+
+    @staticmethod
+    def _search_times(start: str | None, end: str | None) -> tuple[float | None, float | None]:
+        times = []
+        for value in (start, end):
+            if value is None:
+                times.append(None)
+                continue
+            if not isinstance(value, str) or not value or len(value) > 64:
+                raise ValueError("Invalid search time")
+            moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if moment.tzinfo is None or moment.utcoffset() is None:
+                raise ValueError("Search time requires timezone")
+            times.append(moment.timestamp())
+        if times[0] is not None and times[1] is not None and times[0] > times[1]:
+            raise ValueError("Search start must precede end")
+        return times[0], times[1]
 
     @staticmethod
     def _event_filter(source_id=None, *, ip=None, username=None, event_type=None,
                       q=None, start=None, end=None, snapshot=None):
         clauses, params = [], []
+        ip = TelemetryStore._search_ip(ip)
+        start_ts, end_ts = TelemetryStore._search_times(start, end)
         for column, value in (("source_id", source_id), ("src_ip", ip),
                               ("ssh_user", username), ("event_type", event_type)):
             if value is not None:
                 if not isinstance(value, str) or not value or len(value) > 256:
                     raise ValueError("Invalid search value")
-                if column == "src_ip":
-                    address = ipaddress.ip_address(value)
-                    value = str(address)
                 clauses.append(column + "=?")
                 params.append(value)
-        times = []
-        for column, value, operator in (("event_ts", start, ">="), ("event_ts", end, "<=")):
+        for value, operator in ((start_ts, ">="), (end_ts, "<=")):
             if value is not None:
-                moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
-                if moment.tzinfo is None:
-                    raise ValueError("Search time requires timezone")
-                stamp = moment.timestamp()
-                clauses.append(column + operator + "?")
-                params.append(stamp)
-                times.append(stamp)
-        if len(times) == 2 and times[0] > times[1]:
-            raise ValueError("Search start must precede end")
+                clauses.append("event_ts" + operator + "?")
+                params.append(value)
         if q is not None:
             if not isinstance(q, str) or not 1 <= len(q) <= 256:
                 raise ValueError("Invalid keyword")
@@ -729,7 +797,7 @@ class TelemetryStore:
         # which is expensive to read cold despite having fewer indexed columns.
         plain_count = all(value is None for name, value in filters.items() if name != "snapshot")
         count_table = "events INDEXED BY events_detection" if plain_count else "events"
-        with self._connection(operation="event_page") as db:
+        with self._connection(operation="event_page", search=self._has_search(filters)) as db:
             # This first read pins the transaction for both counts and items.
             # Receipts outlive raw retention and append monotonically, including
             # arrivals whose event timestamps are older than this view.
@@ -773,8 +841,9 @@ class TelemetryStore:
     def _incidents(self, db: sqlite3.Connection, source_id: str | None,
                    limit: int, offset: int, *, include_evidence: bool = True,
                    incident_id: str | None = None, triage: str | None = None,
-                   focus: str = "all", sort: str = "recent") -> list[dict[str, Any]]:
-        where, params = self._incident_filter(source_id, triage, focus)
+                   focus: str = "all", sort: str = "recent", ip: str | None = None,
+                   start: str | None = None, end: str | None = None) -> list[dict[str, Any]]:
+        where, params = self._incident_filter(source_id, triage, focus, ip=ip, start=start, end=end)
         order = self._incident_order(sort)
         if incident_id is not None:
             where += " AND incidents.incident_id=?"
@@ -809,10 +878,27 @@ class TelemetryStore:
 
     @staticmethod
     def _incident_filter(source_id: str | None, triage: str | None = None,
-                         focus: str = "all") -> tuple[str, tuple]:
+                         focus: str = "all", *, ip: str | None = None,
+                         start: str | None = None, end: str | None = None) -> tuple[str, tuple]:
         where, params = "", ()
+        peer = TelemetryStore._search_ip(ip)
+        start_ts, end_ts = TelemetryStore._search_times(start, end)
+        if peer is not None:
+            where += " AND incidents.src_ip=?"
+            params += (peer,)
+        # Match a retained evidence interval that intersects the query window,
+        # including either boundary; do not filter by processing/triage times.
+        for column, value, operator in (("last_ts", start_ts, ">="), ("first_ts", end_ts, "<=")):
+            if value is not None:
+                where += " AND incidents." + column + operator + "?"
+                params += (value,)
         if source_id is not None:
-            where += " AND (incidents.source_id=? OR incidents.incident_id IN (SELECT incident_id FROM incident_sources WHERE source_id=?))"
+            if peer is not None:
+                # With a selective peer seek, check each matching incident's
+                # membership instead of materializing a source's whole history.
+                where += " AND (incidents.source_id=? OR EXISTS (SELECT 1 FROM incident_sources WHERE incident_id=incidents.incident_id AND source_id=?))"
+            else:
+                where += " AND (incidents.source_id=? OR incidents.incident_id IN (SELECT incident_id FROM incident_sources WHERE source_id=?))"
             params += (source_id, source_id)
         if triage is not None and triage != "all":
             if triage not in TRIAGE_STATES:
@@ -840,8 +926,8 @@ class TelemetryStore:
                 if sort == "score" else recent)
 
     def _score_counts(self, db: sqlite3.Connection, source_id: str | None,
-                      triage: str | None) -> dict[str, int]:
-        where, params = self._incident_filter(source_id, triage)
+                      triage: str | None, **search) -> dict[str, int]:
+        where, params = self._incident_filter(source_id, triage, **search)
         counts = {"attention": 0, "low": 0, "unscored": 0, "total": 0}
         for state, count in db.execute(f"""SELECT CASE
             WHEN incident_scores.incident_id IS NULL THEN 'unscored'
@@ -855,8 +941,8 @@ class TelemetryStore:
         with self._connection() as db:
             return db.execute("SELECT count(*) FROM incidents WHERE status!='merged'").fetchone()[0]
 
-    def _triage_counts(self, db: sqlite3.Connection, source_id: str | None) -> dict[str, int]:
-        where, params = self._incident_filter(source_id)
+    def _triage_counts(self, db: sqlite3.Connection, source_id: str | None, **search) -> dict[str, int]:
+        where, params = self._incident_filter(source_id, **search)
         counts = {state: 0 for state in TRIAGE_STATES}
         for state, total in db.execute(f"""SELECT {_TRIAGE_STATE} AS state,count(*) {_INCIDENT_FROM}
                 WHERE incidents.status!='merged' {where} GROUP BY state""", params):
@@ -1018,23 +1104,29 @@ class TelemetryStore:
                     "incident_id": canonical, "requested_incident_id": incident_id}
 
     def list_incidents(self, source_id: str | None = None, limit: int = 100, offset: int = 0,
-                       triage: str | None = None, *, focus: str = "all", sort: str = "recent") -> list[dict[str, Any]]:
+                       triage: str | None = None, *, focus: str = "all", sort: str = "recent",
+                       ip: str | None = None, start: str | None = None,
+                       end: str | None = None) -> list[dict[str, Any]]:
         self._page(limit, offset)
-        with self._connection() as db:
-            return self._incidents(db, source_id, limit, offset, triage=triage, focus=focus, sort=sort)
+        with self._connection(search=self._has_search({"ip": ip, "start": start, "end": end})) as db:
+            return self._incidents(db, source_id, limit, offset, triage=triage, focus=focus, sort=sort,
+                                   ip=ip, start=start, end=end)
 
     def paginate_incidents(self, source_id: str | None = None, limit: int = 100,
                            page: int = 1, *, include_evidence: bool = True,
-                           triage: str | None = None, focus: str = "all", sort: str = "recent") -> dict[str, Any]:
+                           triage: str | None = None, focus: str = "all", sort: str = "recent",
+                           ip: str | None = None, start: str | None = None,
+                           end: str | None = None) -> dict[str, Any]:
         self._page_number(limit, page)
-        where, params = self._incident_filter(source_id, triage, focus)
-        with self._connection(operation="incident_page") as db:
+        search = {"ip": ip, "start": start, "end": end}
+        where, params = self._incident_filter(source_id, triage, focus, **search)
+        with self._connection(operation="incident_page", search=self._has_search(search)) as db:
             total = db.execute(f"SELECT count(*) {_INCIDENT_FROM} WHERE incidents.status!='merged' {where}", params).fetchone()[0]
             pagination = self._pagination(total, limit, page)
             return {"items": self._incidents(db, source_id, limit, pagination["offset"],
-                                             include_evidence=include_evidence, triage=triage, focus=focus, sort=sort),
-                    **pagination, "triage": triage or "all", "triage_counts": self._triage_counts(db, source_id),
-                    "focus": focus, "sort": sort, "score_counts": self._score_counts(db, source_id, triage)}
+                                             include_evidence=include_evidence, triage=triage, focus=focus, sort=sort, **search),
+                    **pagination, "triage": triage or "all", "triage_counts": self._triage_counts(db, source_id, **search),
+                    "focus": focus, "sort": sort, "score_counts": self._score_counts(db, source_id, triage, **search)}
 
     def list_sources(self, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
         self._page(limit, offset)

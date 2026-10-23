@@ -94,3 +94,61 @@ restored backwards for a UI/cache rollback.
 
 For summary-cache compatibility, warming responses and release acceptance, see
 [live stability](production-stability.md#prepared-summaries).
+
+## Search an observed source IP
+
+SSH alerts and logs each have a visible exact-IP search form above their table.
+The server validates complete IPv4/IPv6 addresses, canonicalizes equivalent
+representations and rejects CIDR or scoped addresses. Manual submissions default
+to a fixed last-24-hours window. Custom local times and **全部保留时间** are
+available; the applied IP, source, time window and disposition scope are displayed
+beside the form. The default unsearched overview keeps its existing all-retained
+pending-alert behavior. Search does not exclude protected management addresses.
+
+Network incident rows and versioned details provide **查 SSH 告警** and **查 SSH
+日志**. These query the observed source IP across all SSH sources, from 30 minutes
+before the first network evidence to 30 minutes after its last evidence. They
+clear unrelated account/message filters and select all alert dispositions and
+scores, including resolved incidents. They do not infer that a network source ID
+is an SSH source ID, geolocate the address, submit AI work or execute a response.
+Matching an IP alone does not establish a cross-protocol incident or identity.
+
+Alert matching uses evidence-interval overlap with the chosen window; logs use
+individual event times. Result totals and rows use identical filters with
+server-side pagination. Disposition facets share IP/time/source conditions but
+span dispositions; score facets also honor the disposition choice while spanning
+score categories. The browser does not download every page or filter only visible rows.
+IP/time filters participate in the request identity and saved view. They exclude
+the prepared default cache; stale requests and failed new queries cannot relabel
+older IP results. Query changes reset the page and log receipt boundary. Refresh,
+page navigation and **获取最新日志** preserve the applied fixed time window; submit
+**最近 24 小时** again to move that window to the current time. A new browser visit
+retains search fields but starts a new log snapshot on page one.
+
+Coverage notes distinguish unconfigured sources, known collection gaps and
+unknown coverage. Actual retained-history boundaries are currently unknown to
+this view and are labelled accordingly; configured retention days are not a
+promise that every event is present. No matches do not establish safety or absence
+of activity. Log account/type/message filters remain in expandable advanced
+options. Network/HTTP native-IP search and joint-case correlation are separate
+future increments.
+
+### Search resource and rollout boundary
+
+Explicitly filtered SSH reads share a five-second cooperative SQL deadline across
+one page's count, rows and facets, with a 250 ms SQLite lock wait. Progress checks
+run every 1,000 VM instructions and between statements. Expiry or lock contention
+returns a sanitized HTTP 503 with a retry/narrow-range message and no partial
+success; subsequent reads and ingestion use fresh connections. This is not a
+hard operating-system or storage-I/O deadline. Source/status-only default reads,
+prepared-cache construction, ingestion and maintenance retain their existing
+policies. The combined dashboard endpoint may perform separate filtered page
+reads; the budget is per store read, not an entire HTTP request SLA.
+
+A partial `incidents_ip_paging` index seeks across sources by IP and recent time.
+It is additive and leaves raw logs, retained evidence and receipts unchanged;
+older code can ignore it. First startup must build it if absent, which consumes
+space and may hold a database writer lock. Before deployment, measure the index
+build on an appropriate isolated copy, check headroom and backup/recovery scope,
+and verify readiness before returning collection to its normal schedule. No
+production migration or timing guarantee is established by the synthetic tests.
