@@ -248,7 +248,9 @@ def test_vacuum_between_exact_cursor_check_and_read_discards_untrusted_page(conf
 def test_exited_parent_cannot_leave_stdout_holding_child_past_deadline():
     command = [sys.executable, '-c',
                'import os,time\npid=os.fork()\nif pid:\n print(pid,flush=True)\n os._exit(0)\ntime.sleep(30)']
-    chunks = exporter.command_chunks(command, deadline=time.monotonic() + .2, maximum=1024)
+    # Give the interpreter time to start on a busy runner; the assertion tests
+    # descendant cleanup at the deadline, not Python startup within 200 ms.
+    chunks = exporter.command_chunks(command, deadline=time.monotonic() + 2, maximum=1024)
     child_pid = int(next(chunks).strip())
     try:
         with pytest.raises(exporter.ExportError, match='subprocess_deadline'):
