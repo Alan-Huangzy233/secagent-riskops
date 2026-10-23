@@ -146,6 +146,11 @@ that observation limit. This is neither complete traffic visibility nor a claim
 about the final verdict of an unobserved packet. Native UDP observations remain
 excluded from the inbound TCP rule.
 
+Timeout-backed and unlisted blocklists remain bound. Their membership, expiry
+or rule changes still require review. Include other automatic bans and manual
+control operations in source acceptance; this policy does not cover every kind
+of dynamic firewall state.
+
 ## Quiet journals
 
 A fixed filtered journal query may return exit status 1 without stdout or stderr

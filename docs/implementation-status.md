@@ -204,7 +204,7 @@ continue network #120 before Linux host behavior #121.
   reference sets in `backend/app/reference.py`.
 
 
-### Network enrollment preparation (review pending)
+### Network enrollment and source acceptance
 
 The [enrollment guide](network-enrollment.md) covers opt-in full-firewall guards,
 restricted native-prefix observations, explicit network/console/collector paired

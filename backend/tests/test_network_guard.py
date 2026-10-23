@@ -163,7 +163,8 @@ def test_every_reference_and_definition_is_reviewed_fail_closed(change):
         rule['expr'].insert(0, deepcopy(rule['expr'][1]))
     elif change == 'two_selected_sets':
         items.append({'set': {'family': 'inet', 'table': 'synthetic', 'name': 'second', 'type': 'ipv4_addr'}})
-        second = deepcopy(rule['expr'][1]); second['match']['right'] = '@second'
+        second = deepcopy(rule['expr'][1])
+        second['match']['right'] = '@second'
         rule['expr'].insert(0, second)
         identities += ('inet/synthetic/second',)
     elif change == 'unknown_rule_field':
