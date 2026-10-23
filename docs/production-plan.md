@@ -1,10 +1,13 @@
 # Production plan and issue tracking
 
-Updated 2026-10-20. Further demo work is paused while development focuses on the
+GitHub tracking index: [#170](https://github.com/Alan-Huangzy233/secagent-riskops/issues/170).
+
+Updated 2026-10-23. Further demo work is paused while development focuses on the
 independent telemetry pilot. This is a plan, not a statement that the features
 below are implemented or deployed. See [implementation status](./implementation-status.md).
 Historical issue-seeding files in `docs/process/` are provenance, not a live
-copy of GitHub.
+copy of GitHub. The [complete known-work inventory](backlog.md) links active,
+deferred and exploratory requirements to current issue owners.
 
 ## Baseline and active work
 
@@ -41,11 +44,11 @@ live HTTP coverage or remote/whole-host recovery.
 
 | Work | Issue | Acceptance boundary |
 | --- | --- | --- |
-| First-pass model comparison | [#117](https://github.com/Alan-Huangzy233/secagent-riskops/issues/117) | Reproducible labelled comparison and justified selection, or an explicit no-winner result |
-| Durable production AI | [#118](https://github.com/Alan-Huangzy233/secagent-riskops/issues/118) | Redacted summaries, persistent jobs/budgets, versioned results and offline acceptance; real-provider pilot is a later gate |
+| Broader model qualification (initial comparison delivered) | [#117](https://github.com/Alan-Huangzy233/secagent-riskops/issues/117) | Broader independent and pilot qualification beyond the delivered frozen comparison |
+| Durable AI (manual SSH workflow delivered) | [#118](https://github.com/Alan-Huangzy233/secagent-riskops/issues/118) | Additional live evidence adapters and operational acceptance; SSH manual pilot is active |
 | AI result validation | [#10](https://github.com/Alan-Huangzy233/secagent-riskops/issues/10) | Recorded schema/evidence validation, overclaiming and unsafe-dismissal checks, explicit review/failure states |
 | HTTP collection and integration | [#119](https://github.com/Alan-Huangzy233/secagent-riskops/issues/119) | Durable collection, evidence, event-appropriate scoring and console notifications; real-source acceptance before activation |
-| First network source | [#120](https://github.com/Alan-Huangzy233/secagent-riskops/issues/120) | A real observation point and a small validated connection/DNS/firewall rule set |
+| Sustained network source acceptance | [#120](https://github.com/Alan-Huangzy233/secagent-riskops/issues/120) | Initial passive sources enrolled; sustained coverage/resource acceptance and safe receipt governance remain |
 | Linux host behavior | [#121](https://github.com/Alan-Huangzy233/secagent-riskops/issues/121) | Source-backed rules for a selected subset of sudo, account/privilege, service or scheduled-task activity |
 
 [Tabbed views and a server-prepared first page](console-workspace.md) have
@@ -53,19 +56,32 @@ shipped, alongside the bounded [manual AI workflow](manual-ai-triage.md).
 The [online-AI proposal](online-ai-pilot.md) records the rollout constraints;
 automatic calls and broader outgoing fields are not implied by the manual pilot.
 Detection expands in order: **Web → network → Linux host behavior**.
-The next increment is #120's [first network source](network-source-plan.md):
-an existing UFW kernel journal, source-specific collection and a small inbound
-rule. The [offline parser and rule](network-detection.md) have synthetic tests;
-the [durable transport/storage foundation](network-ingestion.md) is merged and
-disabled by default. [Continuous analysis and console integration](network-analysis.md)
-are merged. [Enrollment preparation](network-enrollment.md) adds full-firewall
-guards, native observations, paired recovery, capacity warnings and a synthetic
-workload exercise for review. Quiet-journal handling and an explicit, narrowly
-validated dynamic terminal-set guard address source-acceptance boundaries.
-These additions do not enable any source by themselves. Per-source passive acceptance and sustained
-capacity calibration remain required. HTTP's missing business
-source does not block this engineering work. Linux #121 follows the network
-increment; offline fixtures never establish live coverage.
+The network foundation (#120) is now enrolled in the maintained deployment:
+reviewed passive sources, durable delivery, one inbound TCP rule, retained
+incidents and console notices. Narrow UDP observations and empty heartbeats
+have explicit coverage limits. Repository defaults remain off. Sustained
+operation and long-term receipt/capacity work continue in #120 and
+[#152](https://github.com/Alan-Huangzy233/secagent-riskops/issues/152); new rule families belong to [#151](https://github.com/Alan-Huangzy233/secagent-riskops/issues/151).
+
+The immediate sequence is [#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145) (visible IP search and network→SSH
+pivots), [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147) (joint evidence cases), then [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148)
+(manual joint AI). Grouped cross-type search [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) ships in
+bounded increments; its raw-log index/migration work does not block retained-case
+correlation. Linux #121 source inventory can run alongside these steps and does
+not wait for paid AI approval. HTTP real-source acceptance still waits for an
+available business service. Automatic analysis [#149](https://github.com/Alan-Huangzy233/secagent-riskops/issues/149) and
+automatic response [#150](https://github.com/Alan-Huangzy233/secagent-riskops/issues/150) remain separate later stages.
+
+## Full backlog reconciliation, 2026-10-23
+
+The [known-work inventory](backlog.md) restores unfinished production scope that
+older issues closed during demo scoping. It includes formal runtime/evidence and
+identity, product SOC/UI, GRC, knowledge/intelligence/upload, authorized validation,
+real executors, whole-workflow acceptance and training-lab exploration. Operational
+capacity, recovery/key lifecycle, external transports, richer briefings and ongoing
+repository/dependency maintenance also have owners. Existing #10, #73 and #117–#121
+are updated with delivered foundations and remaining acceptance; #105 stays paused.
+No old demo completion is silently reopened or counted as a finished product.
 
 ## Model comparison
 
@@ -125,10 +141,11 @@ fields; planning this comparison does not enable or fund API calls.
    it. Automatic analysis does not grant automatic dismissal, blocking or
    remediation execution.
 
-Issue #10 owns validation; #118 owns workflow/storage/UI integration. A second
+Issue #10 owns validation; #118 owns workflow/storage/UI integration. Network/joint
+dossiers are tracked separately in [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148). A second
 paid model is optional after evidence of need. Full correction-to-knowledge
 promotion remains later work in
-[#87](https://github.com/Alan-Huangzy233/secagent-riskops/issues/87).
+[#161](https://github.com/Alan-Huangzy233/secagent-riskops/issues/161) (follow-up to historical #87).
 
 ## Detection stages
 
@@ -153,7 +170,7 @@ connection. The [source plan](network-source-plan.md) defines the chosen scope,
 delivery order, resource gates and false-positive cases. Private host identities,
 addresses, routing and raw production samples remain outside the public repo.
 
-## Issue audit, 2026-09-29
+## Historical issue audit, 2026-09-29
 
 The audit inventoried all 91 existing issues and checked all 11 open items'
 acceptance criteria and discussions against main and merged PRs. Nine are closed
