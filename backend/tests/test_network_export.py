@@ -248,7 +248,9 @@ def test_vacuum_between_exact_cursor_check_and_read_discards_untrusted_page(conf
 def test_exited_parent_cannot_leave_stdout_holding_child_past_deadline():
     command = [sys.executable, '-c',
                'import os,time\npid=os.fork()\nif pid:\n print(pid,flush=True)\n os._exit(0)\ntime.sleep(30)']
-    chunks = exporter.command_chunks(command, deadline=time.monotonic() + .2, maximum=1024)
+    # Give the interpreter time to start on a busy runner; the assertion tests
+    # descendant cleanup at the deadline, not Python startup within 200 ms.
+    chunks = exporter.command_chunks(command, deadline=time.monotonic() + 2, maximum=1024)
     child_pid = int(next(chunks).strip())
     try:
         with pytest.raises(exporter.ExportError, match='subprocess_deadline'):
@@ -394,3 +396,197 @@ def test_full_guard_failure_never_releases_page(config, on_second):
     with pytest.raises(exporter.ExportError, match='firewall_guard_snapshot_failed'):
         page(config, [record()], cursor='previous', rules=rules)
     assert len(calls) == (2 if on_second else 1)
+
+
+def terminal_config(config):
+    config = strong_config(config)
+    config['profile'].update(guard_version='netfilter-terminal-v2',
+                             dynamic_terminal_sets=['inet/synthetic/denied_sources'])
+    return config
+
+
+def test_terminal_export_binds_allowlist_to_both_checks_and_validity(config, monkeypatch):
+    config = terminal_config(config)
+    calls = []
+    def rules(**kwargs):
+        calls.append(kwargs)
+        return 'a' * 64
+    result = page(config, [record()], rules=rules)
+    assert len(calls) == 2 and calls[0] == calls[1]
+    assert calls[0]['guard_version'] == 'netfilter-terminal-v2'
+    assert calls[0]['dynamic_terminal_sets'] == ('inet/synthetic/denied_sources',)
+    event = result['entries'][0]['event']
+    assert event['parser_version'] == 'netfilter-kernel-v3' and 'dynamic_terminal_filtering' in event['coverage']
+    config['profile_valid_from_us'] += 1
+    with pytest.raises(exporter.ExportError, match='profile_validity_mismatch'):
+        page(config, rules=rules)
+    monkeypatch.setattr(exporter, 'secure_file', lambda *a, **k: encode(config))
+    with pytest.raises(exporter.ExportError, match='invalid_export_config'):
+        exporter.load_config()
+
+
+@pytest.mark.parametrize('on_second', [False, True])
+@pytest.mark.parametrize('failure', ['unsafe_dynamic_terminal_set', 'firewall_guard_tool_unavailable',
+                                   'subprocess_deadline', 'invalid_nft_rules_snapshot'])
+def test_terminal_review_failure_never_releases_partial_page(config, on_second, failure):
+    config = terminal_config(config)
+    calls = []
+    def rules(**kwargs):
+        calls.append(True)
+        if not on_second or len(calls) == 2:
+            raise exporter.ExportError(failure)
+        return 'a' * 64
+    with pytest.raises(exporter.ExportError, match=failure):
+        page(config, [record()], rules=rules)
+    assert len(calls) == (2 if on_second else 1)
+
+
+def test_terminal_guard_only_unbinds_reviewed_members_across_all_seven_fixed_views(monkeypatch):
+    from copy import deepcopy
+    from test_network_guard import snapshot, IDENTITIES
+    monkeypatch.setattr(exporter.os, 'access', lambda *a: True)
+    items = snapshot()
+    def nft(items):
+        return encode({'nftables': [{'metainfo': {'json_schema_version': 1}}, *items]})
+    outputs = {name: (nft(items) if name == 'nft' else b'*filter\n:INPUT ACCEPT [0:0]\nCOMMIT\n')
+               for name, _ in exporter.FULL_RULE_COMMANDS}
+    calls = []
+    def run(command, **limits):
+        calls.append(command)
+        assert limits['maximum'] == 4 * 1024 * 1024
+        assert limits['deadline'] <= time.monotonic() + 2
+        return outputs[next(name for name, fixed in exporter.FULL_RULE_COMMANDS if list(fixed) == command)]
+    def digest(**kwargs):
+        return exporter.ruleset_fingerprint(deadline=time.monotonic() + 10, run=run,
+                                            guard_version='netfilter-terminal-v2', dynamic_terminal_sets=IDENTITIES, **kwargs)
+    baseline = digest()
+    assert calls == [list(command) for _, command in exporter.FULL_RULE_COMMANDS]
+    changed = deepcopy(items)
+    changed[2]['set']['elem'] = ['198.51.100.45', '203.0.113.9']
+    outputs['nft'] = nft(changed)
+    assert digest() == baseline
+    outputs['nft'] = nft(items)
+    full_before = exporter.ruleset_fingerprint(deadline=time.monotonic() + 10, run=run, guard_version='netfilter-full-v1')
+    outputs['nft'] = nft(changed)
+    assert exporter.ruleset_fingerprint(deadline=time.monotonic() + 10, run=run, guard_version='netfilter-full-v1') != full_before
+    assert baseline != full_before
+    outputs['nft'] = nft(items)
+    for name, _ in exporter.FULL_RULE_COMMANDS:
+        old = outputs[name]
+        changed = deepcopy(items)
+        changed[4]['rule']['expr'][0]['log']['prefix'] = '[CHANGED]'
+        outputs[name] = nft(changed) if name == 'nft' else old.replace(b'ACCEPT', b'DROP')
+        assert digest() != baseline
+        outputs[name] = old
+    changed = deepcopy(items)
+    changed[3]['rule']['expr'].insert(1, {'log': {'prefix': '[UNSAFE]'}})
+    outputs['nft'] = nft(changed)
+    with pytest.raises(exporter.ExportError, match='unsafe_dynamic_terminal_set'):
+        digest()
+    outputs['nft'] = nft(items)
+    monkeypatch.setattr(exporter.os, 'access', lambda *a: False)
+    with pytest.raises(exporter.ExportError, match='firewall_guard_tool_unavailable'):
+        digest()
+
+
+@pytest.mark.parametrize('guard', ['iptables-v1', 'netfilter-full-v1'])
+def test_older_guard_cannot_silently_ignore_a_dynamic_allowlist(guard):
+    with pytest.raises(exporter.ExportError, match='unsafe_dynamic_terminal_set'):
+        exporter.ruleset_fingerprint(deadline=time.monotonic() + 2, guard_version=guard,
+                                     dynamic_terminal_sets=('inet/synthetic/denied_sources',))
+
+
+def fake_journal_process(tmp_path, monkeypatch, program):
+    """Run a real bounded child while keeping the production journal argv."""
+    fake = tmp_path / 'fake-journalctl'
+    fake.write_text('#!' + sys.executable + '\n' + program + '\n')
+    fake.chmod(0o700)
+    popen = exporter.subprocess.Popen
+    calls = []
+    def launch(command, **kwargs):
+        assert tuple(command[:len(exporter.JOURNAL_COMMAND_PREFIX)]) == exporter.JOURNAL_COMMAND_PREFIX
+        calls.append(command)
+        return popen([str(fake), *command[1:]], **kwargs)
+    monkeypatch.setattr(exporter.subprocess, 'Popen', launch)
+    return calls
+
+
+@pytest.mark.parametrize('status', [0, 1])
+def test_empty_filtered_journal_is_a_valid_first_and_repeated_heartbeat(config, tmp_path, monkeypatch, status):
+    config = strong_config(config)
+    calls = fake_journal_process(tmp_path, monkeypatch, f'raise SystemExit({status})')
+    guards = []
+    def rules(**kwargs):
+        guards.append(kwargs['guard_version'])
+        return 'a' * 64
+    for cursor in (None, None, 'previous', 'previous'):
+        result = page(config, cursor=cursor, read=exporter.journal_records, rules=rules)
+        assert result['entries'] == [] and result['caught_up']
+        assert result['cursor_before'] == result['cursor_after'] == cursor
+        assert result['reports'] == ([] if cursor else ['coverage_start', 'profile_boundary'])
+    assert len(calls) == 4 and guards == ['netfilter-full-v1'] * 8
+
+
+@pytest.mark.parametrize('status, stdout, stderr, reason', [
+    (2, b'', b'', 'subprocess_failed'),
+    (1, b'', b'synthetic private diagnostic', 'subprocess_failed'),
+    (0, b'', b'synthetic private diagnostic', 'subprocess_failed'),
+    (1, encode(record()) + b'\n', b'', 'subprocess_failed'),
+    (1, encode(record()), b'', 'subprocess_failed'),
+    (0, encode(record()), b'', 'partial_journal_line'),
+    (1, b'-- No entries --\n', b'', 'invalid_json'),
+])
+def test_real_journal_child_errors_and_truncation_never_become_empty_pages(
+        config, tmp_path, monkeypatch, capsys, status, stdout, stderr, reason):
+    program = ('import os\n'
+               f'os.write(1, {stdout!r})\nos.write(2, {stderr!r})\n'
+               f'raise SystemExit({status})')
+    fake_journal_process(tmp_path, monkeypatch, program)
+    with pytest.raises(exporter.ExportError, match='^' + reason + '$') as error:
+        page(config, cursor='previous', read=exporter.journal_records)
+    assert str(error.value) == reason
+    captured = capsys.readouterr()
+    assert captured.out == captured.err == ''
+
+
+def test_real_journal_child_successful_records_are_still_normalized(config, tmp_path, monkeypatch):
+    fake_journal_process(tmp_path, monkeypatch,
+        f'import os\nos.write(1, {encode(record()) + bytes([10])!r})')
+    result = page(config, cursor='previous', read=exporter.journal_records)
+    assert result['caught_up'] and len(result['entries']) == 1
+    assert result['cursor_after'] == 'opaque-cursor-0'
+    assert b'MESSAGE' not in encode(result)
+
+
+def test_real_journal_stderr_is_bounded_and_not_printed(config, tmp_path, monkeypatch, capsys):
+    fake_journal_process(tmp_path, monkeypatch,
+        "import os\nos.write(2, b'x' * 32768)\nraise SystemExit(1)")
+    with pytest.raises(exporter.ExportError, match='^subprocess_output_limit$'):
+        page(config, cursor='previous', read=exporter.journal_records)
+    captured = capsys.readouterr()
+    assert captured.out == captured.err == ''
+
+
+def test_real_journal_child_with_no_exit_is_not_an_empty_result(tmp_path, monkeypatch):
+    fake_journal_process(tmp_path, monkeypatch, 'import time\ntime.sleep(30)')
+    command = exporter.journal_command(source_profile(), None, valid_cursor=False, since_us=NOW)
+    began = time.monotonic()
+    with pytest.raises(exporter.ExportError, match='^subprocess_deadline$'):
+        list(exporter.journal_records(command, deadline=began + .1))
+    assert time.monotonic() - began < 2
+
+
+def test_exit_one_remains_failure_for_general_commands_even_journal_argv(config, tmp_path, monkeypatch):
+    calls = fake_journal_process(tmp_path, monkeypatch, 'raise SystemExit(1)')
+    command = exporter.journal_command(source_profile(), None, valid_cursor=False, since_us=NOW)
+    with pytest.raises(exporter.ExportError, match='^subprocess_failed$'):
+        exporter.run_command(command, deadline=time.monotonic() + 2, maximum=1024)
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize('command', [['/usr/bin/ssh'], ['/usr/sbin/iptables-save'],
+    ['/usr/sbin/nft', '--json', 'list', 'ruleset'], ['/usr/bin/journalctl', '--quiet']])
+def test_empty_journal_exception_rejects_nonfixed_command_shapes(command):
+    with pytest.raises(exporter.ExportError, match='^invalid_journal_command$'):
+        list(exporter.command_chunks(command, deadline=time.monotonic() + 2,
+                                     maximum=1024, _empty_journal=True))

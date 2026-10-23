@@ -307,6 +307,7 @@ def test_legacy_profile_revision_remains_the_original_serialized_contract():
     old = asdict(profile())
     del old['guard_version']
     del old['profile_valid_from_us']
+    del old['dynamic_terminal_sets']
     for key in ('log_labels', 'ip_families', 'rejection_labels', 'local_input_labels', 'local_input_interfaces'):
         old[key] = sorted(old[key])
     # Golden digest from the merged pre-guard implementation, not recalculated
@@ -340,10 +341,13 @@ def test_guard_context_is_explicit_and_cannot_be_mixed_with_legacy(changes):
         profile(**changes)
 
 
-def test_native_prefix_preserves_observations_without_becoming_tcp_scan_evidence():
+@pytest.mark.parametrize('guard_version', ['netfilter-full-v1', 'netfilter-terminal-v2'])
+def test_native_prefix_preserves_observations_without_becoming_tcp_scan_evidence(guard_version):
     from app.telemetry.network_detection import detect_network
     enrolled = strong_profile(log_labels=('sample-observation:',), rejection_labels=(),
-                              local_input_labels=(), local_input_interfaces=())
+                              local_input_labels=(), local_input_interfaces=(), guard_version=guard_version,
+                              dynamic_terminal_sets=('inet/synthetic/denied_sources',)
+                              if guard_version == 'netfilter-terminal-v2' else ())
     events = []
     for i in range(12):
         message = record()['MESSAGE'].replace('[UFW BLOCK]', 'sample-observation:').replace('DPT=443', f'DPT={2000+i}')
@@ -370,3 +374,67 @@ def test_native_prefix_requires_strong_guard_and_cannot_be_attributed_or_rejecti
                    {'local_input_labels': ('sample:',), 'local_input_interfaces': ('eth0',)}):
         with pytest.raises(NetworkParseError):
             strong_profile(**(base | fields))
+
+
+def terminal_profile(**changes):
+    values = dict(guard_version='netfilter-terminal-v2',
+                  dynamic_terminal_sets=('inet/synthetic/denied_sources',))
+    values.update(changes)
+    return strong_profile(**values)
+
+
+def test_full_v1_profile_keeps_exact_persisted_revision_with_new_empty_field():
+    from app.telemetry.network_protocol import profile_from_dict
+    enrolled = strong_profile()
+    # Captured from merged143 before introducing the new field/version.
+    assert enrolled.revision == '315cf22530128c5374f320398359e815c2415990ae59682145bf1215e542da0f'
+    historical = asdict(enrolled)
+    del historical['dynamic_terminal_sets']
+    assert profile_from_dict(historical) == enrolled
+
+
+def test_terminal_policy_and_exact_sorted_allowlist_are_revision_bound():
+    enrolled = terminal_profile()
+    assert enrolled.revision != strong_profile().revision
+    assert replace(enrolled, dynamic_terminal_sets=('inet/synthetic/other',)).revision != enrolled.revision
+    two = replace(enrolled, dynamic_terminal_sets=('inet/synthetic/second', *enrolled.dynamic_terminal_sets))
+    assert two.revision == replace(two, dynamic_terminal_sets=tuple(reversed(two.dynamic_terminal_sets))).revision
+    event = parse_ufw(record(), profile=enrolled)
+    assert event.parser_version == 'netfilter-kernel-v3'
+    assert 'dynamic_terminal_filtering' in event.coverage
+    assert event.final_outcome == 'unknown'
+    validate_event(event)
+
+
+@pytest.mark.parametrize('guard,identities', [
+    ('iptables-v1', ('inet/synthetic/denied_sources',)),
+    ('netfilter-full-v1', ('inet/synthetic/denied_sources',)),
+    ('netfilter-terminal-v2', ()), ('netfilter-terminal-v2', []),
+    ('netfilter-terminal-v2', ('inet/synthetic/denied_sources',) * 2),
+    ('netfilter-terminal-v2', ('inet/synthetic/bad name',)),
+])
+def test_terminal_set_policy_is_explicit_and_cannot_be_used_in_older_modes(guard, identities):
+    with pytest.raises(NetworkParseError, match='invalid_dynamic_terminal_sets'):
+        profile(guard_version=guard, dynamic_terminal_sets=identities,
+                profile_valid_from_us=None if guard == 'iptables-v1' else 1789999999000000)
+
+
+@pytest.mark.parametrize('factory', [profile, strong_profile, terminal_profile])
+def test_normalized_event_requires_coverage_exactly_for_new_parser_even_with_recomputed_hash(factory):
+    from app.telemetry.network_parse import _content, _digest
+    event = parse_ufw(record(), profile=factory())
+    changed = replace(event, coverage=tuple(sorted(set(event.coverage) ^ {'dynamic_terminal_filtering'})))
+    changed = replace(changed, content_hash=_digest(_content(changed)))
+    with pytest.raises(NetworkParseError, match='inconsistent_event_coverage'):
+        validate_event(changed)
+
+
+def test_terminal_native_udp_stays_nonrejection_and_ineligible():
+    from app.telemetry.network_detection import detect_network
+    enrolled = terminal_profile(log_labels=('synthetic-observation:',), rejection_labels=(),
+                                local_input_labels=(), local_input_interfaces=())
+    raw = record('synthetic-observation: IN=eth0 OUT= SRC=198.51.100.19 DST=192.0.2.8 LEN=60 PROTO=UDP SPT=40000 DPT=5678 LEN=40')
+    event = parse_ufw(raw, profile=enrolled)
+    assert event.protocol == 'UDP' and event.direction == 'unknown' and not event.rejection_related
+    assert 'dynamic_terminal_filtering' in event.coverage
+    assert detect_network([event]).eligible_count == 0

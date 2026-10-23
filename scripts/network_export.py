@@ -24,7 +24,8 @@ import threading
 import time
 import uuid
 
-from app.telemetry.network_parse import FULL_GUARD, LEGACY_GUARD, MAX_CURSOR_BYTES, MAX_REALTIME_US
+from app.telemetry.network_parse import LEGACY_GUARD, STRONG_GUARDS, MAX_CURSOR_BYTES, MAX_REALTIME_US
+from app.telemetry.network_guard import TERMINAL_GUARD, NetworkGuardError, terminal_set_snapshot, validate_terminal_set_ids
 from app.telemetry.network_protocol import (
     MAX_BATCH_BYTES, MAX_ENTRIES, encode, fingerprint, journal_entry,
     profile_from_dict, validate_batch,
@@ -36,8 +37,11 @@ MAX_CONFIG_BYTES = 65536
 MAX_REQUEST_BYTES = 4096
 MAX_RAW_LINE_BYTES = 65536
 MAX_RAW_PAGE_BYTES = 4 * 1024 * 1024
+MAX_JOURNAL_STDERR_BYTES = 16384
 MAX_EXPORT_SECONDS = 10
 FIELDS = ('_TRANSPORT', '_BOOT_ID', '__CURSOR', '__REALTIME_TIMESTAMP', '__MONOTONIC_TIMESTAMP', 'MESSAGE')
+JOURNAL_COMMAND_PREFIX = ('/usr/bin/journalctl', '--no-pager', '--quiet', '--all', '--output=json',
+                          '--output-fields=' + ','.join(FIELDS), '_TRANSPORT=kernel')
 
 
 class ExportError(ValueError):
@@ -95,7 +99,7 @@ def load_config(path: Path = CONFIG_PATH):
         valid_from = value['profile_valid_from_us']
         if (type(value['version']) is not int or value['version'] != 1
                 or type(valid_from) is not int or not 0 <= valid_from <= MAX_REALTIME_US
-                or (profile.guard_version == FULL_GUARD and valid_from != profile.profile_valid_from_us)):
+                or (profile.guard_version in STRONG_GUARDS and valid_from != profile.profile_valid_from_us)):
             raise ValueError
         return value, profile
     except (OSError, ValueError, TypeError, KeyError):
@@ -143,18 +147,31 @@ def _stop(process):
     process.wait(timeout=1)
 
 
-def command_chunks(command, *, deadline, maximum, input_data=b''):
-    """Bound bytes and wall time; close the generator to stop an unread tail."""
+def command_chunks(command, *, deadline, maximum, input_data=b'', _empty_journal=False):
+    """Bound bytes/time; only the fixed journal query can accept an empty grep result.
+
+    stderr is discarded for ordinary strict commands. For the journal query we
+    drain and count a separate bounded pipe without retaining diagnostic bytes.
+    """
+    if _empty_journal and not (
+            len(command) == len(JOURNAL_COMMAND_PREFIX) + 2
+            and tuple(command[:len(JOURNAL_COMMAND_PREFIX)]) == JOURNAL_COMMAND_PREFIX
+            and command[-2].startswith('--grep=^')
+            and command[-1].startswith(('--since=', '--after-cursor='))):
+        raise ExportError('invalid_journal_command')
     process = None
     selector = selectors.DefaultSelector()
     try:
         process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                   stderr=subprocess.DEVNULL, start_new_session=True,
+                                   stderr=subprocess.PIPE if _empty_journal else subprocess.DEVNULL,
+                                   start_new_session=True,
                                    env={'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LC_ALL': 'C', 'TZ': 'UTC'})
         process.stdin.write(input_data)
         process.stdin.close()
-        selector.register(process.stdout, selectors.EVENT_READ)
-        size = 0
+        selector.register(process.stdout, selectors.EVENT_READ, 'stdout')
+        if _empty_journal:
+            selector.register(process.stderr, selectors.EVENT_READ, 'stderr')
+        size = stderr_size = 0
         while selector.get_map():
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -162,18 +179,29 @@ def command_chunks(command, *, deadline, maximum, input_data=b''):
             ready = selector.select(remaining)
             if not ready:
                 raise ExportError('subprocess_deadline')
-            chunk = os.read(process.stdout.fileno(), 8192)
-            if not chunk:
-                selector.unregister(process.stdout)
-                break
-            size += len(chunk)
-            if size > maximum:
-                raise ExportError('subprocess_output_limit')
-            yield chunk
+            for key, _ in ready:
+                chunk = os.read(key.fd, 8192)
+                if not chunk:
+                    selector.unregister(key.fileobj)
+                    continue
+                if key.data == 'stderr':
+                    stderr_size += len(chunk)
+                    if stderr_size > MAX_JOURNAL_STDERR_BYTES:
+                        raise ExportError('subprocess_output_limit')
+                else:
+                    size += len(chunk)
+                    if size > maximum:
+                        raise ExportError('subprocess_output_limit')
+                    yield chunk
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise ExportError('subprocess_deadline')
-        if process.wait(timeout=remaining) != 0:
+        status = process.wait(timeout=remaining)
+        # systemd v255 src/journal/journalctl.c: --grep with zero matches
+        # returns -ENOENT; --quiet leaves stdout empty. A nonempty diagnostic
+        # or any emitted stdout must never be reclassified as that empty case.
+        no_match = _empty_journal and status == 1 and size == stderr_size == 0
+        if (status != 0 and not no_match) or (_empty_journal and stderr_size):
             raise ExportError('subprocess_failed')
     except (OSError, subprocess.SubprocessError):
         raise ExportError('subprocess_failed') from None
@@ -183,6 +211,8 @@ def command_chunks(command, *, deadline, maximum, input_data=b''):
             _stop(process)
             process.stdin.close()
             process.stdout.close()
+            if process.stderr is not None:
+                process.stderr.close()
 
 
 def run_command(command, *, deadline, maximum):
@@ -319,16 +349,25 @@ def normalized_nft_rules(raw):
         raise ExportError('invalid_nft_rules_snapshot') from None
 
 
-def ruleset_fingerprint(*, deadline, run=run_command, guard_version=LEGACY_GUARD):
+def ruleset_fingerprint(*, deadline, run=run_command, guard_version=LEGACY_GUARD, dynamic_terminal_sets=()):
+    try:
+        if guard_version == TERMINAL_GUARD:
+            validate_terminal_set_ids(dynamic_terminal_sets)
+        elif type(dynamic_terminal_sets) is not tuple or dynamic_terminal_sets:
+            raise NetworkGuardError("unsafe_dynamic_terminal_set")
+    except NetworkGuardError:
+        raise ExportError("unsafe_dynamic_terminal_set") from None
     if guard_version == LEGACY_GUARD:
         snapshots = {}
         for family, executable in ((4, '/usr/sbin/iptables-save'), (6, '/usr/sbin/ip6tables-save')):
             raw = run([executable], deadline=min(deadline, time.monotonic() + 2), maximum=MAX_RAW_PAGE_BYTES)
             snapshots[str(family)] = normalized_rules(raw)
         return fingerprint(snapshots)
-    if guard_version != FULL_GUARD:
+    if guard_version not in STRONG_GUARDS:
         raise ExportError('unsupported_profile_guard')
-    snapshots = {'guard_version': FULL_GUARD}
+    snapshots = {'guard_version': guard_version}
+    if guard_version == TERMINAL_GUARD:
+        snapshots['dynamic_terminal_sets'] = sorted(dynamic_terminal_sets)
     for name, command in FULL_RULE_COMMANDS:
         if not os.access(command[0], os.X_OK):
             raise ExportError('firewall_guard_tool_unavailable')
@@ -339,12 +378,16 @@ def ruleset_fingerprint(*, deadline, run=run_command, guard_version=LEGACY_GUARD
                 raise
             raise ExportError('firewall_guard_snapshot_failed') from None
         snapshots[name] = normalized_nft_rules(raw) if name == 'nft' else normalized_rules(raw, strict=True)
+        if name == 'nft' and guard_version == TERMINAL_GUARD:
+            try:
+                snapshots[name] = terminal_set_snapshot(snapshots[name], dynamic_terminal_sets)
+            except NetworkGuardError:
+                raise ExportError('unsafe_dynamic_terminal_set') from None
     return fingerprint(snapshots)
 
 
 def journal_command(profile, cursor, *, valid_cursor, since_us):
-    command = ['/usr/bin/journalctl', '--no-pager', '--quiet', '--all', '--output=json',
-               '--output-fields=' + ','.join(FIELDS), '_TRANSPORT=kernel',
+    command = [*JOURNAL_COMMAND_PREFIX,
                '--grep=^(?:' + '|'.join(re.escape(label) for label in profile.log_labels) + ') ']
     if cursor is not None and valid_cursor:
         command.append('--after-cursor=' + cursor)
@@ -355,7 +398,7 @@ def journal_command(profile, cursor, *, valid_cursor, since_us):
 
 
 def journal_records(command, *, deadline):
-    chunks = command_chunks(command, deadline=deadline, maximum=MAX_RAW_PAGE_BYTES)
+    chunks = command_chunks(command, deadline=deadline, maximum=MAX_RAW_PAGE_BYTES, _empty_journal=True)
     pending = b''
     try:
         for chunk in chunks:
@@ -389,7 +432,7 @@ def export_page(config, request, *, now_us=None, clock=time.monotonic,
                 exists=cursor_exists, rules=ruleset_fingerprint, read=journal_records):
     profile = profile_from_dict(config['profile'])
     validate_request(request, profile)
-    if (profile.guard_version == FULL_GUARD
+    if (profile.guard_version in STRONG_GUARDS
             and config['profile_valid_from_us'] != profile.profile_valid_from_us):
         raise ExportError('profile_validity_mismatch')
     now_us = time.time_ns() // 1000 if now_us is None else now_us
@@ -398,9 +441,12 @@ def export_page(config, request, *, now_us=None, clock=time.monotonic,
     batch = {'version': 1, 'source_id': profile.source_id, 'profile_revision': profile.revision,
              'batch_id': uuid.uuid4().hex, 'collected_at_us': now_us, 'cursor_before': cursor,
              'cursor_after': cursor, 'entries': [], 'reports': [], 'caught_up': False}
+    guard_options = {'guard_version': profile.guard_version}
+    if profile.guard_version == TERMINAL_GUARD:
+        guard_options['dynamic_terminal_sets'] = profile.dynamic_terminal_sets
     if config['profile_valid_from_us'] > now_us:
         raise ExportError('profile_not_yet_valid')
-    if rules(deadline=deadline, guard_version=profile.guard_version) != profile.ruleset_sha256:
+    if rules(deadline=deadline, **guard_options) != profile.ruleset_sha256:
         batch['reports'] = ['profile_drift']
         return validate_batch(batch, profile)
     valid = cursor is not None and exists(cursor)
@@ -450,7 +496,7 @@ def export_page(config, request, *, now_us=None, clock=time.monotonic,
             records.close()
     # Do not release a page observed across changing rules, even if all rows
     # independently parse. Discard its content and retain the caller's cursor.
-    if rules(deadline=deadline, guard_version=profile.guard_version) != profile.ruleset_sha256:
+    if rules(deadline=deadline, **guard_options) != profile.ruleset_sha256:
         batch.update(entries=[], cursor_after=cursor, reports=['profile_drift'], caught_up=False)
     elif valid and not exists(cursor):
         # Journal vacuum may race the initial exact check and the seek/read.

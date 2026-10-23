@@ -567,3 +567,29 @@ def test_native_wire_observation_does_not_gain_rejection_or_local_direction():
         event['content_hash'] = fingerprint({k: v for k, v in event.items() if k not in {'event_id', 'content_hash'}})
         with pytest.raises(NetworkProtocolError):
             validate_batch(changed, enrolled)
+
+
+def test_terminal_profile_roundtrip_rejects_version_coverage_allowlist_and_time_tampering():
+    enrolled = profile(guard_version='netfilter-terminal-v2', profile_valid_from_us=WALL_US,
+                       dynamic_terminal_sets=('inet/synthetic/denied_sources',))
+    assert profile_from_dict(decode(encode(asdict(enrolled)))) == enrolled
+    pending = batch(enrolled, entries=[journal_entry(record(1), enrolled)])
+    assert validate_batch(decode(encode(pending)), enrolled) == pending
+    for parser, remove in [('netfilter-kernel-v3', True), ('netfilter-kernel-v2', False),
+                           ('netfilter-kernel-v2', True), ('ufw-kernel-v1', True)]:
+        changed = deepcopy(pending)
+        event = changed['entries'][0]['event']
+        event['parser_version'] = parser
+        if remove:
+            event['coverage'].remove('dynamic_terminal_filtering')
+        resign_event(event)
+        with pytest.raises(NetworkProtocolError):
+            validate_batch(changed, enrolled)
+    different = profile(guard_version='netfilter-terminal-v2', profile_valid_from_us=WALL_US,
+                        dynamic_terminal_sets=('inet/synthetic/different',))
+    with pytest.raises(NetworkProtocolError, match='network_profile_mismatch'):
+        validate_batch(pending, different)
+    for old in [batch(enrolled, entries=[], collected_at_us=WALL_US - 1),
+                batch(enrolled, entries=[journal_entry(record(0, __REALTIME_TIMESTAMP=str(WALL_US - 1)), enrolled)])]:
+        with pytest.raises(NetworkProtocolError, match='network_profile_mismatch'):
+            validate_batch(old, enrolled)

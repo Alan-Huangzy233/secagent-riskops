@@ -4,7 +4,7 @@ import hashlib
 import json
 import re
 
-from .network_parse import (FULL_GUARD, FULL_PARSER_VERSION, PARSER_VERSION,
+from .network_parse import (STRONG_GUARDS, TERMINAL_GUARD, profile_parser_version,
                             MAX_CURSOR_BYTES, MAX_MONOTONIC_US, MAX_REALTIME_US,
                             NetworkEvent, SourceProfile, parse_ufw, validate_event)
 
@@ -81,7 +81,7 @@ def profile_from_dict(value: dict) -> SourceProfile:
     if type(value) is not dict or set(value) - {field.name for field in fields(SourceProfile)}:
         _fail("invalid_network_profile")
     value = dict(value)
-    for name in ("log_labels", "ip_families", "rejection_labels", "local_input_labels", "local_input_interfaces"):
+    for name in ("log_labels", "ip_families", "rejection_labels", "local_input_labels", "local_input_interfaces", "dynamic_terminal_sets"):
         if name in value:
             if type(value[name]) not in (list, tuple):
                 _fail("invalid_network_profile")
@@ -193,7 +193,7 @@ def validate_batch(payload: dict, profile: SourceProfile) -> dict:
     if type(payload["batch_id"]) is not str or not _ID.fullmatch(payload["batch_id"]):
         _fail("invalid_network_batch_id")
     _number(payload["collected_at_us"])
-    if profile.guard_version == FULL_GUARD and payload["collected_at_us"] < profile.profile_valid_from_us:
+    if profile.guard_version in STRONG_GUARDS and payload["collected_at_us"] < profile.profile_valid_from_us:
         _fail("network_profile_mismatch")
     _cursor(payload["cursor_before"], nullable=True)
     _cursor(payload["cursor_after"], nullable=True)
@@ -214,14 +214,15 @@ def validate_batch(payload: dict, profile: SourceProfile) -> dict:
         if "event" in entry:
             event = event_from_dict(entry["event"])
             if (event.source_id != profile.source_id or event.source_profile_revision != profile.revision
-                    or event.parser_version != (FULL_PARSER_VERSION if profile.guard_version == FULL_GUARD else PARSER_VERSION)
+                    or event.parser_version != profile_parser_version(profile)
                     or event.log_label not in profile.log_labels or event.ip_family not in profile.ip_families
                     or event.rejection_related != (event.log_label in profile.rejection_labels)):
                 _fail("network_profile_mismatch")
-            if (profile.guard_version == FULL_GUARD
+            if (profile.guard_version in STRONG_GUARDS
                     and event.journal_realtime_us < profile.profile_valid_from_us):
                 _fail("network_profile_mismatch")
             expected = {
+                "dynamic_terminal_filtering": profile.guard_version == TERMINAL_GUARD,
                 "logging_rate_limited": profile.logging_limit == "rate_limited",
                 "logging_limits_unknown": profile.logging_limit == "unknown",
                 "journal_retention_unknown": profile.retention == "unknown",

@@ -66,8 +66,9 @@ MAC values and packet payload are never sent or spooled. A malformed packet
 with usable journal identity becomes a redacted rejection; unusable identity
 aborts the page without advancing a cursor.
 
-New real sources must explicitly use the [full Netfilter guard](network-source-guard.md).
-It binds a reviewed validity time and checks nftables plus default/nft/legacy
+New real sources must explicitly select a [reviewed Netfilter guard](network-source-guard.md):
+static `netfilter-full-v1`, or `netfilter-terminal-v2` with its narrow explicit
+dynamic terminal-set policy. Both bind a reviewed validity time and checks nftables plus default/nft/legacy
 iptables views before and after reading a page. The legacy `iptables-v1` mode
 retains its old revision contract but covers only `iptables-save` and
 `ip6tables-save`; it does not justify mixed/native source enrollment. Full-guard

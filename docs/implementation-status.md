@@ -204,7 +204,7 @@ continue network #120 before Linux host behavior #121.
   reference sets in `backend/app/reference.py`.
 
 
-### Network enrollment preparation (review pending)
+### Network enrollment and source acceptance
 
 The [enrollment guide](network-enrollment.md) covers opt-in full-firewall guards,
 restricted native-prefix observations, explicit network/console/collector paired
@@ -215,3 +215,10 @@ rejection meaning and do not create TCP probe findings. Collector service/timer
 templates remain opt-in. No source account, firewall policy or production
 configuration is enabled by these code changes. Per-source passive acceptance,
 sustained capacity and a safe long-term compaction policy remain outstanding.
+
+Source acceptance also supports a narrowly declared dynamic terminal address-set
+guard, preserving static-profile revisions and exposing its observation limit.
+Quiet filtered journals can send empty heartbeats; genuine command failures
+remain errors. API tests exercise the existing bounded busy-retry contract with
+a real WAL reader and unchanged pending bytes. See the [source guard](network-source-guard.md).
+Source-specific activation and sustained operation remain separate acceptance.
