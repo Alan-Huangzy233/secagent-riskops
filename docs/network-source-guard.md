@@ -15,7 +15,6 @@ The `SourceProfile` carries these guard fields:
 | --- | --- |
 | `guard_version` | Legacy default `iptables-v1`, static `netfilter-full-v1`, or explicit `netfilter-terminal-v2`. |
 | `profile_valid_from_us` | Required integer UTC microseconds for both Netfilter guards. Must equal the exporter configuration's outer field of the same name. Legacy profiles must leave this field null/omitted. |
-
 | `dynamic_terminal_sets` | Nonempty exact `family/table/set` allowlist for `netfilter-terminal-v2`; empty for older guards. |
 
 All applicable fields enter the profile's revision. Changing the reviewed snapshot
