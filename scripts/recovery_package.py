@@ -13,9 +13,10 @@ cursor captured *before* a database snapshot can never point past the events
 that snapshot already contains. Restoring such a pair replays a little journal
 that the receipt table rejects as duplicate; the reverse order would skip
 events for good. The guarantee needs no maintenance window, so building a
-package needs no service shutdown. For HTTP, explicitly pair both WAL databases
-and hold every local collector lock until the read snapshots are pinned; release
-all writer/collector locks before the bulk copies.
+package needs no service shutdown. HTTP and network require explicit paired
+WAL cohorts and all local collector locks until the read snapshots are pinned.
+Their stricter checkpoints cannot use the generic SSH capture-order guarantee.
+Writer/collector locks are released before the bulk copies.
 """
 from __future__ import annotations
 
@@ -160,7 +161,7 @@ def load_config(path: Path) -> dict:
         raw = json.loads(path.read_text(encoding='utf-8'))
     except json.JSONDecodeError as error:
         raise PackageError(f'configuration is not valid JSON: {error}') from error
-    allowed = {'host_id', 'description', 'components', 'recipients', 'http_recovery'}
+    allowed = {'host_id', 'description', 'components', 'recipients', 'http_recovery', 'network_recovery'}
     if not isinstance(raw, dict) or set(raw) - allowed:
         raise PackageError(f'configuration must be an object with keys {sorted(allowed)}')
     components, seen = [], set()
@@ -179,7 +180,110 @@ def load_config(path: Path) -> dict:
               'recipients': [_fingerprint(item) for item in recipients]}
     if 'http_recovery' in raw:
         result['http_recovery'] = validate_http_recovery(raw['http_recovery'], components)
+    if 'network_recovery' in raw:
+        if 'http_recovery' in raw:
+            raise PackageError('Combined HTTP and network recovery cohorts are not supported yet')
+        helper = network_helper()
+        try:
+            result['network_recovery'] = helper.validate(raw['network_recovery'], components)
+        except helper.RecoveryError as error:
+            raise PackageError(str(error)) from None
     return result
+
+
+def network_helper():
+    # The deployed recovery service uses the system Python without PYTHONPATH.
+    # These helpers and their app modules use only the standard library.
+    for path in (Path(__file__).resolve().parent, Path(__file__).resolve().parents[1] / 'backend'):
+        if str(path) not in sys.path:
+            sys.path.insert(0, str(path))
+    import network_recovery
+    return network_recovery
+
+
+def capture_network_recovery(policy, specs, contents, census):
+    helper = network_helper()
+    by_name = {item['name']: item for item in specs}
+    local_states = [by_name[item['state']] for item in policy['collectors']]
+    pair = [by_name[policy[key]] for key in ('network_database', 'console_database')]
+    try:
+        with ExitStack() as locks:
+            locks.enter_context(helper.locked_collectors(local_states))
+            descriptors = helper.mappings(policy, specs)
+            components = [capture_state_dir(spec, contents) for spec in local_states]
+            with pinned_http_databases(pair, policy['lock_timeout_seconds']) as (readers, pinned_at):
+                checks = helper.check_pair(readers[pair[0]['name']], readers[pair[1]['name']], descriptors, contents)
+                if helper.mappings(policy, specs) != descriptors:
+                    raise PackageError('Network collector mapping changed during capture')
+                locks.close()
+                for spec in pair:
+                    origin = readers[spec['name']]
+                    components.append(snapshot_database(spec, contents, census, origin=origin))
+                    # Network writes require WAL truncation. Never retain its
+                    # reader during the potentially very large console copy.
+                    origin.close()
+                cohort = {**policy, **checks, 'mappings': descriptors, 'pinned_at': pinned_at,
+                          'collectors_locked_until_pin': True, 'writers_released_before_copy': True,
+                          'network_reader_released_before_console_copy': True,
+                          'scope': 'same-host collectors and paired WAL databases'}
+                return components, cohort
+    except helper.RecoveryError as error:
+        raise PackageError(str(error)) from None
+
+
+def inspect_network_recovery(manifest, directory):
+    policy = manifest.get('consistency', {}).get('network_recovery')
+    network_components = []
+    try:
+        for spec in manifest['components']:
+            if spec['kind'] != 'sqlite':
+                continue
+            name = spec['name']
+            if not NAME_RE.fullmatch(name) or spec['stored_as'] != name+'.sqlite':
+                raise ValueError
+            with closing(sqlite3.connect((directory / spec['stored_as']).as_uri()+
+                                         '?mode=ro&immutable=1', uri=True)) as reader:
+                if reader.execute("SELECT 1 FROM sqlite_master WHERE name='network_receipts'").fetchone():
+                    network_components.append(name)
+        if policy is None:
+            if network_components:
+                raise ValueError
+            return None
+        if network_components != [policy['network_database']]:
+            raise ValueError
+    except (KeyError, TypeError, ValueError, sqlite3.Error):
+        raise PackageError('Network snapshots require their explicit matching recovery cohort') from None
+    helper = network_helper()
+    try:
+        specs = {item['name']: item for item in manifest['components']}
+        pair = [policy[key] for key in ('network_database', 'console_database')]
+        descriptors = policy['mappings']
+        states = [item['state'] for item in policy['collectors']]
+        if (pair[0] == pair[1] or not states or len(set(states)) != len(states)
+                or [item['state'] for item in descriptors] != states
+                or len({item['source_id'] for item in descriptors}) != len(descriptors)
+                or policy['collectors_locked_until_pin'] is not True
+                or policy['network_reader_released_before_console_copy'] is not True):
+            raise ValueError
+        for name in states:
+            spec = specs[name]
+            if (not NAME_RE.fullmatch(name) or spec['kind'] != 'state_dir' or spec['stored_as'] != name
+                    or set(spec['patterns']) != {'*.state.json', '*.pending.json'}):
+                raise ValueError
+        with ExitStack() as stack:
+            readers = []
+            for name in pair:
+                spec = specs[name]
+                if not NAME_RE.fullmatch(name) or spec['kind'] != 'sqlite' or spec['stored_as'] != name+'.sqlite':
+                    raise ValueError
+                readers.append(stack.enter_context(closing(sqlite3.connect(
+                    (directory / spec['stored_as']).as_uri()+'?mode=ro&immutable=1', uri=True))))
+            checks = helper.check_pair(*readers, descriptors, directory)
+        if any(checks[key] != policy[key] for key in checks):
+            raise ValueError
+        return checks
+    except (helper.RecoveryError, KeyError, ValueError, TypeError, sqlite3.Error):
+        raise PackageError('Invalid network recovery cohort metadata or snapshots') from None
 
 
 def stable_copy(source: Path, target: Path) -> dict:
@@ -373,6 +477,8 @@ def snapshot_database(spec: dict, contents: Path, census: bool, *, origin=None) 
             origin = stack.enter_context(closing(sqlite3.connect(f'{source.as_uri()}?mode=ro', uri=True)))
             if origin.execute("SELECT 1 FROM sqlite_master WHERE name='http_receipts'").fetchone():
                 raise PackageError('HTTP databases require an explicit http_recovery cohort')
+            if origin.execute("SELECT 1 FROM sqlite_master WHERE name='network_receipts'").fetchone():
+                raise PackageError('Network databases require an explicit network_recovery cohort')
         with closing(sqlite3.connect(target)) as copy:
             origin.backup(copy)
             if copy.execute('PRAGMA quick_check').fetchone()[0] != 'ok':
@@ -560,10 +666,19 @@ def build(args: argparse.Namespace) -> int:
         started_at = utc_now()
         policy = config.get('http_recovery')
         http_states = policy['collector_states'] if policy else []
-        components = [capture_state_dir(spec, contents) for spec in state_specs if spec['name'] not in http_states]
+        network_policy = config.get('network_recovery')
+        network_states = [item['state'] for item in network_policy['collectors']] if network_policy else []
+        components = [capture_state_dir(spec, contents) for spec in state_specs
+                      if spec['name'] not in http_states + network_states]
         snapshots_started_at = utc_now()
         cohort = None
         captured = set()
+        network_cohort = None
+        if network_policy:
+            network_components, network_cohort = capture_network_recovery(
+                network_policy, config['components'], contents, args.census)
+            components.extend(network_components)
+            captured.update(item['name'] for item in network_components)
         if policy:
             by_name = {item['name']: item for item in config['components']}
             pair = [by_name[policy[role]] for role in ('http_database', 'console_database')]
@@ -601,6 +716,14 @@ def build(args: argparse.Namespace) -> int:
             manifest['restore']['notes'].append('Before starting any restored API, collector or worker, run '
                 '`recovery_package.py mark-http-restored <http-database> <console-database> <package>`. '
                 'It checks both database snapshots and records a marker, not collector or log continuity.')
+        if network_cohort:
+            manifest['consistency']['network_recovery'] = network_cohort
+            manifest['restore']['notes'].append(
+                'Restore network and console databases together with ALL network cursor/pending directories '
+                'from this SAME verified package before starting any collector or worker. Preserve collector '
+                'endpoint, source/profile and SSH mapping paths/content. Deep verification checks paired '
+                'checkpoints; it does not verify remote journal continuity or recover absent private configuration. '
+                'Never VACUUM network receipts or combine a newer cursor with an older database.')
         inner = contents / MANIFEST_NAME
         inner.write_text(json.dumps(manifest, indent=2, sort_keys=True) + '\n', encoding='utf-8')
         manifest['inner_manifest_sha256'] = digest_file(inner)[0]
@@ -849,6 +972,10 @@ def verify(args: argparse.Namespace) -> int:
             report['ok'] = report['ok'] and all(item['ok'] for item in report['components'])
             if report['ok'] and manifest.get('consistency', {}).get('http_recovery'):
                 report['http_recovery'] = inspect_http_recovery(manifest, work)
+            if report['ok']:
+                network_checks = inspect_network_recovery(manifest, work)
+                if network_checks is not None:
+                    report['network_recovery'] = network_checks
             if destination is not None:
                 report['extracted_to'] = str(destination)
         finally:

@@ -22,6 +22,9 @@ import re
 
 SCHEMA_VERSION = 1
 PARSER_VERSION = "ufw-kernel-v1"
+FULL_PARSER_VERSION = "netfilter-kernel-v2"
+LEGACY_GUARD = "iptables-v1"
+FULL_GUARD = "netfilter-full-v1"
 MAX_MESSAGE_BYTES = 8192
 MAX_CURSOR_BYTES = 2048
 MAX_JOURNAL_FIELDS = 128
@@ -32,6 +35,8 @@ _ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}\Z")
 _HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 _BOOT = re.compile(r"[0-9a-f]{32}\Z")
 _LABEL = re.compile(r"\[[A-Z0-9][A-Z0-9 _:-]{0,59}\]\Z")
+_NATIVE_LABEL = re.compile(r"[A-Za-z][A-Za-z0-9_.-]{0,58}:\Z")
+_ANY_LABEL = re.compile(r"(?:\[[A-Z0-9][A-Z0-9 _:-]{0,59}\]|[A-Za-z][A-Za-z0-9_.-]{0,58}:)\Z")
 _INTERFACE = re.compile(r"[A-Za-z0-9_.:@-]{1,15}\Z")
 _PROTOCOL = re.compile(r"[A-Za-z0-9_-]{1,16}\Z")
 _DECIMAL = re.compile(r"[0-9]{1,19}\Z")
@@ -102,6 +107,8 @@ class SourceProfile:
     logging_limit_context: str = "unspecified"
     retention_context: str = "unspecified"
     schema_version: int = SCHEMA_VERSION
+    guard_version: str = LEGACY_GUARD
+    profile_valid_from_us: int | None = None
 
     def __post_init__(self):
         _validate_profile(self)
@@ -110,6 +117,11 @@ class SourceProfile:
     def revision(self) -> str:
         _validate_profile(self)
         payload = {field.name: getattr(self, field.name) for field in fields(self)}
+        # Existing persisted v1 profiles/receipts keep their exact revision.
+        # Strong profiles bind both the guard and its reviewed validity time.
+        if self.guard_version == LEGACY_GUARD:
+            del payload["guard_version"]
+            del payload["profile_valid_from_us"]
         for key in ("log_labels", "ip_families", "rejection_labels", "local_input_labels", "local_input_interfaces"):
             payload[key] = sorted(payload[key])
         return _digest(payload)
@@ -124,8 +136,19 @@ def _validate_profile(profile: SourceProfile):
         _fail("invalid_ruleset_digest")
     if type(profile.schema_version) is not int or profile.schema_version != SCHEMA_VERSION:
         _fail("unsupported_profile_version")
-    for value in (profile.log_labels, profile.rejection_labels, profile.local_input_labels):
-        if not _tuple_strings(value, maximum=16, pattern=_LABEL):
+    if profile.guard_version not in (LEGACY_GUARD, FULL_GUARD):
+        _fail("unsupported_profile_guard")
+    if profile.guard_version == FULL_GUARD:
+        if (type(profile.profile_valid_from_us) is not int
+                or not 0 <= profile.profile_valid_from_us <= MAX_REALTIME_US):
+            _fail("invalid_profile_valid_from")
+    elif profile.profile_valid_from_us is not None:
+        _fail("invalid_profile_valid_from")
+    for value, pattern in ((profile.log_labels, _ANY_LABEL if profile.guard_version == FULL_GUARD else _LABEL),
+                           (profile.rejection_labels, _LABEL), (profile.local_input_labels, _LABEL)):
+        # Native prefixes are observations only, never rejection/local-input
+        # assertions, even when their text resembles a firewall verdict.
+        if not _tuple_strings(value, maximum=16, pattern=pattern):
             _fail("invalid_profile_labels")
     if not profile.log_labels:
         _fail("invalid_profile_labels")
@@ -372,7 +395,8 @@ def parse_ufw(record: dict, *, profile: SourceProfile) -> NetworkEvent:
     elif flags or {"WINDOW", "RES", "URGP"} & values.keys():
         _fail("inconsistent_transport_fields")
     event = NetworkEvent(
-        source_id=profile.source_id, schema_version=SCHEMA_VERSION, parser_version=PARSER_VERSION,
+        source_id=profile.source_id, schema_version=SCHEMA_VERSION,
+        parser_version=FULL_PARSER_VERSION if profile.guard_version == FULL_GUARD else PARSER_VERSION,
         boot_id=boot, journal_cursor=cursor, event_id=_identity(profile.source_id, boot, cursor),
         content_hash="", journal_realtime_us=realtime, journal_monotonic_us=monotonic,
         transport="kernel", ip_family=src.version, src_ip=str(src), dst_ip=str(dst),
@@ -398,7 +422,8 @@ def validate_event(event: NetworkEvent) -> None:
         _fail("invalid_network_event")
     if not isinstance(event.source_id, str) or not _ID.fullmatch(event.source_id):
         _fail("invalid_event_source_id")
-    if type(event.schema_version) is not int or event.schema_version != SCHEMA_VERSION or event.parser_version != PARSER_VERSION:
+    if (type(event.schema_version) is not int or event.schema_version != SCHEMA_VERSION
+            or event.parser_version not in (PARSER_VERSION, FULL_PARSER_VERSION)):
         _fail("unsupported_event_version")
     if not isinstance(event.boot_id, str) or not _BOOT.fullmatch(event.boot_id):
         _fail("invalid_boot_id")
@@ -431,8 +456,11 @@ def validate_event(event: NetworkEvent) -> None:
         _fail("invalid_observation_point")
     if event.direction == "local_input" and (event.ingress_interface is None or event.egress_interface is not None):
         _fail("invalid_local_input_shape")
-    if not isinstance(event.log_label, str) or not _LABEL.fullmatch(event.log_label):
+    pattern = _ANY_LABEL if event.parser_version == FULL_PARSER_VERSION else _LABEL
+    if not isinstance(event.log_label, str) or not pattern.fullmatch(event.log_label):
         _fail("invalid_log_label")
+    if _NATIVE_LABEL.fullmatch(event.log_label) and (event.direction != "unknown" or event.rejection_related):
+        _fail("invalid_native_observation")
     if event.final_outcome != "unknown" or type(event.rejection_related) is not bool:
         _fail("invalid_outcome")
     if (type(event.coverage) is not tuple or len(event.coverage) > len(_COVERAGE) or any(not isinstance(item, str) or item not in _COVERAGE for item in event.coverage)

@@ -58,8 +58,10 @@ an existing UFW kernel journal, source-specific collection and a small inbound
 rule. The [offline parser and rule](network-detection.md) have synthetic tests;
 the [durable transport/storage foundation](network-ingestion.md) is merged and
 disabled by default. [Continuous analysis and console integration](network-analysis.md)
-are implemented for review. Next come complete source provenance, passive
-acceptance, resource calibration and paired network recovery. HTTP's missing business
+are merged. [Enrollment preparation](network-enrollment.md) adds full-firewall
+guards, native observations, paired recovery, capacity warnings and a synthetic
+workload exercise for review. Per-source passive acceptance and sustained
+capacity calibration remain required. HTTP's missing business
 source does not block this engineering work. Linux #121 follows the network
 increment; offline fixtures never establish live coverage.
 

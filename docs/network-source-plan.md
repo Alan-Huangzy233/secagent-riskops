@@ -1,11 +1,13 @@
 # First network source: host firewall observations
 
-Updated 2026-10-20. This is the staged implementation and acceptance plan for
+Updated 2026-10-23. This is the staged implementation and acceptance plan for
 [#120](https://github.com/Alan-Huangzy233/secagent-riskops/issues/120). The
 [offline parser/rule increment](network-detection.md) is implemented. The
 [durable ingestion foundation](network-ingestion.md) is implemented in this
-change, pending PR review; continuous analysis, console integration and live
-acceptance remain pending. Collection is disabled by default.
+change and [continuous analysis](network-analysis.md) is merged.
+[Enrollment preparation](network-enrollment.md) adds full guards, native
+observations, paired recovery and capacity warnings for review; live acceptance
+remains pending. Collection is disabled by default.
 Follow #120 with Linux host behavior
 [#121](https://github.com/Alan-Huangzy233/secagent-riskops/issues/121).
 HTTP #119 still requires a real business service; that gate does not block this
@@ -24,10 +26,10 @@ wall-clock and monotonic timestamps, TCP flags and ports. Its bounded sample is
 not a full-day count. Before enrollment, retain a private, versioned source
 profile covering effective rules, hooks, labels, address families, journal
 retention and logging limits. Fingerprint stable configuration, excluding
-dynamic packet/byte counters. Revalidate it after firewall changes. The current
-exporter fingerprints only `iptables-save` and `ip6tables-save`; this is not
-complete effective-firewall attestation. Mixed/native nftables producers remain
-unsupported until a full guard exists. Before enrollment, verify no unmanaged
+dynamic packet/byte counters. Revalidate it after firewall changes. The legacy exporter mode fingerprints only `iptables-save` and
+`ip6tables-save`; it cannot justify mixed/native source enrollment. New sources
+must explicitly use the [full Netfilter guard](network-source-guard.md). Even
+that equality guard is not automatic effective-firewall or historical attestation. Before enrollment, verify no unmanaged
 or native producers can reuse prefixes or invalidate attribution, and establish
 `profile_valid_from_us` from trusted operator context.
 
@@ -166,12 +168,15 @@ remains eligible. Do not silently inherit a global SSH whitelist exemption.
    immutable commit receipts, operator read APIs, event retention and restart/gap
    handling. A disposable synthetic exercise covers the delivery path. Real
    enrollment, receipt compaction and recovery acceptance are not included.
-3. **Continuous analysis and console (implemented for review):** the
+3. **Continuous analysis and console (merged):** the
    [bounded worker and console](network-analysis.md) integrate the offline rule
    with durable correlation, versioned evidence, advisory scores, a separate
    network table/detail view and console notices. Data-quality failures are
    displayed separately from attack candidates.
-4. **First-source acceptance:** enroll in passive shadow mode after review;
+4. **First-source acceptance (preparation in review):** full guard/native
+   observations, paired recovery, resource exercise and capacity notices are
+   described in the [enrollment guide](network-enrollment.md). Enroll in passive
+   shadow mode after review;
    privately compare selected journal records with durable receipts and evidence.
    Verify direction/profile assumptions, resource budgets, retention and restore;
    record analyst review before considering detection active or closing #120.

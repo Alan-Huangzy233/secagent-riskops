@@ -24,7 +24,7 @@ import threading
 import time
 import uuid
 
-from app.telemetry.network_parse import MAX_CURSOR_BYTES, MAX_REALTIME_US
+from app.telemetry.network_parse import FULL_GUARD, LEGACY_GUARD, MAX_CURSOR_BYTES, MAX_REALTIME_US
 from app.telemetry.network_protocol import (
     MAX_BATCH_BYTES, MAX_ENTRIES, encode, fingerprint, journal_entry,
     profile_from_dict, validate_batch,
@@ -94,7 +94,8 @@ def load_config(path: Path = CONFIG_PATH):
         profile = profile_from_dict(value['profile'])
         valid_from = value['profile_valid_from_us']
         if (type(value['version']) is not int or value['version'] != 1
-                or type(valid_from) is not int or not 0 <= valid_from <= MAX_REALTIME_US):
+                or type(valid_from) is not int or not 0 <= valid_from <= MAX_REALTIME_US
+                or (profile.guard_version == FULL_GUARD and valid_from != profile.profile_valid_from_us)):
             raise ValueError
         return value, profile
     except (OSError, ValueError, TypeError, KeyError):
@@ -188,13 +189,29 @@ def run_command(command, *, deadline, maximum):
     return b''.join(command_chunks(command, deadline=deadline, maximum=maximum))
 
 
-def normalized_rules(raw):
+def normalized_rules(raw, *, strict=False):
     try:
         rules = []
+        in_table = False
         for line in raw.decode('utf-8').splitlines():
             if not line.strip() or line.lstrip().startswith('#'):
                 continue
             tokens = shlex.split(line)
+            if strict:
+                if len(tokens) == 1 and re.fullmatch(r'\*[A-Za-z0-9_]{1,32}', tokens[0]):
+                    if in_table:
+                        raise ValueError
+                    in_table = True
+                elif tokens == ['COMMIT']:
+                    if not in_table:
+                        raise ValueError
+                    in_table = False
+                elif tokens[0].startswith(':'):
+                    if (not in_table or len(tokens) != 3
+                            or not re.fullmatch(r'\[[0-9]+:[0-9]+\]', tokens[-1])):
+                        raise ValueError
+                elif not in_table or len(tokens) < 3 or tokens[0] != '-A':
+                    raise ValueError
             # Our fixed save command has no -c flag: only a chain declaration's
             # trailing counters are dynamic. Rule option values can themselves
             # resemble counters or options, so retain them without rewriting.
@@ -202,16 +219,126 @@ def normalized_rules(raw):
                     and re.fullmatch(r'\[[0-9]+:[0-9]+\]', tokens[-1])):
                 tokens = tokens[:-1]
             rules.append(tokens)
+        if strict and in_table:
+            raise ValueError
         return rules
     except (ValueError, UnicodeError):
         raise ExportError('invalid_rules_snapshot') from None
 
 
-def ruleset_fingerprint(*, deadline, run=run_command):
-    snapshots = {}
-    for family, executable in ((4, '/usr/sbin/iptables-save'), (6, '/usr/sbin/ip6tables-save')):
-        raw = run([executable], deadline=min(deadline, time.monotonic() + 2), maximum=MAX_RAW_PAGE_BYTES)
-        snapshots[str(family)] = normalized_rules(raw)
+# Every path and argument is fixed; enrollment cannot select a reduced view.
+FULL_RULE_COMMANDS = (
+    ('nft', ('/usr/sbin/nft', '--json', '--handle', '--numeric', 'list', 'ruleset')),
+    ('iptables-default', ('/usr/sbin/iptables-save',)),
+    ('ip6tables-default', ('/usr/sbin/ip6tables-save',)),
+    ('iptables-nft', ('/usr/sbin/iptables-nft-save',)),
+    ('ip6tables-nft', ('/usr/sbin/ip6tables-nft-save',)),
+    ('iptables-legacy', ('/usr/sbin/iptables-legacy-save',)),
+    ('ip6tables-legacy', ('/usr/sbin/ip6tables-legacy-save',)),
+)
+_NFT_OBJECTS = frozenset({'table', 'chain', 'rule', 'set', 'map', 'element', 'counter',
+                          'quota', 'limit', 'flowtable', 'ct helper', 'ct timeout',
+                          'ct expectation', 'synproxy'})
+_NFT_FAMILIES = frozenset({'ip', 'ip6', 'inet', 'arp', 'bridge', 'netdev'})
+
+
+def normalized_nft_rules(raw):
+    """Drop only known display metadata and exact packet/byte counter values.
+
+    Expression order, set elements, timeouts/expirations, quota usage, comments
+    and unknown nested expression content remain bound. Stateful sets may thus
+    cause conservative drift; silently omitting them would weaken provenance.
+    Unknown top-level objects/schema versions fail closed.
+    """
+    try:
+        if not isinstance(raw, bytes) or len(raw) > MAX_RAW_PAGE_BYTES:
+            raise ValueError
+        value = decode(raw)
+        if type(value) is not dict or set(value) != {'nftables'} or type(value['nftables']) is not list:
+            raise ValueError
+        pending, nodes = [(value, 0)], 0
+        while pending:
+            item, depth = pending.pop()
+            nodes += 1
+            if depth > 32 or nodes > 100_000:
+                raise ValueError
+            if type(item) is dict:
+                pending.extend((child, depth + 1) for child in item.values())
+            elif type(item) is list:
+                pending.extend((child, depth + 1) for child in item)
+        result, metadata = [], 0
+        for wrapper in value['nftables']:
+            if type(wrapper) is not dict or len(wrapper) != 1:
+                raise ValueError
+            kind, obj = next(iter(wrapper.items()))
+            if type(obj) is not dict:
+                raise ValueError
+            if kind == 'metainfo':
+                metadata += 1
+                if (metadata != 1 or type(obj.get('json_schema_version')) is not int
+                        or obj['json_schema_version'] != 1
+                        or set(obj) - {'version', 'release_name', 'json_schema_version'}):
+                    raise ValueError
+                continue
+            if (kind not in _NFT_OBJECTS or obj.get('family') not in _NFT_FAMILIES
+                    or (kind != 'table' and not isinstance(obj.get('table'), str))
+                    or (kind not in {'rule', 'element'} and not isinstance(obj.get('name'), str))):
+                raise ValueError
+            obj = dict(obj)
+            if 'handle' in obj:
+                if type(obj['handle']) is not int or obj['handle'] < 0:
+                    raise ValueError
+                del obj['handle']
+            if kind == 'rule':
+                if not isinstance(obj.get('chain'), str) or type(obj.get('expr')) is not list:
+                    raise ValueError
+                expressions = []
+                for expr in obj['expr']:
+                    if type(expr) is not dict or len(expr) != 1:
+                        raise ValueError
+                    if 'counter' in expr and type(expr['counter']) is dict:
+                        counter = expr['counter']
+                        if set(counter) == {'packets', 'bytes'}:
+                            if any(type(v) is not int or v < 0 for v in counter.values()):
+                                raise ValueError
+                            expr = {'counter': {}}
+                    expressions.append(expr)
+                obj['expr'] = expressions
+            if kind == 'counter':
+                if not {'packets', 'bytes'} <= obj.keys():
+                    raise ValueError
+                for key in ('packets', 'bytes'):
+                    if type(obj[key]) is not int or obj[key] < 0:
+                        raise ValueError
+                    del obj[key]
+            result.append({kind: obj})
+        if metadata != 1:
+            raise ValueError
+        return result
+    except (ValueError, TypeError, RecursionError):
+        raise ExportError('invalid_nft_rules_snapshot') from None
+
+
+def ruleset_fingerprint(*, deadline, run=run_command, guard_version=LEGACY_GUARD):
+    if guard_version == LEGACY_GUARD:
+        snapshots = {}
+        for family, executable in ((4, '/usr/sbin/iptables-save'), (6, '/usr/sbin/ip6tables-save')):
+            raw = run([executable], deadline=min(deadline, time.monotonic() + 2), maximum=MAX_RAW_PAGE_BYTES)
+            snapshots[str(family)] = normalized_rules(raw)
+        return fingerprint(snapshots)
+    if guard_version != FULL_GUARD:
+        raise ExportError('unsupported_profile_guard')
+    snapshots = {'guard_version': FULL_GUARD}
+    for name, command in FULL_RULE_COMMANDS:
+        if not os.access(command[0], os.X_OK):
+            raise ExportError('firewall_guard_tool_unavailable')
+        try:
+            raw = run(list(command), deadline=min(deadline, time.monotonic() + 2), maximum=MAX_RAW_PAGE_BYTES)
+        except ExportError as exc:
+            if str(exc) in {'subprocess_deadline', 'subprocess_output_limit'}:
+                raise
+            raise ExportError('firewall_guard_snapshot_failed') from None
+        snapshots[name] = normalized_nft_rules(raw) if name == 'nft' else normalized_rules(raw, strict=True)
     return fingerprint(snapshots)
 
 
@@ -262,6 +389,9 @@ def export_page(config, request, *, now_us=None, clock=time.monotonic,
                 exists=cursor_exists, rules=ruleset_fingerprint, read=journal_records):
     profile = profile_from_dict(config['profile'])
     validate_request(request, profile)
+    if (profile.guard_version == FULL_GUARD
+            and config['profile_valid_from_us'] != profile.profile_valid_from_us):
+        raise ExportError('profile_validity_mismatch')
     now_us = time.time_ns() // 1000 if now_us is None else now_us
     deadline = clock() + MAX_EXPORT_SECONDS
     cursor = request['cursor']
@@ -270,7 +400,7 @@ def export_page(config, request, *, now_us=None, clock=time.monotonic,
              'cursor_after': cursor, 'entries': [], 'reports': [], 'caught_up': False}
     if config['profile_valid_from_us'] > now_us:
         raise ExportError('profile_not_yet_valid')
-    if rules(deadline=deadline) != profile.ruleset_sha256:
+    if rules(deadline=deadline, guard_version=profile.guard_version) != profile.ruleset_sha256:
         batch['reports'] = ['profile_drift']
         return validate_batch(batch, profile)
     valid = cursor is not None and exists(cursor)
@@ -320,7 +450,7 @@ def export_page(config, request, *, now_us=None, clock=time.monotonic,
             records.close()
     # Do not release a page observed across changing rules, even if all rows
     # independently parse. Discard its content and retain the caller's cursor.
-    if rules(deadline=deadline) != profile.ruleset_sha256:
+    if rules(deadline=deadline, guard_version=profile.guard_version) != profile.ruleset_sha256:
         batch.update(entries=[], cursor_after=cursor, reports=['profile_drift'], caught_up=False)
     elif valid and not exists(cursor):
         # Journal vacuum may race the initial exact check and the seek/read.

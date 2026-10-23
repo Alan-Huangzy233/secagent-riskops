@@ -33,6 +33,11 @@ jobs:
           sudo env PYTHONDONTWRITEBYTECODE=1 "$(command -v python)" -m pytest
           -p no:cacheprovider backend/tests/test_backup_serialization.py -k cross_account
 
+      - name: Network recovery works across backup and collector accounts
+        run: >-
+          sudo env PYTHONDONTWRITEBYTECODE=1 "$(command -v python)" -m pytest
+          -p no:cacheprovider backend/tests/test_network_recovery.py -k root_backup_of_service_owned
+
       - name: Run the walking-skeleton flow (smoke)
         run: PYTHONPATH=backend python -m app.demo
 
@@ -52,6 +57,10 @@ jobs:
       - name: Network continuous analysis, historical evidence and console retry simulation
         timeout-minutes: 2
         run: PYTHONPATH=backend python scripts/simulate_network_analysis.py
+
+      - name: Network three-source backlog and resource observations
+        timeout-minutes: 3
+        run: PYTHONPATH=backend python scripts/simulate_network_workload.py --budget-seconds 120
 
       - name: HTTP workload bounds, catch-up and resource observations
         timeout-minutes: 5

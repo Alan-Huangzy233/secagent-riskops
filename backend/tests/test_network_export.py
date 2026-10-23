@@ -265,3 +265,132 @@ def test_exited_parent_cannot_leave_stdout_holding_child_past_deadline():
             os.kill(child_pid, 9)
         except ProcessLookupError:
             pass
+
+
+def nft_snapshot():
+    return {'nftables': [
+        {'metainfo': {'version': 'synthetic', 'release_name': 'test', 'json_schema_version': 1}},
+        {'table': {'family': 'inet', 'name': 'authored', 'handle': 10, 'comment': 'keep me'}},
+        {'chain': {'family': 'inet', 'table': 'authored', 'name': 'observe', 'handle': 11,
+                   'type': 'filter', 'hook': 'input', 'prio': 0, 'policy': 'accept'}},
+        {'set': {'family': 'inet', 'table': 'authored', 'name': 'reviewed', 'handle': 12,
+                 'type': 'ipv4_addr', 'elem': ['198.51.100.1']}},
+        {'rule': {'family': 'inet', 'table': 'authored', 'chain': 'observe', 'handle': 13,
+                  'expr': [{'match': {'left': {'payload': {'protocol': 'tcp', 'field': 'dport'}},
+                                     'op': '==', 'right': 443}},
+                           {'counter': {'packets': 5, 'bytes': 300}},
+                           {'log': {'prefix': 'sample:'}}]}},
+        {'counter': {'family': 'inet', 'table': 'authored', 'name': 'total', 'handle': 14,
+                     'packets': 5, 'bytes': 300}},
+    ]}
+
+
+def test_nft_guard_ignores_only_known_metadata_and_exact_counter_fields():
+    from copy import deepcopy
+    before = nft_snapshot()
+    after = deepcopy(before)
+    after['nftables'][0]['metainfo']['version'] = 'next-version'
+    after['nftables'][1]['table']['handle'] += 20
+    after['nftables'][4]['rule']['expr'][1]['counter']['packets'] += 99
+    after['nftables'][5]['counter']['bytes'] += 10000
+    assert exporter.normalized_nft_rules(encode(before)) == exporter.normalized_nft_rules(encode(after))
+    mutations = [
+        lambda x: x[1]['table'].update(comment='changed'),
+        lambda x: x[2]['chain'].update(hook='forward'),
+        lambda x: x[3]['set']['elem'].append('198.51.100.2'),
+        lambda x: x[3]['set'].update(timeout=30),
+        lambda x: x[4]['rule']['expr'][0]['match'].update(right=444),
+        lambda x: x[4]['rule']['expr'][2]['log'].update(prefix='different:'),
+        lambda x: x[4]['rule']['expr'].reverse(),
+        lambda x: x[4]['rule']['expr'].append({'quota': {'val': 100, 'used': 20}}),
+        lambda x: x[4]['rule']['expr'][1]['counter'].update(unrecognized='preserve'),
+    ]
+    for mutate in mutations:
+        changed = deepcopy(before)
+        mutate(changed['nftables'])
+        assert exporter.normalized_nft_rules(encode(before)) != exporter.normalized_nft_rules(encode(changed))
+
+
+@pytest.mark.parametrize('raw', [b'{}', b'{"nftables": []}', b'{"nftables":null}',
+    b'{"nftables":[],"nftables":[]}',
+    encode({'nftables': [{'metainfo': {'json_schema_version': 2}}]}),
+    encode({'nftables': [{'metainfo': {'json_schema_version': True}}]}),
+    encode({'nftables': [{'metainfo': {'json_schema_version': 1}}, {'unknown': {}}]}),
+    encode({'nftables': [{'metainfo': {'json_schema_version': 1}}, {'rule': {'family': 'inet', 'table': 'x', 'chain': 'x', 'expr': 'bad'}}]}),
+])
+def test_nft_schema_and_duplicate_key_errors_fail_closed(raw):
+    with pytest.raises(exporter.ExportError, match='invalid_nft_rules_snapshot'):
+        exporter.normalized_nft_rules(raw)
+
+
+def test_strong_guard_reads_all_fixed_views_and_binds_each_one(monkeypatch):
+    monkeypatch.setattr(exporter.os, 'access', lambda *a: True)
+    outputs = {name: (encode(nft_snapshot()) if name == 'nft' else b'*filter\n:INPUT ACCEPT [0:0]\nCOMMIT\n')
+               for name, _ in exporter.FULL_RULE_COMMANDS}
+    calls = []
+    def run(command, **limits):
+        calls.append(command)
+        assert limits['maximum'] == 4 * 1024 * 1024
+        assert limits['deadline'] <= time.monotonic() + 2
+        name = next(name for name, fixed in exporter.FULL_RULE_COMMANDS if list(fixed) == command)
+        return outputs[name]
+    baseline = exporter.ruleset_fingerprint(deadline=time.monotonic() + 10, run=run, guard_version='netfilter-full-v1')
+    assert calls == [list(command) for _, command in exporter.FULL_RULE_COMMANDS]
+    for name, _ in exporter.FULL_RULE_COMMANDS:
+        old = outputs[name]
+        if name == 'nft':
+            changed = nft_snapshot()
+            changed['nftables'][3]['set']['elem'].append('198.51.100.2')
+            outputs[name] = encode(changed)
+        else:
+            outputs[name] = old.replace(b'ACCEPT', b'DROP')
+        assert exporter.ruleset_fingerprint(deadline=time.monotonic() + 10, run=run, guard_version='netfilter-full-v1') != baseline
+        outputs[name] = old
+    monkeypatch.setattr(exporter.os, 'access', lambda *a: False)
+    with pytest.raises(exporter.ExportError, match='firewall_guard_tool_unavailable'):
+        exporter.ruleset_fingerprint(deadline=time.monotonic() + 10, run=run, guard_version='netfilter-full-v1')
+
+
+@pytest.mark.parametrize('raw', [b'garbage', b'*filter\n:INPUT DROP [0:0]\n', b'COMMIT\n',
+                               b'*filter\n:INPUT bad\nCOMMIT\n'])
+def test_full_guard_rejects_malformed_iptables_snapshots(raw):
+    with pytest.raises(exporter.ExportError, match='invalid_rules_snapshot'):
+        exporter.normalized_rules(raw, strict=True)
+
+
+def strong_config(config):
+    from copy import deepcopy
+    config = deepcopy(config)
+    config['profile'].update(guard_version='netfilter-full-v1', profile_valid_from_us=config['profile_valid_from_us'])
+    return config
+
+
+def test_strong_export_binds_validity_and_passes_guard_to_both_checks(config, monkeypatch):
+    config = strong_config(config)
+    calls = []
+    def rules(**kwargs):
+        calls.append(kwargs['guard_version'])
+        return 'a' * 64
+    result = page(config, [record()], rules=rules)
+    assert calls == ['netfilter-full-v1', 'netfilter-full-v1']
+    assert result['entries'][0]['event']['parser_version'] == 'netfilter-kernel-v2'
+    config['profile_valid_from_us'] += 1
+    with pytest.raises(exporter.ExportError, match='profile_validity_mismatch'):
+        page(config, rules=rules)
+    monkeypatch.setattr(exporter, 'secure_file', lambda *a, **k: encode(config))
+    with pytest.raises(exporter.ExportError, match='invalid_export_config'):
+        exporter.load_config()
+
+
+@pytest.mark.parametrize('on_second', [False, True])
+def test_full_guard_failure_never_releases_page(config, on_second):
+    config = strong_config(config)
+    calls = []
+    def rules(**kwargs):
+        calls.append(True)
+        if not on_second or len(calls) == 2:
+            raise exporter.ExportError('firewall_guard_snapshot_failed')
+        return 'a' * 64
+    with pytest.raises(exporter.ExportError, match='firewall_guard_snapshot_failed'):
+        page(config, [record()], cursor='previous', rules=rules)
+    assert len(calls) == (2 if on_second else 1)

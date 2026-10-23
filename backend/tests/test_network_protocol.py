@@ -531,3 +531,39 @@ def test_ack_hash_binds_payload_even_when_all_echoed_fields_stay_equal():
     validate_batch(changed, profile())
     with pytest.raises(NetworkProtocolError):
         validate_ack(receipt, changed)
+
+
+def test_full_profile_wire_roundtrip_binds_guard_validity_and_parser_version():
+    enrolled = profile(guard_version='netfilter-full-v1', profile_valid_from_us=WALL_US)
+    assert profile_from_dict(asdict(enrolled)) == enrolled
+    pending = batch(enrolled, entries=[journal_entry(record(1), enrolled)])
+    assert validate_batch(decode(encode(pending)), enrolled) == pending
+    old = record(0, __REALTIME_TIMESTAMP=str(WALL_US - 1))
+    # A correctly hashed event before enrollment must still be refused by API.
+    with pytest.raises(NetworkProtocolError, match='network_profile_mismatch'):
+        validate_batch(batch(enrolled, entries=[journal_entry(old, enrolled)]), enrolled)
+    with pytest.raises(NetworkProtocolError, match='network_profile_mismatch'):
+        validate_batch(batch(enrolled, entries=[], collected_at_us=WALL_US - 1), enrolled)
+    changed = deepcopy(pending)
+    event = changed['entries'][0]['event']
+    event['parser_version'] = 'ufw-kernel-v1'
+    event['content_hash'] = fingerprint({k: v for k, v in event.items() if k not in {'event_id', 'content_hash'}})
+    with pytest.raises(NetworkProtocolError, match='network_profile_mismatch'):
+        validate_batch(changed, enrolled)
+
+
+def test_native_wire_observation_does_not_gain_rejection_or_local_direction():
+    enrolled = profile(guard_version='netfilter-full-v1', profile_valid_from_us=WALL_US,
+                       log_labels=('sample-observation:',), rejection_labels=(),
+                       local_input_labels=(), local_input_interfaces=())
+    raw = record(1)
+    raw['MESSAGE'] = raw['MESSAGE'].replace('[UFW BLOCK]', 'sample-observation:')
+    pending = batch(enrolled, entries=[journal_entry(raw, enrolled)])
+    assert validate_batch(pending, enrolled) == pending
+    for field, value in [('rejection_related', True), ('direction', 'local_input')]:
+        changed = deepcopy(pending)
+        event = changed['entries'][0]['event']
+        event[field] = value
+        event['content_hash'] = fingerprint({k: v for k, v in event.items() if k not in {'event_id', 'content_hash'}})
+        with pytest.raises(NetworkProtocolError):
+            validate_batch(changed, enrolled)

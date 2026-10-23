@@ -1,0 +1,12 @@
+[Unit]
+Description=Poll enrolled firewall observations for %i
+
+[Timer]
+OnBootSec=45s
+OnUnitInactiveSec=60s
+RandomizedDelaySec=5s
+AccuracySec=1s
+Unit=secagent-riskops-network-collector@%i.service
+
+[Install]
+WantedBy=timers.target

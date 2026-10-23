@@ -5,7 +5,7 @@ page records what is **actually implemented in code** so the two are never
 confused.
 
 Last reviewed: 2026-10-03; HTTP acceptance/network detection sections updated
-2026-10-19; network ingestion/analysis updated 2026-10-20. The walking skeleton and measured
+2026-10-19; network ingestion/analysis updated 2026-10-20; enrollment preparation updated 2026-10-23. The walking skeleton and measured
 demo baseline are preserved; further demo work is paused. Active development targets the independent
 SSH/auth telemetry pilot. The [production plan](./production-plan.md) tracks
 model comparison and broader detection; planned capabilities are not claims of
@@ -170,15 +170,14 @@ UFW journal reads, durable pending-batch retry and ACK-gated cursor commits.
 existing configuration. The synthetic `scripts/simulate_network_ingest.py`
 exercises the disposable delivery path without live source access.
 
-The current exporter guards only iptables/ip6tables snapshots. Mixed/native
-nftables producers are unsupported until a full guard; local-input provenance,
-absence of unmanaged producers and profile validity still require operator
-review. Normalized events have bounded retention; compact event identities and
+The legacy exporter guards only iptables/ip6tables snapshots. New sources
+explicitly select the [full guard](network-source-guard.md), with native prefixes
+restricted to unknown-direction observations. Local-input provenance, absence of
+unrelated producers and profile validity still require operator review. Normalized events have bounded retention; compact event identities and
 batch receipts remain until configured capacity stops writes. Expiry remains
 visible after cleanup, and no unsafe receipt pruning is implemented.
 
-[Continuous analysis](network-analysis.md) is implemented in this increment for
-review: bounded receipt/batch checkpoints, monotonic-hour cases, versioned scores
+[Continuous analysis](network-analysis.md) is merged: bounded receipt/batch checkpoints, monotonic-hour cases, versioned scores
 and evidence, a paginated network table/detail view and console notices. Late
 observations revise cases; incomplete context preserves prior evidence visibly
 stale. The strict network schema migration preserves existing delivery ACKs.
@@ -203,3 +202,16 @@ continue network #120 before Linux host behavior #121.
   blob storage is a follow-up. Replay therefore runs within a live `Services`.
 - The control library, ATT&CK map, and asset registry are small hard-coded
   reference sets in `backend/app/reference.py`.
+
+
+### Network enrollment preparation (review pending)
+
+The [enrollment guide](network-enrollment.md) covers opt-in full-firewall guards,
+restricted native-prefix observations, explicit network/console/collector paired
+recovery, independent capacity warnings and a three-source synthetic workload.
+Existing v1 profile revisions remain compatible; new profiles bind their guard
+and reviewed validity time. Native observations cannot assert local-input or
+rejection meaning and do not create TCP probe findings. Collector service/timer
+templates remain opt-in. No source account, firewall policy or production
+configuration is enabled by these code changes. Per-source passive acceptance,
+sustained capacity and a safe long-term compaction policy remain outstanding.

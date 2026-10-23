@@ -1,0 +1,33 @@
+[Unit]
+Description=Collect enrolled firewall observations for %i into SecAgent RiskOps
+After=network-online.target secagent-riskops.service
+Wants=network-online.target
+Requires=secagent-riskops.service
+
+[Service]
+Type=oneshot
+User=riskops-network-collector
+Group=riskops-network-collector
+Environment=PYTHONPATH=/opt/secagent-riskops/current/backend
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/secagent-riskops/venv/bin/python /opt/secagent-riskops/current/scripts/network_collector.py --once --config /etc/secagent-riskops/network/%i.json
+TimeoutStartSec=35
+StateDirectory=secagent-riskops-network-collector/%i
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/var/lib/secagent-riskops-network-collector/%i
+MemoryMax=128M
+CPUQuota=25%
+CPUWeight=10
+TasksMax=24
