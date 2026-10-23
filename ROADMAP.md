@@ -1,5 +1,7 @@
 # SecAgent RiskOps Roadmap
 
+GitHub tracking index: [#170](https://github.com/Alan-Huangzy233/secagent-riskops/issues/170).
+
 ## Current focus: production triage and detection coverage
 
 The maintainer has paused further demo work and moved development to the
@@ -16,18 +18,32 @@ console notifications and UTC daily briefings are implemented. Current position:
   HTTP daily briefings, same-host recovery/history, isolated Nginx HTTPS and
   bounded workload acceptance are also implemented. No business website is
   currently available for real-source acceptance; keep #119 open for that gate.
-- **In progress: the first network source (#120).** Offline UFW parsing and
-  one bounded TCP multi-port rule now have synthetic positive/negative tests
-  ([usage and limits](./docs/network-detection.md)). Dedicated durable
-  collection/storage and operator read APIs are merged ([ingestion guide](./docs/network-ingestion.md)).
-  [Continuous cases, versioned evidence, scores, console table/details and notices](./docs/network-analysis.md)
-  are merged. [Source enrollment preparation](./docs/network-enrollment.md) now adds
-  full-firewall provenance checks, native observations, paired recovery and capacity
-  warnings for review. Per-source passive acceptance and sustained operation remain.
-  The [network source plan](./docs/network-source-plan.md) separates those gates
-  from live acceptance. Production network detection remains disabled. Linux host
-  behavior (#121) follows the network increment; HTTP activation resumes when a real service exists.
+- **Network foundation deployed; sustained acceptance remains (#120).**
+  Reviewed passive sources now feed [durable collection](./docs/network-ingestion.md),
+  [TCP findings, versioned evidence, scores and console notices](./docs/network-analysis.md).
+  Limited UDP observations and empty heartbeats do not imply full traffic coverage.
+  [Enrollment guards and paired recovery](./docs/network-enrollment.md) are implemented;
+  sustained operation, source-specific coverage and long-term receipt/capacity
+  governance remain in #120 and [#152](https://github.com/Alan-Huangzy233/secagent-riskops/issues/152). Repository defaults
+  remain opt-in; that differs from the maintained deployment's activated sources.
+- **Next: IP search and investigation pivots** ([#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145)). Existing SSH
+  log search is hidden in advanced filters; alerts lack an IP filter and network
+  findings lack a local-evidence pivot. Follow with scoped cross-type lookup
+  ([#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146)), SSH + network joint cases ([#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147)) and
+  manual joint AI review ([#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148)). These are planned separate increments.
+- Linux #121 retains the Web → network → Linux detection order; source inventory
+  can proceed alongside search/correlation. A missing business website or pending
+  AI permission does not block already-authorized source engineering. Broader
+  network rules ([#151](https://github.com/Alan-Huangzy233/secagent-riskops/issues/151)) need verified fields and benign examples.
+- Automatic analysis ([#149](https://github.com/Alan-Huangzy233/secagent-riskops/issues/149)) and controlled automatic
+  response ([#150](https://github.com/Alan-Huangzy233/secagent-riskops/issues/150)) are separate later gates. Existing AI
+  advice and operator-confirmed blocking do not constitute unattended enforcement.
 
+The complete [known-work inventory](./docs/backlog.md) links every remaining
+product/operations direction to an issue, including deferred recovery, GRC,
+knowledge, authorized validation and finding-derived training labs. Historical
+narrowed demo issues stay closed; their production follow-ups carry explicit
+acceptance boundaries.
 Acceptance criteria and active issues are in the
 [production plan](./docs/production-plan.md). AI advice does not change incident
 disposition or execute actions. Implementation and deployment remain separate,
@@ -67,7 +83,7 @@ GRC or knowledge UI, PostgreSQL.
 | v0.1.9 Assessment Authorization and Rules of Engagement | Partly implemented: hash-bound scope, fail-closed policy gates, blank and ambiguous scope refused; the rest is planned |
 | v0.2 AI SOC Inbox | Reduction pipeline implemented in the skeleton and measured under `v0.3.0-demo`; full product inbox planned; the independent SSH pilot has console notifications and UTC daily briefings |
 | v0.2.4 Approval Service and Local Authentication | Partly implemented: one operator's approval, bound to the plan and scope hashes; approval requests, approver authentication and a second approver planned |
-| v0.2.5 Web Console | A read-only demo page replays the synthetic week (`/demo`, no build step); the console itself is planned, not implemented |
+| v0.2.5 Web Console | Formal multi-user product console planned; a separate telemetry console with tables, cache, search and manual controls is implemented, alongside the read-only synthetic demo |
 | v0.3 GRC Bridge | Planned, not implemented beyond a fixed control mapping; to be renumbered after `v0.3.0-demo` |
 | v0.4 Controlled Remediation | Policy engine, ActionPlan and one typed executor (`harden_ssh_access`) on lab copies with independent verification and automatic, verified rollback; executors on real hosts planned |
 | v0.5 Knowledge Loop | Planned, not implemented |
@@ -86,6 +102,8 @@ GRC or knowledge UI, PostgreSQL.
 
 ## v0.1 Foundation
 
+Remaining production work: [#156](https://github.com/Alan-Huangzy233/secagent-riskops/issues/156).
+
 Goal: Establish the project structure, architecture, core schemas, evidence model, and audit trail.
 
 Deliverables:
@@ -97,6 +115,8 @@ Deliverables:
 - Evidence and audit trace model
 
 ## v0.1.5 Agent Workflow Runtime
+
+Remaining production work: [#156](https://github.com/Alan-Huangzy233/secagent-riskops/issues/156), [#157](https://github.com/Alan-Huangzy233/secagent-riskops/issues/157).
 
 Goal: Build the Flow / Task / Step / ToolCall / Artifact runtime that powers SOC investigations, GRC mapping, remediation workflows, and knowledge review.
 
@@ -110,6 +130,8 @@ Deliverables:
 
 ## v0.2 AI SOC Inbox
 
+Remaining production work: [#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145), [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146), [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147), [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148), [#155](https://github.com/Alan-Huangzy233/secagent-riskops/issues/155).
+
 Goal: Reduce alert fatigue by normalizing, grouping, scoring, and triaging alerts.
 
 Deliverables:
@@ -122,6 +144,8 @@ Deliverables:
 - Daily SOC briefing
 
 ## v0.2.4 Approval Service and Local Authentication
+
+Remaining production work: [#73](https://github.com/Alan-Huangzy233/secagent-riskops/issues/73), [#158](https://github.com/Alan-Huangzy233/secagent-riskops/issues/158), [#154](https://github.com/Alan-Huangzy233/secagent-riskops/issues/154).
 
 Goal: Give the fail-closed policy engine a counterpart that can actually grant
 approval, with an authenticated identity behind every decision, and move
@@ -180,6 +204,8 @@ and deferred to a later milestone.
 
 ## v0.2.5 Web Console
 
+Remaining production work: [#159](https://github.com/Alan-Huangzy233/secagent-riskops/issues/159).
+
 Goal: Replace the API-docs-only interface with a browser console for the
 capabilities that already exist in the backend.
 
@@ -201,6 +227,8 @@ Out of scope: realtime push (polling first), mobile layouts, internationalizatio
 
 ## v0.3 GRC Bridge
 
+Remaining production work: [#160](https://github.com/Alan-Huangzy233/secagent-riskops/issues/160).
+
 Goal: Convert confirmed findings and incidents into compliance evidence and risk register entries.
 
 Deliverables:
@@ -211,6 +239,8 @@ Deliverables:
 - GRC report export
 
 ## v0.4 Controlled Remediation
+
+Remaining production work: [#166](https://github.com/Alan-Huangzy233/secagent-riskops/issues/166), [#150](https://github.com/Alan-Huangzy233/secagent-riskops/issues/150).
 
 Goal: Execute already-approved remediation actions with verification and rollback.
 
@@ -230,6 +260,8 @@ Deliverables:
 
 ## v0.5 Knowledge Loop
 
+Remaining production work: [#161](https://github.com/Alan-Huangzy233/secagent-riskops/issues/161).
+
 Goal: Store validated detection, suppression, control mapping, and remediation knowledge for future reuse.
 
 Deliverables:
@@ -241,6 +273,8 @@ Deliverables:
 
 ## v1.0 End-to-End Demo
 
+Remaining production work: [#167](https://github.com/Alan-Huangzy233/secagent-riskops/issues/167).
+
 Goal: Demonstrate the full workflow from raw alerts to incident, GRC evidence, remediation, verification, and knowledge update.
 
 Deliverables:
@@ -251,6 +285,8 @@ Deliverables:
 - End-to-end acceptance checks in CI
 
 ## v0.1.6 External Intelligence Ingestion
+
+Remaining production work: [#162](https://github.com/Alan-Huangzy233/secagent-riskops/issues/162).
 
 Goal: Build the source registry, connector, crawler-safety, raw document, extracted entity, and knowledge candidate foundation for external security intelligence enrichment.
 
@@ -268,6 +304,8 @@ Deliverables:
 
 ## v0.1.7 Authorized Security Validation
 
+Remaining production work: [#165](https://github.com/Alan-Huangzy233/secagent-riskops/issues/165).
+
 Goal: Build a safe, scoped, read-only validation layer that checks authorized targets and converts results into findings, evidence, risks, controls, and remediation plans.
 
 Deliverables:
@@ -284,6 +322,8 @@ Deliverables:
 
 ## v0.1.8 Curated Knowledge Intake
 
+Remaining production work: [#163](https://github.com/Alan-Huangzy233/secagent-riskops/issues/163).
+
 Goal: Build a secure manual upload, parsing, review, and promotion workflow for user-provided security documents, authorized lab writeups, advisories, rules, and remediation guidance.
 
 Deliverables:
@@ -299,6 +339,8 @@ Deliverables:
 - Public repository privacy and secret audit
 
 ## v0.1.9 Assessment Authorization and Rules of Engagement
+
+Remaining production work: [#164](https://github.com/Alan-Huangzy233/secagent-riskops/issues/164).
 
 Goal: Turn user-provided assessment scope and pentest constraints into an explicit, reviewable, versioned, and deterministically enforced authorization policy.
 
@@ -317,6 +359,8 @@ Deliverables:
 - Stable policy decision reason codes and audit events
 
 ## Long-term direction: Finding-derived Training Labs
+
+Remaining production work: [#168](https://github.com/Alan-Huangzy233/secagent-riskops/issues/168).
 
 Explore turning selected, confirmed findings from authorized pentests into
 sanitised, reproducible training environments for other users. This follows

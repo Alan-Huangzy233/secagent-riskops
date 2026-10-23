@@ -150,7 +150,7 @@ separate incident and paginated restore-history tabs. History describes paired
 database snapshots and operator marking time, not collector catch-up or log completeness. None of these fixtures
 claims production coverage or measures detection accuracy.
 
-## Network detection and ingestion (live acceptance pending)
+## Network detection and ingestion (initial enrollment accepted; sustained work remains)
 
 The versioned UFW kernel-journal parser and source profile are implemented in
 `backend/app/telemetry/network_parse.py`. The bounded offline detector in
@@ -166,8 +166,9 @@ The [durable ingestion foundation](network-ingestion.md) is merged: `network_pro
 receipts, a separate bounded SQLite store and operator read APIs. Dedicated
 `scripts/network_export.py` and `scripts/network_collector.py` provide bounded
 UFW journal reads, durable pending-batch retry and ACK-gated cursor commits.
-`network_ingest` defaults to `null`; no network store or collector is enabled by
-existing configuration. The synthetic `scripts/simulate_network_ingest.py`
+`network_ingest` defaults to `null`; the repository example configuration does
+not enable a network store or collector. The maintained deployment separately
+completed reviewed initial enrollment, as recorded below. The synthetic `scripts/simulate_network_ingest.py`
 exercises the disposable delivery path without live source access.
 
 The legacy exporter guards only iptables/ip6tables snapshots. New sources
@@ -181,11 +182,13 @@ visible after cleanup, and no unsafe receipt pruning is implemented.
 and evidence, a paginated network table/detail view and console notices. Late
 observations revise cases; incomplete context preserves prior evidence visibly
 stale. The strict network schema migration preserves existing delivery ACKs.
-Passive real-source acceptance, resource measurements, long-term capacity and
-network store/spool/cursor backup/restore acceptance remain separate gates in
-the [network source plan](network-source-plan.md).
-This change enables no production network detector; synthetic cases do not
-establish accuracy or live coverage. The demo Suricata parser and SSH exporter
+Real-source acceptance, resource measurements, long-term capacity and paired
+network store/spool/cursor recovery are separate gates in the
+[network source plan](network-source-plan.md). Initial passive enrollment and
+paired recovery foundations are accepted below; sustained operation and future
+change-specific restore validation remain. Code installation alone does not
+enable a production source, and synthetic cases do not establish accuracy or
+live coverage. The demo Suricata parser and SSH exporter
 do not supply this network source. HTTP #119 awaits a real business service;
 continue network #120 before Linux host behavior #121.
 
@@ -213,8 +216,10 @@ Existing v1 profile revisions remain compatible; new profiles bind their guard
 and reviewed validity time. Native observations cannot assert local-input or
 rejection meaning and do not create TCP probe findings. Collector service/timer
 templates remain opt-in. No source account, firewall policy or production
-configuration is enabled by these code changes. Per-source passive acceptance,
-sustained capacity and a safe long-term compaction policy remain outstanding.
+configuration is enabled by these code changes alone. Separately, reviewed initial
+passive enrollment was accepted in the maintained deployment after PR #143/#144.
+Sustained source/coverage acceptance, capacity calibration and safe long-term
+receipt governance remain outstanding in #120 and [#152](https://github.com/Alan-Huangzy233/secagent-riskops/issues/152).
 
 Source acceptance also supports a narrowly declared dynamic terminal address-set
 guard, preserving static-profile revisions and exposing its observation limit.
@@ -222,3 +227,13 @@ Quiet filtered journals can send empty heartbeats; genuine command failures
 remain errors. API tests exercise the existing bounded busy-retry contract with
 a real WAL reader and unchanged pending bytes. See the [source guard](network-source-guard.md).
 Source-specific activation and sustained operation remain separate acceptance.
+The maintained deployment has observed TCP findings; narrow UDP/empty-heartbeat
+paths do not establish general traffic visibility. This is distinct from default-off
+repository examples and does not enable any new source for another deployment.
+
+## Remaining work tracking
+
+The [known-work inventory](backlog.md) links current and deferred production
+requirements to GitHub issues. Visible IP search/pivots, cross-type joint cases
+and joint AI are planned increments, not part of the deployed network foundation.
+Formal product features remain separate from the persistent telemetry pilot.
