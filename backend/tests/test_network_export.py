@@ -394,3 +394,101 @@ def test_full_guard_failure_never_releases_page(config, on_second):
     with pytest.raises(exporter.ExportError, match='firewall_guard_snapshot_failed'):
         page(config, [record()], cursor='previous', rules=rules)
     assert len(calls) == (2 if on_second else 1)
+
+
+def terminal_config(config):
+    config = strong_config(config)
+    config['profile'].update(guard_version='netfilter-terminal-v2',
+                             dynamic_terminal_sets=['inet/synthetic/denied_sources'])
+    return config
+
+
+def test_terminal_export_binds_allowlist_to_both_checks_and_validity(config, monkeypatch):
+    config = terminal_config(config)
+    calls = []
+    def rules(**kwargs):
+        calls.append(kwargs)
+        return 'a' * 64
+    result = page(config, [record()], rules=rules)
+    assert len(calls) == 2 and calls[0] == calls[1]
+    assert calls[0]['guard_version'] == 'netfilter-terminal-v2'
+    assert calls[0]['dynamic_terminal_sets'] == ('inet/synthetic/denied_sources',)
+    event = result['entries'][0]['event']
+    assert event['parser_version'] == 'netfilter-kernel-v3' and 'dynamic_terminal_filtering' in event['coverage']
+    config['profile_valid_from_us'] += 1
+    with pytest.raises(exporter.ExportError, match='profile_validity_mismatch'):
+        page(config, rules=rules)
+    monkeypatch.setattr(exporter, 'secure_file', lambda *a, **k: encode(config))
+    with pytest.raises(exporter.ExportError, match='invalid_export_config'):
+        exporter.load_config()
+
+
+@pytest.mark.parametrize('on_second', [False, True])
+@pytest.mark.parametrize('failure', ['unsafe_dynamic_terminal_set', 'firewall_guard_tool_unavailable',
+                                   'subprocess_deadline', 'invalid_nft_rules_snapshot'])
+def test_terminal_review_failure_never_releases_partial_page(config, on_second, failure):
+    config = terminal_config(config)
+    calls = []
+    def rules(**kwargs):
+        calls.append(True)
+        if not on_second or len(calls) == 2:
+            raise exporter.ExportError(failure)
+        return 'a' * 64
+    with pytest.raises(exporter.ExportError, match=failure):
+        page(config, [record()], rules=rules)
+    assert len(calls) == (2 if on_second else 1)
+
+
+def test_terminal_guard_only_unbinds_reviewed_members_across_all_seven_fixed_views(monkeypatch):
+    from copy import deepcopy
+    from test_network_guard import snapshot, IDENTITIES
+    monkeypatch.setattr(exporter.os, 'access', lambda *a: True)
+    items = snapshot()
+    def nft(items):
+        return encode({'nftables': [{'metainfo': {'json_schema_version': 1}}, *items]})
+    outputs = {name: (nft(items) if name == 'nft' else b'*filter\n:INPUT ACCEPT [0:0]\nCOMMIT\n')
+               for name, _ in exporter.FULL_RULE_COMMANDS}
+    calls = []
+    def run(command, **limits):
+        calls.append(command)
+        assert limits['maximum'] == 4 * 1024 * 1024
+        assert limits['deadline'] <= time.monotonic() + 2
+        return outputs[next(name for name, fixed in exporter.FULL_RULE_COMMANDS if list(fixed) == command)]
+    def digest(**kwargs):
+        return exporter.ruleset_fingerprint(deadline=time.monotonic() + 10, run=run,
+                                            guard_version='netfilter-terminal-v2', dynamic_terminal_sets=IDENTITIES, **kwargs)
+    baseline = digest()
+    assert calls == [list(command) for _, command in exporter.FULL_RULE_COMMANDS]
+    changed = deepcopy(items)
+    changed[2]['set']['elem'] = ['198.51.100.45', '203.0.113.9']
+    outputs['nft'] = nft(changed)
+    assert digest() == baseline
+    outputs['nft'] = nft(items)
+    full_before = exporter.ruleset_fingerprint(deadline=time.monotonic() + 10, run=run, guard_version='netfilter-full-v1')
+    outputs['nft'] = nft(changed)
+    assert exporter.ruleset_fingerprint(deadline=time.monotonic() + 10, run=run, guard_version='netfilter-full-v1') != full_before
+    assert baseline != full_before
+    outputs['nft'] = nft(items)
+    for name, _ in exporter.FULL_RULE_COMMANDS:
+        old = outputs[name]
+        changed = deepcopy(items)
+        changed[4]['rule']['expr'][0]['log']['prefix'] = '[CHANGED]'
+        outputs[name] = nft(changed) if name == 'nft' else old.replace(b'ACCEPT', b'DROP')
+        assert digest() != baseline
+        outputs[name] = old
+    changed = deepcopy(items)
+    changed[3]['rule']['expr'].insert(1, {'log': {'prefix': '[UNSAFE]'}})
+    outputs['nft'] = nft(changed)
+    with pytest.raises(exporter.ExportError, match='unsafe_dynamic_terminal_set'):
+        digest()
+    outputs['nft'] = nft(items)
+    monkeypatch.setattr(exporter.os, 'access', lambda *a: False)
+    with pytest.raises(exporter.ExportError, match='firewall_guard_tool_unavailable'):
+        digest()
+
+
+@pytest.mark.parametrize('guard', ['iptables-v1', 'netfilter-full-v1'])
+def test_older_guard_cannot_silently_ignore_a_dynamic_allowlist(guard):
+    with pytest.raises(exporter.ExportError, match='unsafe_dynamic_terminal_set'):
+        exporter.ruleset_fingerprint(deadline=time.monotonic() + 2, guard_version=guard,
+                                     dynamic_terminal_sets=('inet/synthetic/denied_sources',))

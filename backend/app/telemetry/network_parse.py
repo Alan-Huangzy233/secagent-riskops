@@ -19,12 +19,16 @@ import ipaddress
 import json
 import re
 
+from .network_guard import TERMINAL_GUARD, NetworkGuardError, validate_terminal_set_ids
+
 
 SCHEMA_VERSION = 1
 PARSER_VERSION = "ufw-kernel-v1"
 FULL_PARSER_VERSION = "netfilter-kernel-v2"
+TERMINAL_PARSER_VERSION = "netfilter-kernel-v3"
 LEGACY_GUARD = "iptables-v1"
 FULL_GUARD = "netfilter-full-v1"
+STRONG_GUARDS = (FULL_GUARD, TERMINAL_GUARD)
 MAX_MESSAGE_BYTES = 8192
 MAX_CURSOR_BYTES = 2048
 MAX_JOURNAL_FIELDS = 128
@@ -51,7 +55,7 @@ _COVERAGE = frozenset({
     "logging_rate_limited", "logging_limits_unknown", "journal_retention_unknown",
     "unverified_local_input", "incomplete_interfaces", "missing_transport_ports",
     "tcp_flags_unavailable", "truncated_transport_header", "fragmented_packet",
-    "unsupported_protocol", "ipv6_extension_headers",
+    "unsupported_protocol", "ipv6_extension_headers", "dynamic_terminal_filtering",
 })
 
 
@@ -91,6 +95,8 @@ class SourceProfile:
     these labels with this interface shape identify local input unambiguously.
     Leave both empty if that assertion has not been verified. This is a narrow
     first-source contract; output/forward/NAT attribution is not implemented.
+    Dynamic terminal sets require a separately versioned, explicit allowlist;
+    their changing membership limits observation coverage even with stable rules.
     Rate and retention details belong in their bounded context strings, not in
     changing counters. A profile revision changes with any stable context field.
     """
@@ -109,6 +115,7 @@ class SourceProfile:
     schema_version: int = SCHEMA_VERSION
     guard_version: str = LEGACY_GUARD
     profile_valid_from_us: int | None = None
+    dynamic_terminal_sets: tuple[str, ...] = ()
 
     def __post_init__(self):
         _validate_profile(self)
@@ -122,6 +129,10 @@ class SourceProfile:
         if self.guard_version == LEGACY_GUARD:
             del payload["guard_version"]
             del payload["profile_valid_from_us"]
+        if self.guard_version != TERMINAL_GUARD:
+            del payload["dynamic_terminal_sets"]
+        else:
+            payload["dynamic_terminal_sets"] = sorted(payload["dynamic_terminal_sets"])
         for key in ("log_labels", "ip_families", "rejection_labels", "local_input_labels", "local_input_interfaces"):
             payload[key] = sorted(payload[key])
         return _digest(payload)
@@ -136,15 +147,22 @@ def _validate_profile(profile: SourceProfile):
         _fail("invalid_ruleset_digest")
     if type(profile.schema_version) is not int or profile.schema_version != SCHEMA_VERSION:
         _fail("unsupported_profile_version")
-    if profile.guard_version not in (LEGACY_GUARD, FULL_GUARD):
+    if profile.guard_version not in (LEGACY_GUARD, *STRONG_GUARDS):
         _fail("unsupported_profile_guard")
-    if profile.guard_version == FULL_GUARD:
+    if profile.guard_version == TERMINAL_GUARD:
+        try:
+            validate_terminal_set_ids(profile.dynamic_terminal_sets)
+        except NetworkGuardError:
+            _fail("invalid_dynamic_terminal_sets")
+    elif type(profile.dynamic_terminal_sets) is not tuple or profile.dynamic_terminal_sets:
+        _fail("invalid_dynamic_terminal_sets")
+    if profile.guard_version in STRONG_GUARDS:
         if (type(profile.profile_valid_from_us) is not int
                 or not 0 <= profile.profile_valid_from_us <= MAX_REALTIME_US):
             _fail("invalid_profile_valid_from")
     elif profile.profile_valid_from_us is not None:
         _fail("invalid_profile_valid_from")
-    for value, pattern in ((profile.log_labels, _ANY_LABEL if profile.guard_version == FULL_GUARD else _LABEL),
+    for value, pattern in ((profile.log_labels, _ANY_LABEL if profile.guard_version in STRONG_GUARDS else _LABEL),
                            (profile.rejection_labels, _LABEL), (profile.local_input_labels, _LABEL)):
         # Native prefixes are observations only, never rejection/local-input
         # assertions, even when their text resembles a firewall verdict.
@@ -168,6 +186,11 @@ def _validate_profile(profile: SourceProfile):
         _fail("invalid_retention")
     if not all(_ascii(value, maximum=256) for value in (profile.logging_limit_context, profile.retention_context)):
         _fail("invalid_profile_context")
+
+
+def profile_parser_version(profile: SourceProfile) -> str:
+    return {LEGACY_GUARD: PARSER_VERSION, FULL_GUARD: FULL_PARSER_VERSION,
+            TERMINAL_GUARD: TERMINAL_PARSER_VERSION}[profile.guard_version]
 
 
 @dataclass(frozen=True)
@@ -352,6 +375,8 @@ def parse_ufw(record: dict, *, profile: SourceProfile) -> NetworkEvent:
     src_port, dst_port = _port(values.get("SPT")), _port(values.get("DPT"))
     ingress, egress = _interface(values.get("IN")), _interface(values.get("OUT"))
     coverage: set[str] = set()
+    if profile.guard_version == TERMINAL_GUARD:
+        coverage.add("dynamic_terminal_filtering")
     if profile.logging_limit == "rate_limited":
         coverage.add("logging_rate_limited")
     elif profile.logging_limit == "unknown":
@@ -396,7 +421,7 @@ def parse_ufw(record: dict, *, profile: SourceProfile) -> NetworkEvent:
         _fail("inconsistent_transport_fields")
     event = NetworkEvent(
         source_id=profile.source_id, schema_version=SCHEMA_VERSION,
-        parser_version=FULL_PARSER_VERSION if profile.guard_version == FULL_GUARD else PARSER_VERSION,
+        parser_version=profile_parser_version(profile),
         boot_id=boot, journal_cursor=cursor, event_id=_identity(profile.source_id, boot, cursor),
         content_hash="", journal_realtime_us=realtime, journal_monotonic_us=monotonic,
         transport="kernel", ip_family=src.version, src_ip=str(src), dst_ip=str(dst),
@@ -423,7 +448,7 @@ def validate_event(event: NetworkEvent) -> None:
     if not isinstance(event.source_id, str) or not _ID.fullmatch(event.source_id):
         _fail("invalid_event_source_id")
     if (type(event.schema_version) is not int or event.schema_version != SCHEMA_VERSION
-            or event.parser_version not in (PARSER_VERSION, FULL_PARSER_VERSION)):
+            or event.parser_version not in (PARSER_VERSION, FULL_PARSER_VERSION, TERMINAL_PARSER_VERSION)):
         _fail("unsupported_event_version")
     if not isinstance(event.boot_id, str) or not _BOOT.fullmatch(event.boot_id):
         _fail("invalid_boot_id")
@@ -456,7 +481,7 @@ def validate_event(event: NetworkEvent) -> None:
         _fail("invalid_observation_point")
     if event.direction == "local_input" and (event.ingress_interface is None or event.egress_interface is not None):
         _fail("invalid_local_input_shape")
-    pattern = _ANY_LABEL if event.parser_version == FULL_PARSER_VERSION else _LABEL
+    pattern = _ANY_LABEL if event.parser_version != PARSER_VERSION else _LABEL
     if not isinstance(event.log_label, str) or not pattern.fullmatch(event.log_label):
         _fail("invalid_log_label")
     if _NATIVE_LABEL.fullmatch(event.log_label) and (event.direction != "unknown" or event.rejection_related):
@@ -466,6 +491,8 @@ def validate_event(event: NetworkEvent) -> None:
     if (type(event.coverage) is not tuple or len(event.coverage) > len(_COVERAGE) or any(not isinstance(item, str) or item not in _COVERAGE for item in event.coverage)
             or event.coverage != tuple(sorted(set(event.coverage)))):
         _fail("invalid_event_coverage")
+    if (event.parser_version == TERMINAL_PARSER_VERSION) != ("dynamic_terminal_filtering" in event.coverage):
+        _fail("inconsistent_event_coverage")
     if (event.direction == "unknown") != ("unverified_local_input" in event.coverage):
         _fail("inconsistent_event_coverage")
     if event.protocol == "TCP" and (event.tcp_flags is None) != ("tcp_flags_unavailable" in event.coverage):

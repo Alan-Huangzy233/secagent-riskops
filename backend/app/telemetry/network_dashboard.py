@@ -27,6 +27,7 @@ let networkEvidencePage=1,networkEvidencePages=1,networkEvidenceLoading=false,ne
 const networkCollection={never_seen:'尚未收到日志',stale:'采集心跳过期',delayed:'采集延迟',degraded:'采集有缺口、拒收或尚未追平',current:'近期采集正常'};
 const networkCoverage={
  offline_context_only:'仅依据已保存的日志上下文',observations_are_lower_bounds:'记录仅为可见流量的下限',apparent_source_not_identity:'来源地址不能确认人员身份',
+ dynamic_terminal_filtering:'动态封禁可能提前过滤部分流量',
  logging_rate_limited:'日志有限速，可能缺少记录',logging_limits_unknown:'日志限速范围未知',journal_retention_unknown:'来源日志保留范围未知',
  unverified_local_input:'未核验本机入站路径',incomplete_interfaces:'接口覆盖不完整',missing_transport_ports:'缺少传输层端口',tcp_flags_unavailable:'缺少 TCP 标志',
  truncated_transport_header:'传输层头部不完整',fragmented_packet:'分片报文',unsupported_protocol:'不支持的协议',ipv6_extension_headers:'IPv6 扩展头影响可见范围',

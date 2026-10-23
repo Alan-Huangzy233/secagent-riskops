@@ -24,7 +24,8 @@ import threading
 import time
 import uuid
 
-from app.telemetry.network_parse import FULL_GUARD, LEGACY_GUARD, MAX_CURSOR_BYTES, MAX_REALTIME_US
+from app.telemetry.network_parse import LEGACY_GUARD, STRONG_GUARDS, MAX_CURSOR_BYTES, MAX_REALTIME_US
+from app.telemetry.network_guard import TERMINAL_GUARD, NetworkGuardError, terminal_set_snapshot, validate_terminal_set_ids
 from app.telemetry.network_protocol import (
     MAX_BATCH_BYTES, MAX_ENTRIES, encode, fingerprint, journal_entry,
     profile_from_dict, validate_batch,
@@ -95,7 +96,7 @@ def load_config(path: Path = CONFIG_PATH):
         valid_from = value['profile_valid_from_us']
         if (type(value['version']) is not int or value['version'] != 1
                 or type(valid_from) is not int or not 0 <= valid_from <= MAX_REALTIME_US
-                or (profile.guard_version == FULL_GUARD and valid_from != profile.profile_valid_from_us)):
+                or (profile.guard_version in STRONG_GUARDS and valid_from != profile.profile_valid_from_us)):
             raise ValueError
         return value, profile
     except (OSError, ValueError, TypeError, KeyError):
@@ -319,16 +320,25 @@ def normalized_nft_rules(raw):
         raise ExportError('invalid_nft_rules_snapshot') from None
 
 
-def ruleset_fingerprint(*, deadline, run=run_command, guard_version=LEGACY_GUARD):
+def ruleset_fingerprint(*, deadline, run=run_command, guard_version=LEGACY_GUARD, dynamic_terminal_sets=()):
+    try:
+        if guard_version == TERMINAL_GUARD:
+            validate_terminal_set_ids(dynamic_terminal_sets)
+        elif type(dynamic_terminal_sets) is not tuple or dynamic_terminal_sets:
+            raise NetworkGuardError("unsafe_dynamic_terminal_set")
+    except NetworkGuardError:
+        raise ExportError("unsafe_dynamic_terminal_set") from None
     if guard_version == LEGACY_GUARD:
         snapshots = {}
         for family, executable in ((4, '/usr/sbin/iptables-save'), (6, '/usr/sbin/ip6tables-save')):
             raw = run([executable], deadline=min(deadline, time.monotonic() + 2), maximum=MAX_RAW_PAGE_BYTES)
             snapshots[str(family)] = normalized_rules(raw)
         return fingerprint(snapshots)
-    if guard_version != FULL_GUARD:
+    if guard_version not in STRONG_GUARDS:
         raise ExportError('unsupported_profile_guard')
-    snapshots = {'guard_version': FULL_GUARD}
+    snapshots = {'guard_version': guard_version}
+    if guard_version == TERMINAL_GUARD:
+        snapshots['dynamic_terminal_sets'] = sorted(dynamic_terminal_sets)
     for name, command in FULL_RULE_COMMANDS:
         if not os.access(command[0], os.X_OK):
             raise ExportError('firewall_guard_tool_unavailable')
@@ -339,6 +349,11 @@ def ruleset_fingerprint(*, deadline, run=run_command, guard_version=LEGACY_GUARD
                 raise
             raise ExportError('firewall_guard_snapshot_failed') from None
         snapshots[name] = normalized_nft_rules(raw) if name == 'nft' else normalized_rules(raw, strict=True)
+        if name == 'nft' and guard_version == TERMINAL_GUARD:
+            try:
+                snapshots[name] = terminal_set_snapshot(snapshots[name], dynamic_terminal_sets)
+            except NetworkGuardError:
+                raise ExportError('unsafe_dynamic_terminal_set') from None
     return fingerprint(snapshots)
 
 
@@ -389,7 +404,7 @@ def export_page(config, request, *, now_us=None, clock=time.monotonic,
                 exists=cursor_exists, rules=ruleset_fingerprint, read=journal_records):
     profile = profile_from_dict(config['profile'])
     validate_request(request, profile)
-    if (profile.guard_version == FULL_GUARD
+    if (profile.guard_version in STRONG_GUARDS
             and config['profile_valid_from_us'] != profile.profile_valid_from_us):
         raise ExportError('profile_validity_mismatch')
     now_us = time.time_ns() // 1000 if now_us is None else now_us
@@ -398,9 +413,12 @@ def export_page(config, request, *, now_us=None, clock=time.monotonic,
     batch = {'version': 1, 'source_id': profile.source_id, 'profile_revision': profile.revision,
              'batch_id': uuid.uuid4().hex, 'collected_at_us': now_us, 'cursor_before': cursor,
              'cursor_after': cursor, 'entries': [], 'reports': [], 'caught_up': False}
+    guard_options = {'guard_version': profile.guard_version}
+    if profile.guard_version == TERMINAL_GUARD:
+        guard_options['dynamic_terminal_sets'] = profile.dynamic_terminal_sets
     if config['profile_valid_from_us'] > now_us:
         raise ExportError('profile_not_yet_valid')
-    if rules(deadline=deadline, guard_version=profile.guard_version) != profile.ruleset_sha256:
+    if rules(deadline=deadline, **guard_options) != profile.ruleset_sha256:
         batch['reports'] = ['profile_drift']
         return validate_batch(batch, profile)
     valid = cursor is not None and exists(cursor)
@@ -450,7 +468,7 @@ def export_page(config, request, *, now_us=None, clock=time.monotonic,
             records.close()
     # Do not release a page observed across changing rules, even if all rows
     # independently parse. Discard its content and retain the caller's cursor.
-    if rules(deadline=deadline, guard_version=profile.guard_version) != profile.ruleset_sha256:
+    if rules(deadline=deadline, **guard_options) != profile.ruleset_sha256:
         batch.update(entries=[], cursor_after=cursor, reports=['profile_drift'], caught_up=False)
     elif valid and not exists(cursor):
         # Journal vacuum may race the initial exact check and the seek/read.
