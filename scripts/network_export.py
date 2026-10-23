@@ -37,8 +37,11 @@ MAX_CONFIG_BYTES = 65536
 MAX_REQUEST_BYTES = 4096
 MAX_RAW_LINE_BYTES = 65536
 MAX_RAW_PAGE_BYTES = 4 * 1024 * 1024
+MAX_JOURNAL_STDERR_BYTES = 16384
 MAX_EXPORT_SECONDS = 10
 FIELDS = ('_TRANSPORT', '_BOOT_ID', '__CURSOR', '__REALTIME_TIMESTAMP', '__MONOTONIC_TIMESTAMP', 'MESSAGE')
+JOURNAL_COMMAND_PREFIX = ('/usr/bin/journalctl', '--no-pager', '--quiet', '--all', '--output=json',
+                          '--output-fields=' + ','.join(FIELDS), '_TRANSPORT=kernel')
 
 
 class ExportError(ValueError):
@@ -144,18 +147,31 @@ def _stop(process):
     process.wait(timeout=1)
 
 
-def command_chunks(command, *, deadline, maximum, input_data=b''):
-    """Bound bytes and wall time; close the generator to stop an unread tail."""
+def command_chunks(command, *, deadline, maximum, input_data=b'', _empty_journal=False):
+    """Bound bytes/time; only the fixed journal query can accept an empty grep result.
+
+    stderr is discarded for ordinary strict commands. For the journal query we
+    drain and count a separate bounded pipe without retaining diagnostic bytes.
+    """
+    if _empty_journal and not (
+            len(command) == len(JOURNAL_COMMAND_PREFIX) + 2
+            and tuple(command[:len(JOURNAL_COMMAND_PREFIX)]) == JOURNAL_COMMAND_PREFIX
+            and command[-2].startswith('--grep=^')
+            and command[-1].startswith(('--since=', '--after-cursor='))):
+        raise ExportError('invalid_journal_command')
     process = None
     selector = selectors.DefaultSelector()
     try:
         process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                   stderr=subprocess.DEVNULL, start_new_session=True,
+                                   stderr=subprocess.PIPE if _empty_journal else subprocess.DEVNULL,
+                                   start_new_session=True,
                                    env={'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LC_ALL': 'C', 'TZ': 'UTC'})
         process.stdin.write(input_data)
         process.stdin.close()
-        selector.register(process.stdout, selectors.EVENT_READ)
-        size = 0
+        selector.register(process.stdout, selectors.EVENT_READ, 'stdout')
+        if _empty_journal:
+            selector.register(process.stderr, selectors.EVENT_READ, 'stderr')
+        size = stderr_size = 0
         while selector.get_map():
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -163,18 +179,29 @@ def command_chunks(command, *, deadline, maximum, input_data=b''):
             ready = selector.select(remaining)
             if not ready:
                 raise ExportError('subprocess_deadline')
-            chunk = os.read(process.stdout.fileno(), 8192)
-            if not chunk:
-                selector.unregister(process.stdout)
-                break
-            size += len(chunk)
-            if size > maximum:
-                raise ExportError('subprocess_output_limit')
-            yield chunk
+            for key, _ in ready:
+                chunk = os.read(key.fd, 8192)
+                if not chunk:
+                    selector.unregister(key.fileobj)
+                    continue
+                if key.data == 'stderr':
+                    stderr_size += len(chunk)
+                    if stderr_size > MAX_JOURNAL_STDERR_BYTES:
+                        raise ExportError('subprocess_output_limit')
+                else:
+                    size += len(chunk)
+                    if size > maximum:
+                        raise ExportError('subprocess_output_limit')
+                    yield chunk
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise ExportError('subprocess_deadline')
-        if process.wait(timeout=remaining) != 0:
+        status = process.wait(timeout=remaining)
+        # systemd v255 src/journal/journalctl.c: --grep with zero matches
+        # returns -ENOENT; --quiet leaves stdout empty. A nonempty diagnostic
+        # or any emitted stdout must never be reclassified as that empty case.
+        no_match = _empty_journal and status == 1 and size == stderr_size == 0
+        if (status != 0 and not no_match) or (_empty_journal and stderr_size):
             raise ExportError('subprocess_failed')
     except (OSError, subprocess.SubprocessError):
         raise ExportError('subprocess_failed') from None
@@ -184,6 +211,8 @@ def command_chunks(command, *, deadline, maximum, input_data=b''):
             _stop(process)
             process.stdin.close()
             process.stdout.close()
+            if process.stderr is not None:
+                process.stderr.close()
 
 
 def run_command(command, *, deadline, maximum):
@@ -358,8 +387,7 @@ def ruleset_fingerprint(*, deadline, run=run_command, guard_version=LEGACY_GUARD
 
 
 def journal_command(profile, cursor, *, valid_cursor, since_us):
-    command = ['/usr/bin/journalctl', '--no-pager', '--quiet', '--all', '--output=json',
-               '--output-fields=' + ','.join(FIELDS), '_TRANSPORT=kernel',
+    command = [*JOURNAL_COMMAND_PREFIX,
                '--grep=^(?:' + '|'.join(re.escape(label) for label in profile.log_labels) + ') ']
     if cursor is not None and valid_cursor:
         command.append('--after-cursor=' + cursor)
@@ -370,7 +398,7 @@ def journal_command(profile, cursor, *, valid_cursor, since_us):
 
 
 def journal_records(command, *, deadline):
-    chunks = command_chunks(command, deadline=deadline, maximum=MAX_RAW_PAGE_BYTES)
+    chunks = command_chunks(command, deadline=deadline, maximum=MAX_RAW_PAGE_BYTES, _empty_journal=True)
     pending = b''
     try:
         for chunk in chunks:

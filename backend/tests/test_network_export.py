@@ -492,3 +492,99 @@ def test_older_guard_cannot_silently_ignore_a_dynamic_allowlist(guard):
     with pytest.raises(exporter.ExportError, match='unsafe_dynamic_terminal_set'):
         exporter.ruleset_fingerprint(deadline=time.monotonic() + 2, guard_version=guard,
                                      dynamic_terminal_sets=('inet/synthetic/denied_sources',))
+
+
+def fake_journal_process(tmp_path, monkeypatch, program):
+    """Run a real bounded child while keeping the production journal argv."""
+    fake = tmp_path / 'fake-journalctl'
+    fake.write_text('#!' + sys.executable + '\n' + program + '\n')
+    fake.chmod(0o700)
+    popen = exporter.subprocess.Popen
+    calls = []
+    def launch(command, **kwargs):
+        assert tuple(command[:len(exporter.JOURNAL_COMMAND_PREFIX)]) == exporter.JOURNAL_COMMAND_PREFIX
+        calls.append(command)
+        return popen([str(fake), *command[1:]], **kwargs)
+    monkeypatch.setattr(exporter.subprocess, 'Popen', launch)
+    return calls
+
+
+@pytest.mark.parametrize('status', [0, 1])
+def test_empty_filtered_journal_is_a_valid_first_and_repeated_heartbeat(config, tmp_path, monkeypatch, status):
+    config = strong_config(config)
+    calls = fake_journal_process(tmp_path, monkeypatch, f'raise SystemExit({status})')
+    guards = []
+    def rules(**kwargs):
+        guards.append(kwargs['guard_version'])
+        return 'a' * 64
+    for cursor in (None, None, 'previous', 'previous'):
+        result = page(config, cursor=cursor, read=exporter.journal_records, rules=rules)
+        assert result['entries'] == [] and result['caught_up']
+        assert result['cursor_before'] == result['cursor_after'] == cursor
+        assert result['reports'] == ([] if cursor else ['coverage_start', 'profile_boundary'])
+    assert len(calls) == 4 and guards == ['netfilter-full-v1'] * 8
+
+
+@pytest.mark.parametrize('status, stdout, stderr, reason', [
+    (2, b'', b'', 'subprocess_failed'),
+    (1, b'', b'synthetic private diagnostic', 'subprocess_failed'),
+    (0, b'', b'synthetic private diagnostic', 'subprocess_failed'),
+    (1, encode(record()) + b'\n', b'', 'subprocess_failed'),
+    (1, encode(record()), b'', 'subprocess_failed'),
+    (0, encode(record()), b'', 'partial_journal_line'),
+    (1, b'-- No entries --\n', b'', 'invalid_json'),
+])
+def test_real_journal_child_errors_and_truncation_never_become_empty_pages(
+        config, tmp_path, monkeypatch, capsys, status, stdout, stderr, reason):
+    program = ('import os\n'
+               f'os.write(1, {stdout!r})\nos.write(2, {stderr!r})\n'
+               f'raise SystemExit({status})')
+    fake_journal_process(tmp_path, monkeypatch, program)
+    with pytest.raises(exporter.ExportError, match='^' + reason + '$') as error:
+        page(config, cursor='previous', read=exporter.journal_records)
+    assert str(error.value) == reason
+    captured = capsys.readouterr()
+    assert captured.out == captured.err == ''
+
+
+def test_real_journal_child_successful_records_are_still_normalized(config, tmp_path, monkeypatch):
+    fake_journal_process(tmp_path, monkeypatch,
+        f'import os\nos.write(1, {encode(record()) + bytes([10])!r})')
+    result = page(config, cursor='previous', read=exporter.journal_records)
+    assert result['caught_up'] and len(result['entries']) == 1
+    assert result['cursor_after'] == 'opaque-cursor-0'
+    assert b'MESSAGE' not in encode(result)
+
+
+def test_real_journal_stderr_is_bounded_and_not_printed(config, tmp_path, monkeypatch, capsys):
+    fake_journal_process(tmp_path, monkeypatch,
+        "import os\nos.write(2, b'x' * 32768)\nraise SystemExit(1)")
+    with pytest.raises(exporter.ExportError, match='^subprocess_output_limit$'):
+        page(config, cursor='previous', read=exporter.journal_records)
+    captured = capsys.readouterr()
+    assert captured.out == captured.err == ''
+
+
+def test_real_journal_child_with_no_exit_is_not_an_empty_result(tmp_path, monkeypatch):
+    fake_journal_process(tmp_path, monkeypatch, 'import time\ntime.sleep(30)')
+    command = exporter.journal_command(source_profile(), None, valid_cursor=False, since_us=NOW)
+    began = time.monotonic()
+    with pytest.raises(exporter.ExportError, match='^subprocess_deadline$'):
+        list(exporter.journal_records(command, deadline=began + .1))
+    assert time.monotonic() - began < 2
+
+
+def test_exit_one_remains_failure_for_general_commands_even_journal_argv(config, tmp_path, monkeypatch):
+    calls = fake_journal_process(tmp_path, monkeypatch, 'raise SystemExit(1)')
+    command = exporter.journal_command(source_profile(), None, valid_cursor=False, since_us=NOW)
+    with pytest.raises(exporter.ExportError, match='^subprocess_failed$'):
+        exporter.run_command(command, deadline=time.monotonic() + 2, maximum=1024)
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize('command', [['/usr/bin/ssh'], ['/usr/sbin/iptables-save'],
+    ['/usr/sbin/nft', '--json', 'list', 'ruleset'], ['/usr/bin/journalctl', '--quiet']])
+def test_empty_journal_exception_rejects_nonfixed_command_shapes(command):
+    with pytest.raises(exporter.ExportError, match='^invalid_journal_command$'):
+        list(exporter.command_chunks(command, deadline=time.monotonic() + 2,
+                                     maximum=1024, _empty_journal=True))
