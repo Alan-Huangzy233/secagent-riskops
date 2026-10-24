@@ -65,9 +65,9 @@ operation and long-term receipt/capacity work continue in #120 and
 
 Visible IP search and network→SSH pivots ([#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145)) are deployed.
 The next step is [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147) (joint evidence cases): the
-[offline foundation](joint-evidence.md) supplies bounded typed association;
-retained-source adapters, durable reconciliation and the joint console remain
-pending. Then follow with [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148) (manual joint AI). Grouped cross-type search [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) ships in
+[foundation and read adapters](joint-evidence.md) supply bounded typed association
+and explicit retained-source reads. Production integration, durable reconciliation
+and the joint console remain pending. Then follow with [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148) (manual joint AI). Grouped cross-type search [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) ships in
 bounded increments; its raw-log index/migration work does not block retained-case
 correlation. Linux #121 source inventory can run alongside these steps and does
 not wait for paid AI approval. HTTP real-source acceptance still waits for an

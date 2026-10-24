@@ -13,8 +13,8 @@ public tracking.
 
 1. Delivered: visible exact-IP search in SSH alerts/logs and network→SSH pivots (#145).
 2. Build SSH + network joint cases. The [offline foundation](joint-evidence.md)
-   supplies typed association and synthetic counterexamples; live adapters,
-   durable cases and the console remain pending. Search matches alone do not
+   supplies typed association and bounded read-only source adapters with isolated
+   acceptance; live integration, durable cases and the console remain pending. Search matches alone do not
    identify one actor or prove an attack chain.
 3. Add manual AI review of those versioned joint dossiers.
 4. Continue Linux host evidence after the network foundation. Source inventory
@@ -52,7 +52,7 @@ paused. No date is promised for deferred product or exploratory work.
 | --- | --- | --- |
 | [#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145) | Make IP search visible and pivot from network findings to SSH evidence | deployed |
 | [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) | Add scoped IP lookup across network, HTTP and SSH records | planned |
-| [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147) | Correlate SSH and network evidence into traceable investigation cases | offline foundation; live integration pending |
+| [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147) | Correlate SSH and network evidence into traceable investigation cases | foundation and read adapters; live integration pending |
 | [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148) | Extend manual AI review to network and correlated SSH evidence | planned |
 
 ## Detection, AI and operational follow-ups
