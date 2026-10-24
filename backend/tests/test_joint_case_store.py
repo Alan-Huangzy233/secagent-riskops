@@ -106,6 +106,7 @@ def test_no_mode_changes_to_existing_parent(retained, tmp_path):
     store, *_ = retained
     directory = tmp_path/'existing-parent'
     directory.mkdir(mode=0o750)
+    directory.chmod(0o750)  # Establish the fixture independently of process umask.
     JointCaseStore.create(directory/'new.sqlite', store.scope)
     assert directory.stat().st_mode & 0o777 == 0o750
 
