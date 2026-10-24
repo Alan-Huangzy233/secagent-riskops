@@ -14,7 +14,9 @@ public tracking.
 1. Delivered: visible exact-IP search in SSH alerts/logs and network→SSH pivots (#145).
 2. Build SSH + network joint cases. The [offline foundation](joint-evidence.md)
    supplies typed association and bounded read-only source adapters with isolated
-   acceptance; live integration, durable cases and the console remain pending. Search matches alone do not
+   acceptance. A separate derived store and explicit finite refresh of registered
+   anchors are implemented and tested in isolation; live discovery, scheduling,
+   configuration and the console remain pending. Search matches alone do not
    identify one actor or prove an attack chain.
 3. Add manual AI review of those versioned joint dossiers.
 4. Continue Linux host evidence after the network foundation. Source inventory
@@ -52,7 +54,7 @@ paused. No date is promised for deferred product or exploratory work.
 | --- | --- | --- |
 | [#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145) | Make IP search visible and pivot from network findings to SSH evidence | deployed |
 | [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) | Add scoped IP lookup across network, HTTP and SSH records | planned |
-| [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147) | Correlate SSH and network evidence into traceable investigation cases | foundation and read adapters; live integration pending |
+| [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147) | Correlate SSH and network evidence into traceable investigation cases | foundation, readers and explicit derived persistence/refresh implemented; live workflow pending |
 | [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148) | Extend manual AI review to network and correlated SSH evidence | planned |
 
 ## Detection, AI and operational follow-ups
@@ -102,8 +104,11 @@ paused. No date is promised for deferred product or exploratory work.
   follow-ups link back to their original scope; closure of a narrowed demo task
   is not completion of the full product. Completed cache/layout, ingestion,
   scoring, notifications, backup serialization and demo evaluations are reused.
-- The small joint-case pilot uses existing durable stores. It does not wait for
-  a PostgreSQL migration, formal multi-user console or complete product rewrite.
+- The small joint-case pilot reads existing durable source stores and keeps
+  derived observations in a separate, explicitly created store. This derived
+  store is not a collector ACK participant; finite registration does not imply
+  whole-deployment coverage. The pilot does not wait for a PostgreSQL migration,
+  formal multi-user console or complete product rewrite.
 - The formal identity/frontend scope still defers SSO, public self-registration,
   password-reset flows, multitenancy, realtime push and a dedicated mobile
   product. These remain design options, not new delivery promises.

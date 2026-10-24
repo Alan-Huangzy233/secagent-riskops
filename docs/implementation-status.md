@@ -5,8 +5,10 @@ page records what is **actually implemented in code** so the two are never
 confused.
 
 Last reviewed: 2026-10-03; HTTP acceptance/network detection sections updated
-2026-10-19; network ingestion/analysis updated 2026-10-20; enrollment preparation updated 2026-10-23. The walking skeleton and measured
-demo baseline are preserved; further demo work is paused. Active development targets the independent
+2026-10-19; network ingestion/analysis updated 2026-10-20; enrollment preparation
+updated 2026-10-23; joint evidence/persistence updated 2026-10-24. The walking
+skeleton and measured demo baseline are preserved; further demo work is paused.
+Active development targets the independent
 SSH/auth telemetry pilot. The [production plan](./production-plan.md) tracks
 model comparison and broader detection; planned capabilities are not claims of
 implementation or deployment.
@@ -238,7 +240,10 @@ requirements to GitHub issues. Visible IP search and network-to-SSH pivots (#145
 are deployed after index preflight and desktop/mobile, protected-address, paging
 and automatic-collection acceptance. The [joint evidence foundation](joint-evidence.md)
 adds pure typed association plus bounded, explicit retained-source readers
-validated against temporary real source schemas. Live workflow integration, a
-durable derived store and the console (#147), then joint AI (#148), remain
-pending; no new production worker or model calls are activated.
+validated against temporary real source schemas. A separate derived store and
+explicit finite refresh are implemented and tested in isolation. They retain
+immutable projections for registered anchors, including unchanged network
+versions with SSH-only late evidence. This is not a delivered production workflow.
+Automatic discovery, configuration/scheduling, the joint console (#147), then joint AI (#148), remain
+pending; no production joint store, worker or new model calls are activated.
 Formal product features remain separate from the persistent telemetry pilot.
