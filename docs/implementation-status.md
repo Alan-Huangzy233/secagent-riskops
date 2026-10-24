@@ -237,7 +237,8 @@ The [known-work inventory](backlog.md) links current and deferred production
 requirements to GitHub issues. Visible IP search and network-to-SSH pivots (#145)
 are deployed after index preflight and desktop/mobile, protected-address, paging
 and automatic-collection acceptance. The [joint evidence foundation](joint-evidence.md)
-adds pure typed association and synthetic counterexamples only. Live joint source
-adapters, a durable derived store and the console (#147), then joint AI (#148),
-remain pending; no new production worker or model calls are activated.
+adds pure typed association plus bounded, explicit retained-source readers
+validated against temporary real source schemas. Live workflow integration, a
+durable derived store and the console (#147), then joint AI (#148), remain
+pending; no new production worker or model calls are activated.
 Formal product features remain separate from the persistent telemetry pilot.

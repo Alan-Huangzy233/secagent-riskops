@@ -32,8 +32,9 @@ console notifications and UTC daily briefings are implemented. Current position:
 - **Next: SSH + network joint cases** ([#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147)).
   The [offline evidence foundation](./docs/joint-evidence.md) defines explicit
   asset ownership, typed evidence, bounded time association and reproducible
-  counterexamples. Durable source adapters, reconciliation and the joint console
-  remain pending. Scoped cross-type lookup ([#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146)) can progress alongside it;
+  counterexamples. Explicit bounded readers now select a fixed network revision
+  and retained SSH incident evidence. Production integration, durable derived
+  cases, reconciliation and the joint console remain pending. Scoped cross-type lookup ([#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146)) can progress alongside it;
   manual joint AI review ([#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148)) follows separately.
 - Linux #121 retains the Web → network → Linux detection order; source inventory
   can proceed alongside search/correlation. A missing business website or pending
