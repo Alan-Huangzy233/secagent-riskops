@@ -44,6 +44,9 @@ jobs:
       - name: Run the reduction demo (smoke)
         run: PYTHONPATH=backend python -m app.evaluation.demo
 
+      - name: Joint evidence synthetic contract remains reproducible
+        run: PYTHONPATH=backend python -m app.evaluation.joint --check examples/joint-evidence/report.json
+
       - name: HTTP detection fixture reproduces its evidence report
         run: PYTHONPATH=backend python -m app.evaluation.web --input examples/http-access/access.jsonl --source-id synthetic-web --service-id example-site --check examples/http-access/report.json
 

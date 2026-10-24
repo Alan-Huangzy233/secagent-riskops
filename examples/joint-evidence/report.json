@@ -1,0 +1,87 @@
+{
+  "checks": {
+    "cross_host_and_outside_window_not_linked": true,
+    "duplicate_does_not_increase_evidence_count": true,
+    "input_order_does_not_change_projection": true,
+    "late_ssh_changes_revision_same_case": true
+  },
+  "data": "authored synthetic typed evidence",
+  "model_calls": 0,
+  "policy_version": "explicit-asset-peer-window-v1",
+  "production_integration": false,
+  "scenarios": [
+    {
+      "projection_sha256": "e50ddc9898f102fc315c0821ff116a6b0ba94f6aede2d48914eba969944397ee",
+      "scenario": "probe_and_ssh_failure",
+      "ssh_evidence": 1,
+      "state": "linked"
+    },
+    {
+      "projection_sha256": "594419c7f086a7b196e5a1544c21c60f54f31fd7eefa84c90cbfebb0910dcb78",
+      "scenario": "probe_failure_and_auth_success",
+      "ssh_evidence": 2,
+      "state": "linked"
+    },
+    {
+      "projection_sha256": "7289bf44a2eb7ea5bea59c1ba2c57d33ac114785ef78e1e9ecc8923b3276c01c",
+      "scenario": "same_incident_other_host",
+      "ssh_evidence": 0,
+      "state": "unmatched"
+    },
+    {
+      "projection_sha256": "7289bf44a2eb7ea5bea59c1ba2c57d33ac114785ef78e1e9ecc8923b3276c01c",
+      "scenario": "same_peer_outside_window",
+      "ssh_evidence": 0,
+      "state": "unmatched"
+    },
+    {
+      "projection_sha256": "7289bf44a2eb7ea5bea59c1ba2c57d33ac114785ef78e1e9ecc8923b3276c01c",
+      "scenario": "other_peer_same_host",
+      "ssh_evidence": 0,
+      "state": "unmatched"
+    },
+    {
+      "projection_sha256": "e50ddc9898f102fc315c0821ff116a6b0ba94f6aede2d48914eba969944397ee",
+      "scenario": "duplicate_delivery",
+      "ssh_evidence": 1,
+      "state": "linked"
+    },
+    {
+      "projection_sha256": "1ba0cb0ffa0a22edc43fa3ee2f3f1f63991f32d001dedbc82f8223ee6ff566e6",
+      "scenario": "incomplete_candidates",
+      "ssh_evidence": 1,
+      "state": "partial"
+    },
+    {
+      "projection_sha256": "2510daa5d0a1c7c1a90288edb783a44ee98d8cd46b06213aaad1b37a4057f676",
+      "scenario": "limited_timeline",
+      "ssh_evidence": 2,
+      "state": "partial"
+    },
+    {
+      "projection_sha256": "77e87c287d153c43d954f44b93067ed131194e072908775b4f8f805fa56d0ace",
+      "scenario": "stale_network_revision",
+      "ssh_evidence": 1,
+      "state": "stale"
+    },
+    {
+      "projection_sha256": "92402ff17e93ed697c2ffb37ae613786888c51a2406b84796e8b9318e0de9803",
+      "scenario": "retracted_network_revision",
+      "ssh_evidence": 1,
+      "state": "retracted"
+    },
+    {
+      "projection_sha256": "ef449aa3b350c4ca4498e708a7d623c712401f3fc587972402a92920cc407962",
+      "scenario": "wrong_destination",
+      "ssh_evidence": 0,
+      "state": "rejected"
+    },
+    {
+      "projection_sha256": "2df4b321ba73bd5f88c20188e586e23ea4affd94dd345be9336c42cb90097557",
+      "scenario": "unreviewed_profile",
+      "ssh_evidence": 0,
+      "state": "rejected"
+    }
+  ],
+  "version": "joint-evidence-v1"
+}
