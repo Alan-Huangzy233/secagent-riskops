@@ -2,7 +2,7 @@
 
 GitHub tracking index: [#170](https://github.com/Alan-Huangzy233/secagent-riskops/issues/170).
 
-Updated 2026-10-23. Further demo work is paused while development focuses on the
+Updated 2026-10-24. Further demo work is paused while development focuses on the
 independent telemetry pilot. This is a plan, not a statement that the features
 below are implemented or deployed. See [implementation status](./implementation-status.md).
 Historical issue-seeding files in `docs/process/` are provenance, not a live
@@ -63,9 +63,11 @@ have explicit coverage limits. Repository defaults remain off. Sustained
 operation and long-term receipt/capacity work continue in #120 and
 [#152](https://github.com/Alan-Huangzy233/secagent-riskops/issues/152); new rule families belong to [#151](https://github.com/Alan-Huangzy233/secagent-riskops/issues/151).
 
-The immediate sequence is [#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145) (visible IP search and network→SSH
-pivots), [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147) (joint evidence cases), then [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148)
-(manual joint AI). Grouped cross-type search [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) ships in
+Visible IP search and network→SSH pivots ([#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145)) are deployed.
+The next step is [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147) (joint evidence cases): the
+[offline foundation](joint-evidence.md) supplies bounded typed association;
+retained-source adapters, durable reconciliation and the joint console remain
+pending. Then follow with [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148) (manual joint AI). Grouped cross-type search [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) ships in
 bounded increments; its raw-log index/migration work does not block retained-case
 correlation. Linux #121 source inventory can run alongside these steps and does
 not wait for paid AI approval. HTTP real-source acceptance still waits for an

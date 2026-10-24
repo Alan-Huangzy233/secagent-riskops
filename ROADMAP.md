@@ -26,11 +26,15 @@ console notifications and UTC daily briefings are implemented. Current position:
   sustained operation, source-specific coverage and long-term receipt/capacity
   governance remain in #120 and [#152](https://github.com/Alan-Huangzy233/secagent-riskops/issues/152). Repository defaults
   remain opt-in; that differs from the maintained deployment's activated sources.
-- **Next: IP search and investigation pivots** ([#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145)). Existing SSH
-  log search is hidden in advanced filters; alerts lack an IP filter and network
-  findings lack a local-evidence pivot. Follow with scoped cross-type lookup
-  ([#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146)), SSH + network joint cases ([#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147)) and
-  manual joint AI review ([#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148)). These are planned separate increments.
+- **IP search and investigation pivots delivered** ([#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145), PR #172).
+  Visible SSH alert/log filters and network-to-SSH pivots are deployed and checked
+  on desktop/mobile, including protected-address search and exact-IP paging.
+- **Next: SSH + network joint cases** ([#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147)).
+  The [offline evidence foundation](./docs/joint-evidence.md) defines explicit
+  asset ownership, typed evidence, bounded time association and reproducible
+  counterexamples. Durable source adapters, reconciliation and the joint console
+  remain pending. Scoped cross-type lookup ([#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146)) can progress alongside it;
+  manual joint AI review ([#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148)) follows separately.
 - Linux #121 retains the Web → network → Linux detection order; source inventory
   can proceed alongside search/correlation. A missing business website or pending
   AI permission does not block already-authorized source engineering. Broader
@@ -130,7 +134,7 @@ Deliverables:
 
 ## v0.2 AI SOC Inbox
 
-Remaining production work: [#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145), [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146), [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147), [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148), [#155](https://github.com/Alan-Huangzy233/secagent-riskops/issues/155).
+Remaining production work: [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146), [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147), [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148), [#155](https://github.com/Alan-Huangzy233/secagent-riskops/issues/155).
 
 Goal: Reduce alert fatigue by normalizing, grouping, scoring, and triaging alerts.
 
