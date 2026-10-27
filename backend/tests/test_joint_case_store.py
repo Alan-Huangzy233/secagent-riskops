@@ -70,7 +70,7 @@ def test_explicit_private_creation_identity_scope_limits_and_no_implicit_open(re
     with closing(sqlite3.connect(store.path)) as db:
         assert db.execute('PRAGMA application_id').fetchone()[0] == module.APPLICATION_ID
         assert db.execute('PRAGMA user_version').fetchone()[0] == module.SCHEMA_VERSION
-        assert db.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0] == 6
+        assert db.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0] == 9
     missing = tmp_path/'missing.sqlite'
     with pytest.raises(CaseStoreError, match='joint_store_unavailable'):
         JointCaseStore.open(missing)

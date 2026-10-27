@@ -23,12 +23,13 @@ from .joint_case_contract import (
 )
 
 APPLICATION_ID = 0x4A4E5431
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 SCOPE = 'explicit_registered_anchors_only'
 _INCIDENT = re.compile(r'NET-[0-9a-f]{32}\Z')
 _CASE = re.compile(r'JOINT-[0-9a-f]{32}\Z')
 _OUTCOMES = ('published', 'unchanged', 'failed', 'not_eligible', 'superseded')
-_SCHEMA = (
+_UNSET = object()
+_SCHEMA_V1 = (
     """CREATE TABLE joint_meta (
         singleton INTEGER PRIMARY KEY CHECK(singleton=1), schema_version INTEGER NOT NULL,
         store_id TEXT NOT NULL, scope_json TEXT NOT NULL, scope_sha256 TEXT NOT NULL,
@@ -74,6 +75,84 @@ _SCHEMA = (
     """CREATE TRIGGER joint_scope_no_delete BEFORE DELETE ON joint_meta
         BEGIN SELECT RAISE(ABORT,'immutable_joint_scope'); END""",
 )
+
+
+_V2_SCHEMA = (
+    """CREATE TABLE joint_runtime (
+        singleton INTEGER PRIMARY KEY CHECK(singleton=1), query_epoch TEXT NOT NULL,
+        catalog_min_seq INTEGER NOT NULL CHECK(catalog_min_seq>=1),
+        revalidation_pending INTEGER NOT NULL CHECK(revalidation_pending IN (0,1)),
+        recovery_discovery_done INTEGER NOT NULL CHECK(recovery_discovery_done IN (0,1)),
+        recovery_refresh_cycle TEXT, discovery_error TEXT, recovery_discovery_cycle TEXT)""",
+    """CREATE TABLE joint_discovery (
+        singleton INTEGER PRIMARY KEY CHECK(singleton=1), cycle_id TEXT NOT NULL,
+        producer_id TEXT NOT NULL, target_seq INTEGER NOT NULL, cursor_seq INTEGER NOT NULL,
+        state TEXT NOT NULL, scanned_count INTEGER NOT NULL, registered_count INTEGER NOT NULL,
+        skipped_json TEXT NOT NULL, fixed_error_code TEXT, started_at TEXT NOT NULL, finished_at TEXT)""",
+    """CREATE TABLE joint_revision_summaries (
+        case_id TEXT NOT NULL, revision INTEGER NOT NULL, publish_generation INTEGER NOT NULL UNIQUE,
+        asset_id TEXT NOT NULL, peer_ip TEXT NOT NULL, association_state TEXT NOT NULL,
+        network_incident_id TEXT NOT NULL, network_revision INTEGER NOT NULL, network_source_id TEXT NOT NULL,
+        window_start_us INTEGER, window_end_us INTEGER, temporal_available INTEGER NOT NULL,
+        network_count INTEGER NOT NULL, ssh_count INTEGER NOT NULL, saved_count INTEGER NOT NULL,
+        observed_count INTEGER NOT NULL, timeline_complete INTEGER NOT NULL,
+        PRIMARY KEY(case_id,revision), FOREIGN KEY(case_id,revision) REFERENCES joint_case_revisions(case_id,revision))""",
+    'CREATE INDEX joint_summary_history ON joint_revision_summaries(case_id,publish_generation DESC)',
+    'CREATE INDEX joint_summary_generation ON joint_revision_summaries(publish_generation DESC,case_id)',
+    """CREATE TRIGGER joint_summary_no_update BEFORE UPDATE ON joint_revision_summaries
+        BEGIN SELECT RAISE(ABORT,'immutable_joint_summary'); END""",
+    """CREATE TRIGGER joint_summary_no_delete BEFORE DELETE ON joint_revision_summaries
+        BEGIN SELECT RAISE(ABORT,'immutable_joint_summary'); END""",
+)
+_SCHEMA = _SCHEMA_V1 + _V2_SCHEMA
+
+
+def _summary_values(case_id, revision, generation, payload):
+    anchor, counts = payload['anchor'], payload['counts']
+    return (case_id, revision, generation, payload['asset_id'], anchor['src_ip'], payload['state'],
+         anchor['incident_id'], anchor['revision'], anchor['source_id'], payload['window']['start_us'],
+         payload['window']['end_us'], int(payload['temporal_association_available']),
+         sum(counts['network'].values()), sum(item['evidence'] for item in counts['ssh'].values()),
+         len(payload['timeline']), payload['observed_evidence_count'], int(payload['timeline_complete']))
+
+
+def _summary(db, case_id, revision, generation, payload):
+    db.execute('INSERT INTO joint_revision_summaries VALUES('+','.join('?' for _ in range(17))+')',
+               _summary_values(case_id,revision,generation,payload))
+
+
+def _initialize_runtime(db, catalog_min_seq, *, pending=False):
+    db.execute('INSERT INTO joint_runtime VALUES(1,?,?,?,0,NULL,NULL,NULL)',
+               (uuid.uuid4().hex, catalog_min_seq, int(pending)))
+
+
+def _positive(value, *, zero=False):
+    if type(value) is not int or not (0 if zero else 1) <= value <= 2**63-1:
+        _error('joint_invalid_request')
+
+
+def _discovery(db):
+    row = db.execute('SELECT d.*,r.catalog_min_seq FROM joint_discovery d JOIN joint_runtime r USING(singleton)').fetchone()
+    if row is None:
+        return None
+    result = dict(row)
+    result.pop('singleton')
+    result['skipped_counts'] = json.loads(result.pop('skipped_json'))
+    result['error'] = result.pop('fixed_error_code')
+    result['complete'] = result['state']=='completed'
+    return result
+
+
+def _recover_if_complete(db):
+    runtime = db.execute('SELECT * FROM joint_runtime WHERE singleton=1').fetchone()
+    discovery = _discovery(db)
+    if (runtime['revalidation_pending'] and runtime['recovery_discovery_done'] and not runtime['discovery_error']
+            and discovery and discovery['complete'] and not discovery['error']
+            and runtime['recovery_discovery_cycle']==discovery['cycle_id']):
+        cycle = JointCaseStore._cycle(db)
+        if (cycle and runtime['recovery_refresh_cycle']==cycle['cycle_id'] and cycle['all_items_refreshed']
+                and db.execute("SELECT 1 FROM joint_registrations WHERE refresh_state!='fresh' LIMIT 1").fetchone() is None):
+            db.execute('UPDATE joint_runtime SET revalidation_pending=0 WHERE singleton=1')
 
 
 def _now():
@@ -177,7 +256,8 @@ class JointCaseStore:
         return self._limits
 
     @classmethod
-    def create(cls, path, scope, *, limits=None):
+    def create(cls, path, scope, *, limits=None, catalog_min_seq=1):
+        _positive(catalog_min_seq)
         if type(scope) is not CaseScope or (limits is not None and type(limits) is not StoreLimits):
             _error('joint_invalid_request')
         limits = limits or StoreLimits()
@@ -207,6 +287,7 @@ class JointCaseStore:
             db.execute(f'PRAGMA user_version={SCHEMA_VERSION}')
             db.execute('INSERT INTO joint_meta VALUES(1,?,?,?,?,?,0,0,0)',
                        (SCHEMA_VERSION, uuid.uuid4().hex, scope.to_json(), scope.sha256, limits.to_json()))
+            _initialize_runtime(db, catalog_min_seq)
             _commit(db)
         except BaseException as error:
             if db is not None:
@@ -254,6 +335,11 @@ class JointCaseStore:
             count, size, generation = db.execute('SELECT count(*),coalesce(sum(payload_bytes),0),'
                 'coalesce(max(publish_generation),0) FROM joint_case_revisions').fetchone()
             registrations = db.execute('SELECT count(*) FROM joint_registrations').fetchone()[0]
+            runtime = db.execute('SELECT * FROM joint_runtime WHERE singleton=1').fetchone()
+            if (runtime is None or not re.fullmatch('[0-9a-f]{32}', runtime['query_epoch'])
+                    or type(runtime['catalog_min_seq']) is not int or runtime['catalog_min_seq'] < 1
+                    or db.execute('SELECT count(*) FROM joint_revision_summaries').fetchone()[0] != count):
+                _error('joint_store_corrupt')
             if (count != row['revision_count'] or size != row['payload_bytes']
                     or generation != row['committed_generation'] or count > limits.revision_limit
                     or size > limits.payload_byte_limit or registrations > limits.registration_limit
@@ -302,30 +388,152 @@ class JointCaseStore:
                 or any(type(item) is not AnchorRequest for item in requests)
                 or len({item.incident_id for item in requests}) != len(requests)):
             _error('joint_invalid_request')
-        summary = dict(registered=0, updated=0, unchanged=0)
         with self._connection(write=True) as db:
-            total, last = db.execute('SELECT count(*),coalesce(max(registration_seq),0) FROM joint_registrations').fetchone()
-            for item in requests:
-                row = db.execute('SELECT * FROM joint_registrations WHERE incident_id=?', (item.incident_id,)).fetchone()
-                if row is None:
-                    if total >= self.limits.registration_limit:
-                        _error('joint_capacity_exceeded')
-                    last += 1
-                    db.execute("INSERT INTO joint_registrations(registration_seq,incident_id,requested_network_revision,"
-                        "request_generation,refresh_state) VALUES(?,?,?,1,'pending')", (last, item.incident_id, item.revision))
-                    total += 1
-                    summary['registered'] += 1
-                elif item.revision < row['requested_network_revision']:
-                    _error('joint_revision_regression')
-                elif item.revision == row['requested_network_revision']:
-                    summary['unchanged'] += 1
-                else:
-                    db.execute("UPDATE joint_registrations SET requested_network_revision=?,request_generation=request_generation+1,"
-                               "refresh_state='pending',fixed_error_code=NULL WHERE registration_seq=?",
-                               (item.revision, row['registration_seq']))
-                    summary['updated'] += 1
-            summary['total'] = total
+            return self._register(db, requests)
+
+    def _register(self, db, requests):
+        summary = dict(registered=0, updated=0, unchanged=0)
+        total, last = db.execute('SELECT count(*),coalesce(max(registration_seq),0) FROM joint_registrations').fetchone()
+        for item in requests:
+            row = db.execute('SELECT * FROM joint_registrations WHERE incident_id=?', (item.incident_id,)).fetchone()
+            if row is None:
+                if total >= self.limits.registration_limit:
+                    _error('joint_capacity_exceeded')
+                last += 1
+                db.execute("INSERT INTO joint_registrations(registration_seq,incident_id,requested_network_revision,"
+                    "request_generation,refresh_state) VALUES(?,?,?,1,'pending')", (last, item.incident_id, item.revision))
+                total += 1
+                summary['registered'] += 1
+            elif item.revision < row['requested_network_revision']:
+                _error('joint_revision_regression')
+            elif item.revision == row['requested_network_revision']:
+                summary['unchanged'] += 1
+            else:
+                db.execute("UPDATE joint_registrations SET requested_network_revision=?,request_generation=request_generation+1,"
+                           "refresh_state='pending',fixed_error_code=NULL WHERE registration_seq=?",
+                           (item.revision, row['registration_seq']))
+                summary['updated'] += 1
+        summary['total'] = total
         return summary
+
+    @property
+    def catalog_min_seq(self):
+        with self._connection() as db:
+            return db.execute('SELECT catalog_min_seq FROM joint_runtime WHERE singleton=1').fetchone()[0]
+
+    def get_discovery(self):
+        with self._connection() as db:
+            return _discovery(db)
+
+    def begin_discovery(self, target_seq, producer_id):
+        _positive(target_seq, zero=True)
+        if type(producer_id) is not str or producer_id != self.scope.producer_id:
+            _error('joint_anchor_mismatch')
+        with self._connection(write=True) as db:
+            previous = _discovery(db)
+            if previous and not previous['complete']:
+                return previous
+            if previous and target_seq < previous['target_seq']:
+                _error('joint_revision_regression')
+            minimum = db.execute('SELECT catalog_min_seq FROM joint_runtime WHERE singleton=1').fetchone()[0]
+            complete, at, identity = target_seq < minimum, _now(), uuid.uuid4().hex
+            db.execute('DELETE FROM joint_discovery')
+            db.execute('INSERT INTO joint_discovery VALUES(1,?,?,?,?,?,0,0,?,NULL,?,?)',
+                (identity, producer_id, target_seq, minimum-1,
+                 'completed' if complete else 'active', '{}', at, at if complete else None))
+            db.execute('UPDATE joint_runtime SET recovery_discovery_done=?,recovery_refresh_cycle=NULL,'
+                       'recovery_discovery_cycle=? WHERE singleton=1', (int(complete),identity))
+            if complete:
+                db.execute('UPDATE joint_runtime SET discovery_error=NULL WHERE singleton=1')
+            return _discovery(db)
+
+    def apply_discovery_page(self, cycle_id, expected_cursor, page):
+        _positive(expected_cursor, zero=True)
+        try:
+            requests, skips = page.eligible_requests, page.skipped_counts
+            for number in (page.after_seq, page.target_seq, page.next_seq, page.scanned_count):
+                _positive(number, zero=True)
+            if (type(requests) is not tuple or len(requests)>50
+                    or any(type(item) is not AnchorRequest for item in requests)
+                    or len({item.incident_id for item in requests})!=len(requests)
+                    or type(skips) is not dict or len(skips)>8
+                    or any(key not in ('source_unmapped','destination_unmapped','profile_unmapped')
+                           or type(value) is not int or value<0 for key,value in skips.items())
+                    or type(page.complete) is not bool or page.scanned_count>50
+                    or page.scanned_count != len(requests)+sum(skips.values())
+                    or page.after_seq != expected_cursor or not expected_cursor<=page.next_seq<=page.target_seq
+                    or (page.scanned_count and page.next_seq<=expected_cursor)
+                    or (not page.complete and (page.scanned_count==0 or page.next_seq>=page.target_seq))
+                    or (page.complete and page.next_seq != page.target_seq)):
+                _error('joint_invalid_request')
+        except AttributeError:
+            raise CaseStoreError('joint_invalid_request') from None
+        with self._connection(write=True) as db:
+            current = _discovery(db)
+            if (not current or current['cycle_id'] != cycle_id or current['cursor_seq'] != expected_cursor
+                    or current['complete']):
+                return 'superseded'
+            if page.producer_id != self.scope.producer_id:
+                _error('joint_anchor_mismatch')
+            if page.target_seq != current['target_seq']:
+                _error('joint_invalid_request')
+            summary = self._register(db, requests)
+            totals = current['skipped_counts']
+            for key,value in skips.items():
+                totals[key] = totals.get(key,0)+value
+            db.execute('UPDATE joint_discovery SET cursor_seq=?,state=?,scanned_count=scanned_count+?,'
+                'registered_count=registered_count+?,skipped_json=?,fixed_error_code=NULL,finished_at=? WHERE singleton=1',
+                (page.next_seq,'completed' if page.complete else 'active',page.scanned_count,
+                 summary['registered']+summary['updated'],json.dumps(totals,sort_keys=True),_now() if page.complete else None))
+            if page.complete:
+                db.execute('UPDATE joint_runtime SET recovery_discovery_done=1,discovery_error=NULL WHERE singleton=1 '
+                           'AND (revalidation_pending=0 OR recovery_discovery_cycle=?)',(cycle_id,))
+            return 'applied'
+
+    def fail_discovery(self, cycle_id, expected_cursor, code):
+        _positive(expected_cursor, zero=True)
+        try:
+            CaseStoreError(code)
+        except (TypeError,ValueError):
+            _error('joint_invalid_request')
+        with self._connection(write=True) as db:
+            current = _discovery(db)
+            if not current or current['cycle_id']!=cycle_id or current['cursor_seq']!=expected_cursor or current['complete']:
+                return 'superseded'
+            db.execute('UPDATE joint_discovery SET fixed_error_code=? WHERE singleton=1',(code,))
+            self._record_discovery_failure(db,code)
+            return 'recorded'
+
+    @staticmethod
+    def _record_discovery_failure(db,code):
+        db.execute('UPDATE joint_runtime SET discovery_error=?,revalidation_pending=1,'
+                   'recovery_discovery_done=0,recovery_refresh_cycle=NULL,recovery_discovery_cycle=NULL WHERE singleton=1',(code,))
+
+    def record_discovery_failure(self,code,*,expected_cycle_id=_UNSET,expected_cursor=None,
+                                 expected_revalidation_pending=_UNSET,expected_refresh_cycle_id=_UNSET):
+        try:
+            CaseStoreError(code)
+        except (TypeError,ValueError):
+            _error('joint_invalid_request')
+        with self._connection(write=True) as db:
+            if expected_cycle_id is not _UNSET:
+                current = _discovery(db)
+                if ((current is None and expected_cycle_id is not None) or
+                        (current is not None and (current['cycle_id']!=expected_cycle_id or
+                                                  current['cursor_seq']!=expected_cursor))):
+                    return 'superseded'
+            if expected_revalidation_pending is not _UNSET:
+                if type(expected_revalidation_pending) is not bool:
+                    _error('joint_invalid_request')
+                pending = db.execute('SELECT revalidation_pending FROM joint_runtime WHERE singleton=1').fetchone()[0]
+                if bool(pending)!=expected_revalidation_pending:
+                    return 'superseded'
+            if expected_refresh_cycle_id is not _UNSET:
+                cycle = self._cycle(db)
+                if (cycle['cycle_id'] if cycle else None)!=expected_refresh_cycle_id:
+                    return 'superseded'
+            self._record_discovery_failure(db,code)
+        return 'recorded'
 
     @staticmethod
     def _cycle(db):
@@ -357,6 +565,9 @@ class JointCaseStore:
             db.execute("INSERT INTO joint_cycle_items SELECT ?,registration_seq,request_generation,"
                        "requested_network_revision,'pending',NULL FROM joint_registrations WHERE registration_seq<=?",
                        (identity, target))
+            db.execute('UPDATE joint_runtime SET recovery_refresh_cycle=? WHERE singleton=1 AND '
+                       'revalidation_pending=1 AND recovery_discovery_done=1', (identity,))
+            _recover_if_complete(db)
             return self._cycle(db)
 
     def get_cycle(self):
@@ -380,6 +591,7 @@ class JointCaseStore:
         db.execute(f'UPDATE joint_cycle SET {outcome}={outcome}+1,cursor_seq=?,state=?,finished_at=? WHERE singleton=1',
                    (target if remaining is None else remaining-1, 'completed' if remaining is None else 'active',
                     _now() if remaining is None else None))
+        _recover_if_complete(db)
 
     def _pending(self, db, item):
         row = db.execute('SELECT i.*,r.incident_id,r.request_generation,r.requested_network_revision,'
@@ -434,6 +646,7 @@ class JointCaseStore:
                 db.execute('INSERT INTO joint_case_revisions VALUES(?,?,?,?,?,?,?,?)',
                     (value.case_id, revision, generation, value.projection_sha256, value.projection_json,
                      value.metadata_json, size, at))
+                _summary(db,value.case_id,revision,generation,json.loads(value.projection_json))
                 db.execute('UPDATE joint_cases SET current_revision=? WHERE case_id=?', (revision, value.case_id))
                 db.execute('UPDATE joint_meta SET committed_generation=?,revision_count=revision_count+1,'
                            'payload_bytes=payload_bytes+? WHERE singleton=1', (generation, size))

@@ -69,9 +69,10 @@ The next step is [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issu
 and explicit retained-source reads. An independent derived store and finite,
 explicitly invoked refresh of registered anchors are implemented and tested in
 isolation. Semantic changes create immutable case revisions; read metadata and
-failures do not overwrite previous evidence. The scope excludes automatic
-anchor discovery, configuration, scheduling, the joint console and production
-activation. These remain subsequent #147 increments. Then follow with [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148) (manual joint AI). Grouped cross-type search [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) ships in
+failures do not overwrite previous evidence. The [joint console](joint-console.md)
+adds optional mapping validation, explicit bounded catalog discovery/refresh,
+derived-store migration/recovery and a read-only paginated view. Production
+activation and a refresh schedule remain subsequent #147 work. Then follow with [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148) (manual joint AI). Grouped cross-type search [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) ships in
 bounded increments; its raw-log index/migration work does not block retained-case
 correlation. Linux #121 source inventory can run alongside these steps and does
 not wait for paid AI approval. HTTP real-source acceptance still waits for an

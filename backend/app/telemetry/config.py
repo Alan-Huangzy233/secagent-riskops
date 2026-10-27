@@ -10,6 +10,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from .joint_config import JointCasesConfig, compile_joint_config
+
 _PASSWORD_ALGORITHM = "pbkdf2_sha256"
 _PASSWORD_ITERATIONS = 600_000
 
@@ -140,6 +142,7 @@ class LiveConfig(BaseModel):
     console_cache_enabled: bool = False
     http_ingest: HttpIngestConfig | None = None
     network_ingest: NetworkIngestConfig | None = None
+    joint_cases: JointCasesConfig | None = None
     notification_backup_directories: tuple[str, ...] = Field(default=(), max_length=8)
 
     @field_validator("notification_backup_directories")
@@ -190,6 +193,7 @@ class LiveConfig(BaseModel):
                 other_paths.append(Path(self.http_ingest.database_path).resolve())
             if Path(self.network_ingest.database_path).resolve() in other_paths:
                 raise ValueError("Network storage must be separate from SSH and HTTP storage")
+        compile_joint_config(self)
         return self
 
 

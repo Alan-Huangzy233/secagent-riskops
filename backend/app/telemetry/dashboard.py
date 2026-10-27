@@ -7,6 +7,7 @@ import hashlib
 from .ai_dashboard import AI_PANEL, AI_SCRIPT
 from .http_dashboard import STYLE as HTTP_STYLE, SCRIPT as HTTP_SCRIPT
 from .network_dashboard import STYLE as NETWORK_STYLE, SCRIPT as NETWORK_SCRIPT
+from .joint_dashboard import STYLE as JOINT_STYLE, SCRIPT as JOINT_SCRIPT
 from .console_workspace import STYLE as WORKSPACE_STYLE, SCRIPT as WORKSPACE_SCRIPT, arrange
 
 _STYLE = """
@@ -460,8 +461,8 @@ $('incident-triage').value=incidentTriage;$('incident-focus').value=incidentFocu
 refresh();
 """
 
-_SCRIPT = _SCRIPT.removesuffix("refresh();\n") + AI_SCRIPT + HTTP_SCRIPT + NETWORK_SCRIPT + WORKSPACE_SCRIPT + "\ninitializeWorkspace();\nrefresh();\n"
-_STYLE += WORKSPACE_STYLE + HTTP_STYLE + NETWORK_STYLE
+_SCRIPT = _SCRIPT.removesuffix("refresh();\n") + AI_SCRIPT + HTTP_SCRIPT + NETWORK_SCRIPT + JOINT_SCRIPT + WORKSPACE_SCRIPT + "\ninitializeWorkspace();\nrefresh();\n"
+_STYLE += WORKSPACE_STYLE + HTTP_STYLE + NETWORK_STYLE + JOINT_STYLE
 
 DASHBOARD_HTML = """<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SecAgent RiskOps · 实时日志</title><style>__STYLE__</style></head>

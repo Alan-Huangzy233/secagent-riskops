@@ -6,7 +6,7 @@ confused.
 
 Last reviewed: 2026-10-03; HTTP acceptance/network detection sections updated
 2026-10-19; network ingestion/analysis updated 2026-10-20; enrollment preparation
-updated 2026-10-23; joint evidence/persistence updated 2026-10-24. The walking
+updated 2026-10-23; joint console updated 2026-10-27. The walking
 skeleton and measured demo baseline are preserved; further demo work is paused.
 Active development targets the independent
 SSH/auth telemetry pilot. The [production plan](./production-plan.md) tracks
@@ -244,6 +244,8 @@ validated against temporary real source schemas. A separate derived store and
 explicit finite refresh are implemented and tested in isolation. They retain
 immutable projections for registered anchors, including unchanged network
 versions with SSH-only late evidence. This is not a delivered production workflow.
-Automatic discovery, configuration/scheduling, the joint console (#147), then joint AI (#148), remain
+Optional validated mapping, bounded explicit discovery/update commands, derived
+recovery and a [read-only joint console](joint-console.md) are implemented.
+Production activation and refresh scheduling (#147), then joint AI (#148), remain
 pending; no production joint store, worker or new model calls are activated.
 Formal product features remain separate from the persistent telemetry pilot.

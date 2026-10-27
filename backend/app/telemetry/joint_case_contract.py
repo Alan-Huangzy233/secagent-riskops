@@ -27,7 +27,7 @@ ERROR_CODES = READER_ERROR_CODES | frozenset({
     'joint_store_exists', 'joint_store_unavailable', 'joint_store_busy',
     'joint_store_schema_mismatch', 'joint_revision_regression', 'joint_invalid_request',
     'joint_scope_mismatch', 'joint_capacity_exceeded', 'joint_result_invalid',
-    'joint_anchor_mismatch', 'joint_source_alias', 'joint_store_corrupt',
+    'joint_anchor_mismatch', 'joint_source_alias', 'joint_store_corrupt', 'joint_refresh_required',
 })
 _ID = re.compile(r'[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}\Z')
 _NET_ID = re.compile(r'NET-[0-9a-f]{32}\Z')

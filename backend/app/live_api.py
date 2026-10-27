@@ -271,6 +271,8 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
     register_routes(application, operator)
     from .telemetry.network_api import register_routes as register_network_routes
     register_network_routes(application, operator)
+    from .telemetry.joint_api import register_routes as register_joint_routes
+    register_joint_routes(application, operator)
 
     @application.get("/health")
     def health(request: Request):
