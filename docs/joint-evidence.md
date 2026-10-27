@@ -1,11 +1,12 @@
-# Joint SSH and network evidence: foundation and read-only adapters
+# Joint SSH and network evidence: retained observations and derived cases
 
 [Issue #147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147) tracks
 joint investigation cases. The pure association contract has reproducible
-synthetic acceptance; explicit read-only adapters can now project retained
-source evidence into that contract. Production continues to use the
-existing SSH/network views and IP search; no joint database, worker, configuration,
-API or console tab is activated by importing this module.
+synthetic acceptance; explicit read-only adapters project retained source
+evidence into that contract. An independent derived store and explicit finite
+refresh are also implemented and tested with isolated sources. Production
+continues to use the existing SSH/network views and IP search. Importing these modules creates no
+joint database, worker, configuration, API or console tab.
 
 ## Why inspect actual evidence
 
@@ -131,6 +132,104 @@ shared-memory sidecars; read-only here means no retained-row or schema mutation,
 not a guarantee of zero filesystem writes. `immutable=1` is not used on changing
 WAL databases. These readers do not establish a backup or recovery snapshot.
 
+## Explicit derived persistence and finite refresh
+
+`joint_case_contract`, `joint_case_store` and `joint_reconcile` implement an
+internal workflow over a separate SQLite database. `CaseScope` fixes the explicit
+asset mappings, expected producer, association window, timeline cap and declared
+SSH coverage. It also pins the projection, reader and transformation policies.
+Changing this scope requires a separately reviewed store; it is not an in-place
+configuration edit.
+
+A caller uses these internal interfaces explicitly:
+
+| Interface | Behavior |
+| --- | --- |
+| `JointCaseStore.create(path, scope, limits=...)` | Create a new private derived file; refuse an existing file |
+| `JointCaseStore.open(path)` | Validate an existing derived store's identity, schema, scope and limits without migrations |
+| `store.register((AnchorRequest(incident_id, revision), ...))` | Register 1–50 distinct anchors per atomic batch; equal requested revisions are unchanged, higher revisions advance the request generation, lower revisions fail |
+| `store.begin_cycle()` | Freeze registered requests into one finite worklist; reuse an already active cycle |
+| `joint_reconcile.reconcile_step(store, network_path, ssh_path, ...)` | Attempt a bounded step of the explicitly begun cycle |
+| `store.get_cycle()` / `store.get_registration(incident_id)` | Inspect worklist progress or an anchor's current refresh status |
+| `store.get_case(case_id, revision=None)` | Read the current projection or an explicitly selected immutable revision |
+
+The workflow does not discover all network cases, enroll production sources or
+start a worker. Its coverage is only the explicitly registered anchors and the
+retained incident evidence read for them.
+
+The store retains the pure canonical projection as an immutable numbered case
+revision. A repeated current projection hash updates read/freshness metadata
+without adding a semantic revision. A changed SSH projection can add a revision
+under the same case ID even when the requested network revision is unchanged.
+Returning from content A to B and later to A is a third observation revision;
+historical hash reuse must not erase that transition. Read times, query costs
+and operational retries do not become new evidence revisions.
+`get_case(case_id, revision=N)` retains that revision's projection and first-read
+metadata; its `current_revision`, `is_current` and refresh fields separately
+report current state. Those current-state fields can change during later reads.
+
+Each cycle freezes the registered-anchor boundary and each item's requested
+revision/generation. It revisits every registered item, including previous
+unmatched and failed reads. It does not use network changes or SSH receipt or
+`updated_at` cursors as a substitute for this revisit. New registrations wait
+for the next cycle; a request changed during an outstanding read cannot publish
+its obsolete result. Explicit bounded steps resume the saved worklist, and a
+single failed anchor does not prevent later items being attempted. The step
+reports the cycle it selected separately from `current_cycle`, which another
+caller may already have advanced.
+
+One explicit step admits at most five items within a ten-second cooperative
+budget. Each joint read keeps the adapters' shared maximum five-second deadline,
+shortened to the step's remaining budget. An in-flight read can finish with an
+error; its bounded outcome transaction is still attempted before returning.
+These are admission and cooperative execution bounds, not hard filesystem or
+end-to-end timing guarantees.
+
+The source read transactions close before the derived write transaction. A
+semantic revision, current pointer and completed item are published atomically.
+Reader failures, adapter caps and deadlines preserve the previous case and
+record a separate refresh failure; they never become an empty successful finding. A
+successful pure `partial`, `stale` or `retracted` observation retains its own
+meaning and history. Finishing the finite worklist means every item was
+attempted, not that every source refreshed successfully or that all production
+cases are covered. `attempted_complete` means no worklist items remain pending;
+`all_items_refreshed` additionally requires no failed, ineligible or superseded
+items. Neither status establishes complete source coverage.
+
+Callers may lower these `StoreLimits` defaults when creating a store. The selected
+limits are then immutable:
+
+| Limit | Default maximum |
+| --- | --- |
+| Registered anchors | 1,000 |
+| Semantic revisions across the store | 10,000 |
+| Total stored canonical projection bytes | 256 MiB |
+| One canonical projection | 4 MiB |
+| One read metadata object | 32 KiB |
+
+A logical capacity limit during refresh preserves existing evidence and records
+a refresh failure when the outcome transaction can commit. Registration capacity
+rejects the whole new batch. If a busy/full database or I/O failure prevents even
+the outcome commit, the caller receives a fixed store error and the item stays
+pending for retry. There is no automatic pruning or silent limit increase.
+
+The derived file has its own identity, schema and fixed capacity limits; its
+mapping/policy scope and limits cannot be silently replaced. Logical projection
+byte limits exclude SQLite pages, indexes, bounded metadata and WAL overhead, so
+they are not a hard disk-usage limit. The file must not alias a source database,
+participate in collector ACKs or mutate source rows.
+The retained timeline remains bounded: saving a partial projection does not
+store hidden evidence or create full historical evidence pagination. Two
+sequential source reads remain separate observations; the store does not turn
+them into a cross-database atomic snapshot or a durable upstream SSH revision.
+
+This increment is not wired to application configuration, a scheduler, live
+routes, console views, notifications, AI or response controls. Source enrollment
+validation, automatic anchor discovery, production activation and a tested
+derived-store recovery procedure remain separate work. The implemented internal
+interfaces have isolated acceptance; no production joint store or refresh job
+is activated by this increment.
+
 ## Reproduce the fixture
 
 From the repository root:
@@ -139,7 +238,8 @@ From the repository root:
 PYTHONPATH=backend python -m app.evaluation.joint --check examples/joint-evidence/report.json
 python -m pytest backend/tests/test_joint_evidence.py backend/tests/test_joint_reader_io.py \
   backend/tests/test_joint_network_reader.py backend/tests/test_joint_ssh_reader.py \
-  backend/tests/test_joint_reader.py
+  backend/tests/test_joint_reader.py backend/tests/test_joint_case_contract.py \
+  backend/tests/test_joint_case_store.py backend/tests/test_joint_reconcile.py
 ```
 
 The report uses authored documentation addresses and fixed timestamps. It exercises
@@ -150,17 +250,22 @@ The unit suite additionally covers boundary, clock and malformed-input cases.
 Adapter tests create temporary databases through the actual source store schemas
 and check historical membership, late arrivals, raw-only exclusions, source
 isolation, concurrent reads/writes, indexed bounded queries and error cleanup.
-They do not read production databases or measure production detection accuracy.
+Derived-store and refresh tests cover SSH-only late arrivals, unmatched-to-linked
+transitions, A→B→A history, metadata-only refresh, finite cycle boundaries,
+request-generation races, source failures, capacity limits and atomic rollback.
+They verify that both source transactions close before publication and that
+source content remains unchanged. These tests do not read production databases
+or measure production detection accuracy.
 
 ## Remaining delivery
 
-Issue #147 remains open. The adapters have isolated acceptance; they are not yet
-connected to a production joint workflow. Next increments need explicit mapping
-validation against enrolled sources, a separate durable derived
-store, finite reconciliation that notices SSH-only late arrivals, revision-pinned
-pagination and the joint-case console. Reads must release source transactions
-before publishing derived records; sequential source snapshots must not be
-presented as a cross-store atomic snapshot.
+Issue #147 remains open. The pure foundation, source adapters and explicit
+derived store/finite refresh have isolated acceptance. Production integration
+still needs mapping validation against enrolled sources, bounded anchor
+discovery, scheduling, revision-pinned
+pagination and the joint-case console. Explicit registration cannot stand in for
+an inventory of all production findings. Source transactions must close before
+publication, and sequential source observations remain non-atomic across stores.
 
 Recovery must preserve original network/console/collector pairing. Derived-store
 backup and source-restore revalidation need their own tested contract. A reviewed
