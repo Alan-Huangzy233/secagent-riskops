@@ -15,8 +15,9 @@ public tracking.
 2. Build SSH + network joint cases. The [offline foundation](joint-evidence.md)
    supplies typed association and bounded read-only source adapters with isolated
    acceptance. A separate derived store and explicit finite refresh of registered
-   anchors are implemented and tested in isolation; live discovery, scheduling,
-   configuration and the console remain pending. Search matches alone do not
+   anchors are implemented. The [joint console](joint-console.md) adds optional
+   mapping, explicit bounded discovery, recovery and a read-only paginated view.
+   Production activation and a refresh schedule remain pending. Search matches alone do not
    identify one actor or prove an attack chain.
 3. Add manual AI review of those versioned joint dossiers.
 4. Continue Linux host evidence after the network foundation. Source inventory
@@ -54,7 +55,7 @@ paused. No date is promised for deferred product or exploratory work.
 | --- | --- | --- |
 | [#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145) | Make IP search visible and pivot from network findings to SSH evidence | deployed |
 | [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) | Add scoped IP lookup across network, HTTP and SSH records | planned |
-| [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147) | Correlate SSH and network evidence into traceable investigation cases | foundation, readers and explicit derived persistence/refresh implemented; live workflow pending |
+| [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147) | Correlate SSH and network evidence into traceable investigation cases | foundation, readers, derived observations, explicit discovery/recovery and console implemented; production activation pending |
 | [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148) | Extend manual AI review to network and correlated SSH evidence | planned |
 
 ## Detection, AI and operational follow-ups

@@ -35,9 +35,10 @@ console notifications and UTC daily briefings are implemented. Current position:
   counterexamples. Explicit bounded readers now select a fixed network revision
   and retained SSH incident evidence. An independent derived store and explicit
   finite refresh of registered anchors are implemented and tested in isolation;
-  unchanged network revisions are revisited for SSH-only late evidence. Automatic
-  discovery, configuration, scheduling, the joint console and production
-  activation remain pending. Scoped cross-type lookup ([#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146)) can progress alongside it;
+  unchanged network revisions are revisited for SSH-only late evidence. The
+  [joint console](./docs/joint-console.md) adds validated optional mapping, bounded
+  explicit discovery/update commands, derived-store recovery and a read-only
+  paginated table. Production activation and a refresh schedule remain pending. Scoped cross-type lookup ([#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146)) can progress alongside it;
   manual joint AI review ([#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148)) follows separately.
 - Linux #121 retains the Web → network → Linux detection order; source inventory
   can proceed alongside search/correlation. A missing business website or pending

@@ -4,9 +4,10 @@
 joint investigation cases. The pure association contract has reproducible
 synthetic acceptance; explicit read-only adapters project retained source
 evidence into that contract. An independent derived store and explicit finite
-refresh are also implemented and tested with isolated sources. Production
-continues to use the existing SSH/network views and IP search. Importing these modules creates no
-joint database, worker, configuration, API or console tab.
+refresh are also implemented and tested with isolated sources. The optional
+[joint console and explicit CLI](joint-console.md) expose those observations with
+validated mapping, bounded discovery and recovery. Production activation remains
+separate; importing these modules creates no joint database or worker.
 
 ## Why inspect actual evidence
 
@@ -65,8 +66,8 @@ source reads described below.
 `joint_reader.read_joint_evidence(network_path, ssh_path, mappings, incident_id,
 revision, ...)` reads one required network revision and the mapped SSH evidence.
 It returns an immutable `JointRead` with the pure projection and separate read
-metadata. It is an internal explicit-call interface: no configuration, scheduled
-worker, API endpoint, database migration or console feature activates it.
+metadata. It is an explicit-call interface. The optional joint CLI invokes it during
+refresh; console GET requests never invoke it. No scheduled worker is started.
 
 The network reader checks the store identity/version and reads the producer,
 revision payload and historical evidence membership in one read transaction.
@@ -153,8 +154,8 @@ A caller uses these internal interfaces explicitly:
 | `store.get_cycle()` / `store.get_registration(incident_id)` | Inspect worklist progress or an anchor's current refresh status |
 | `store.get_case(case_id, revision=None)` | Read the current projection or an explicitly selected immutable revision |
 
-The workflow does not discover all network cases, enroll production sources or
-start a worker. Its coverage is only the explicitly registered anchors and the
+This internal refresh workflow does not discover network cases or start a worker.
+The optional CLI performs separately bounded discovery through the enrolled mapping. Its coverage is only the explicitly registered anchors and the
 retained incident evidence read for them.
 
 The store retains the pure canonical projection as an immutable numbered case
@@ -223,12 +224,11 @@ store hidden evidence or create full historical evidence pagination. Two
 sequential source reads remain separate observations; the store does not turn
 them into a cross-database atomic snapshot or a durable upstream SSH revision.
 
-This increment is not wired to application configuration, a scheduler, live
-routes, console views, notifications, AI or response controls. Source enrollment
-validation, automatic anchor discovery, production activation and a tested
-derived-store recovery procedure remain separate work. The implemented internal
-interfaces have isolated acceptance; no production joint store or refresh job
-is activated by this increment.
+The [console guide](joint-console.md) describes the optional validated
+configuration, explicit discovery/refresh CLI, v2 typed summaries, read-only
+routes, paginated view and derived recovery. There is no scheduler, joint
+notification, AI or response-control integration. Production activation remains
+separate; the default configuration creates no joint store or refresh job.
 
 ## Reproduce the fixture
 

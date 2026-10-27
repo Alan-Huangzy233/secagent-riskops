@@ -3,11 +3,13 @@ import re
 
 from .http_dashboard import SECTION as HTTP_SECTION, DIALOG as HTTP_DIALOG
 from .network_dashboard import SECTION as NETWORK_SECTION, DIALOG as NETWORK_DIALOG
+from .joint_dashboard import SECTION as JOINT_SECTION, DIALOG as JOINT_DIALOG
 
 
 VIEWS = (("incidents", "告警", "incident-section"), ("events", "日志", "event-section"),
          ("http", "HTTP 检测", "http-section"),
          ("network", "网络检测", "network-section"),
+         ("joint", "联合案件", "joint-section"),
          ("overview", "来源概览", "overview-section"), ("notifications", "通知与简报", "notification-section"),
          ("collection", "采集记录", "collection-section"), ("ip", "IP 查询", "ip-query-section"),
          ("controls", "响应操作", "control-section"))
@@ -25,7 +27,7 @@ STYLE = r"""
 SCRIPT = r"""
 let workspaceView='incidents',bootstrapPacket=null,bootstrapReceivedAt=0,bootstrapPromise=null,bootstrapTimer=null;
 let detailReturnFocus=null,detailTab='overview',bootstrapBlocked=false,bootstrapBlockedGeneration=null,controlsPromise=null;
-const workspaceViews=['incidents','events','http','network','overview','notifications','collection','ip','controls'];
+const workspaceViews=['incidents','events','http','network','joint','overview','notifications','collection','ip','controls'];
 function searchPrefix(kind){return kind==='event'?'search':'incident-search';}
 function searchFilters(kind){return kind==='event'?eventFilters:incidentFilters;}
 function localInput(value){const date=new Date(value);if(!value||Number.isNaN(date.valueOf()))return '';return new Date(date.valueOf()-date.getTimezoneOffset()*60000).toISOString().slice(0,19);}
@@ -117,7 +119,7 @@ function renderRecordOverview(record){
 function setWorkspace(name){
  if(!workspaceViews.includes(name))name='incidents';workspaceView=name;
  for(const key of workspaceViews){$('workspace-'+key).hidden=key!==name;$('workspace-tab-'+key).setAttribute('aria-selected',String(key===name));$('workspace-tab-'+key).tabIndex=key===name?0:-1;}
- $('source-filter').disabled=['http','network'].includes(name);
+ $('source-filter').disabled=['http','network','joint'].includes(name);
  try{sessionStorage.setItem('riskops-workspace',name);}catch{}
 }
 async function selectWorkspace(name,load=true){setWorkspace(name);if(load)await loadWorkspaceView();}
@@ -146,6 +148,7 @@ async function loadWorkspaceView(force=false){
   else if(view==='events')await cachedOrLiveList('event',force);
   else if(view==='http')await loadHttp();
   else if(view==='network')await loadNetwork();
+  else if(view==='joint')await loadJoint();
   else if(view==='notifications')await loadNotifications();
   else if(view==='collection')await loadCollection();
   else if(view==='controls')await loadControls();
@@ -209,6 +212,7 @@ function initializeWorkspace(){
  initializeIPSearch();
  initializeHttp();
  initializeNetwork();
+ initializeJoint();
  for(const name of workspaceViews){
   const button=$('workspace-tab-'+name);button.addEventListener('click',()=>selectWorkspace(name));
   button.addEventListener('keydown',event=>{const index=workspaceViews.indexOf(name);let next=null;if(['ArrowDown','ArrowRight'].includes(event.key))next=(index+1)%workspaceViews.length;else if(['ArrowUp','ArrowLeft'].includes(event.key))next=(index+workspaceViews.length-1)%workspaceViews.length;else if(event.key==='Home')next=0;else if(event.key==='End')next=workspaceViews.length-1;if(next!==null){event.preventDefault();selectWorkspace(workspaceViews[next]);$('workspace-tab-'+workspaceViews[next]).focus();}});
@@ -246,6 +250,7 @@ def arrange(html):
     mapped = {re.search(r'id="([^"]+)"', section).group(1): section for section in sections}
     mapped["http-section"] = HTTP_SECTION
     mapped["network-section"] = NETWORK_SECTION
+    mapped["joint-section"] = JOINT_SECTION
     detail = mapped.pop("detail-section")
     detail = detail.replace('<h2 id="detail-title">记录详情</h2>', '<div class="drawer-heading"><h2 id="detail-title">记录详情</h2><button id="detail-close" type="button" aria-label="关闭详情">关闭 ✕</button></div>', 1)
     original = '<pre id="detail">选择上方记录查看详情。</pre>'
@@ -289,4 +294,4 @@ def arrange(html):
     prefix = prefix.replace('默认手动刷新，保留当前来源、筛选、页码与已打开的详情。日志查询固定在本次快照；点击“获取最新日志”重新查询并回到第一页。自动刷新仅在页面可见且没有读取任务时运行。', '后台同步概览与首页告警。日志翻页固定在本次快照；“获取最新日志”重新读取。自定义视图可选择刷新间隔。')
     prefix = prefix.replace('<div class="card">', '<div class="card"><span class="muted">SSH · </span>')
     sync = '<div id="console-sync-line" class="sync-line" data-stale="true"><span class="sync-dot" aria-hidden="true"></span><span id="console-sync" role="status">正在读取服务器准备的数据…</span></div>'
-    return head + '<body><div class="workspace-shell">' + nav + '<main class="workspace-main"><header class="workspace-header">' + prefix + sync + '</header>' + ''.join(panels) + '</main></div><dialog id="detail-dialog" aria-labelledby="detail-title">' + detail + '</dialog>' + HTTP_DIALOG + NETWORK_DIALOG + '<script>' + script
+    return head + '<body><div class="workspace-shell">' + nav + '<main class="workspace-main"><header class="workspace-header">' + prefix + sync + '</header>' + ''.join(panels) + '</main></div><dialog id="detail-dialog" aria-labelledby="detail-title">' + detail + '</dialog>' + HTTP_DIALOG + NETWORK_DIALOG + JOINT_DIALOG + '<script>' + script
