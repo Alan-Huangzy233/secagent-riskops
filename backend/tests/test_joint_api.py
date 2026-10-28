@@ -146,3 +146,72 @@ def test_missing_derived_store_does_not_initialize_and_does_not_break_health(set
         assert response.json() == {'detail': 'joint_store_unavailable'}
         assert client.get('/health').json() == {'status': 'ok'}
     assert not missing.parent.exists()
+
+
+@pytest.mark.parametrize('checkpoint', ['absent', 'malformed', 'mismatched', 'public', 'symlink'])
+def test_refresh_metadata_failure_does_not_hide_saved_cases_or_write_files(setup, checkpoint, monkeypatch):
+    from app.telemetry.joint_case_query import open_query
+    from app.telemetry.joint_config import JointRefreshConfig, compile_joint_config
+    from app.telemetry.joint_refresh_state import new_state, reserved_paths, save_state
+    config, derived, sources, case_id = setup
+    config = config.model_copy(update={'joint_cases': config.joint_cases.model_copy(update={
+        'refresh': JointRefreshConfig(enabled=True)})})
+    spec = compile_joint_config(config)
+    _, metadata = reserved_paths(spec)
+    if checkpoint == 'malformed':
+        metadata.write_text('{broken')
+        metadata.chmod(0o600)
+    elif checkpoint in ('mismatched', 'public'):
+        value = new_state(spec, open_query(spec.database_path, spec.scope, spec.limits).status())
+        if checkpoint == 'mismatched':
+            value['binding']['query_epoch'] = '0'*32
+        save_state(spec, value)
+        if checkpoint == 'public':
+            metadata.chmod(0o644)
+    elif checkpoint == 'symlink':
+        metadata.symlink_to(sources[0].path)
+    with TestClient(app(config)) as client:
+        paths = (derived.path, sources[0].path, sources[1].path)
+        before = [store_digest(path) for path in paths]
+        entries = set(Path(derived.path).parent.iterdir())
+        content = metadata.read_bytes() if metadata.exists() else None
+        def forbidden(*a, **kw):
+            pytest.fail('status read tried to start or mutate an update')
+        monkeypatch.setattr('app.telemetry.joint_refresh.tick', forbidden)
+        monkeypatch.setattr('app.telemetry.joint_refresh_state.save_state', forbidden)
+        monkeypatch.setattr('app.telemetry.joint_refresh_state.writer_lock', forbidden)
+        response = get(client, 'status')
+        assert response.status_code == 200, response.text
+        refresh = response.json()['refresh']
+        assert refresh['enabled'] and refresh['stale']
+        assert refresh['last_success_at'] is None
+        assert refresh['state'] == ('not_started' if checkpoint == 'absent' else 'unavailable')
+        assert get(client, 'cases').json()['total'] == 1
+        assert get(client, 'cases/'+case_id, revision=1).status_code == 200
+        assert [store_digest(path) for path in paths] == before
+        assert set(Path(derived.path).parent.iterdir()) == entries
+        assert (metadata.read_bytes() if metadata.exists() else None) == content
+        assert str(Path(derived.path).parent) not in response.text
+
+
+def test_status_reads_worker_checkpoint_without_refreshing_again(setup, monkeypatch):
+    from app.telemetry.joint_cli import run
+    from app.telemetry.joint_config import JointRefreshConfig, compile_joint_config
+    from app.telemetry.joint_refresh_state import reserved_paths
+    config, derived, _, _ = setup
+    config = config.model_copy(update={'joint_cases': config.joint_cases.model_copy(update={
+        'refresh': JointRefreshConfig(enabled=True)})})
+    assert run(config, 'tick')['last_success_at'] is None
+    finished = run(config, 'tick')
+    assert finished['last_success_at'] is not None and not finished['stale']
+    _, metadata = reserved_paths(compile_joint_config(config))
+    content = metadata.read_bytes()
+    before = store_digest(derived.path)
+    with TestClient(app(config)) as client:
+        monkeypatch.setattr('app.telemetry.joint_refresh.tick',
+                            lambda *a, **kw: pytest.fail('GET started another worker'))
+        for _ in range(2):
+            response = get(client, 'status')
+            assert response.json()['refresh']['last_success_at'] == finished['last_success_at']
+            assert response.json()['refresh']['state'] == 'waiting'
+        assert metadata.read_bytes() == content and store_digest(derived.path) == before

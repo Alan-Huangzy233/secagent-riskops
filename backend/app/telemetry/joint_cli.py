@@ -1,4 +1,4 @@
-"""Explicit, bounded local joint observations; no daemon, scheduling or API calls."""
+"""Bounded local joint commands, including an opt-in update tick; no API calls."""
 from __future__ import annotations
 
 import argparse
@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from .joint_case_contract import CaseStoreError
-from .joint_case_store import JointCaseStore
+from .joint_case_store import JointCaseStore, _identity, _path
 from .joint_catalog import catalog_target, preflight_sources, read_catalog_page
 from .joint_config import compile_joint_config
 from .joint_reader_io import EvidenceReadError, ReadBudget
@@ -16,6 +16,13 @@ from .joint_reconcile import reconcile_step
 def _separate(spec, *outputs):
     """Check lexical/symlink/hardlink aliases before any derived mutation."""
     try:
+        for value in (spec.database_path, *outputs):
+            if not isinstance(value, (str, Path)) or not str(value) or '\x00' in str(value):
+                raise CaseStoreError('joint_invalid_request')
+            try:
+                str(value).encode('utf-8', errors='strict')
+            except UnicodeError:
+                raise CaseStoreError('joint_invalid_request') from None
         sources = [Path(value).resolve(strict=False) for value in (
             spec.ssh_database_path, spec.network_database_path, spec.http_database_path) if value]
         identities = set()
@@ -26,9 +33,6 @@ def _separate(spec, *outputs):
             except FileNotFoundError:
                 pass
         for value in (spec.database_path, *outputs):
-            if not isinstance(value, (str, Path)) or not str(value) or '\x00' in str(value):
-                raise CaseStoreError('joint_invalid_request')
-            str(value).encode('utf-8', errors='strict')
             path = Path(value).resolve(strict=False)
             if path in sources:
                 raise CaseStoreError('joint_source_alias')
@@ -38,6 +42,27 @@ def _separate(spec, *outputs):
                     raise CaseStoreError('joint_source_alias')
             except FileNotFoundError:
                 pass
+        from .joint_refresh_state import reserved_paths
+        protected = [Path(value).resolve(strict=False) for value in (spec.database_path, *outputs)]
+        for reserved in reserved_paths(spec):
+            resolved = reserved.resolve(strict=False)
+            if resolved in sources or resolved in protected:
+                raise CaseStoreError('joint_source_alias')
+            try:
+                info = reserved.stat()
+                reserved_identity = (info.st_dev, info.st_ino)
+            except FileNotFoundError:
+                reserved_identity = None
+            if reserved_identity is not None:
+                if reserved_identity in identities:
+                    raise CaseStoreError('joint_source_alias')
+                for path in protected:
+                    try:
+                        info = path.stat()
+                        if (info.st_dev, info.st_ino) == reserved_identity:
+                            raise CaseStoreError('joint_source_alias')
+                    except FileNotFoundError:
+                        pass
     except CaseStoreError:
         raise
     except (OSError, RuntimeError, ValueError):
@@ -78,13 +103,29 @@ def discover(spec, *, limit=50):
     return {'outcome': outcome, 'discovery': store.get_discovery()}
 
 
-def run(config, command, *, output=None, input_path=None):
-    """No source/store I/O when disabled. Returned summaries contain no paths."""
-    spec = compile_joint_config(config)
-    if spec is None:
-        return {'enabled': False, 'state': 'disabled'}
-    _separate(spec, *((output,) if output is not None else ()),
-              *((input_path,) if input_path is not None else ()))
+def refresh(spec):
+    """One explicitly admitted refresh step; callers own the writer lock."""
+    store = _open(spec)
+    from .joint_case_query import open_query
+    status = open_query(spec.database_path, spec.scope, spec.limits,
+                        catalog_min_seq=spec.catalog_min_seq).status()
+    if status['revalidation_pending']:
+        observed_discovery = status['discovery']
+        try:
+            preflight_sources(spec)
+        except (CaseStoreError, EvidenceReadError) as error:
+            store.record_discovery_failure(error.code,
+                expected_cycle_id=observed_discovery['cycle_id'] if observed_discovery else None,
+                expected_cursor=observed_discovery['cursor_seq'] if observed_discovery else None,
+                expected_revalidation_pending=status['revalidation_pending'],
+                expected_refresh_cycle_id=status['cycle']['cycle_id'] if status['cycle'] else None)
+            raise
+    store.begin_cycle()
+    return reconcile_step(store, spec.network_database_path, spec.ssh_database_path)
+
+
+def _run_spec(spec, command, *, output=None, input_path=None):
+    """Implementation entered with a writer lock for mutating commands."""
     base = {'enabled': True, 'command': command, 'scope': 'explicit_registered_anchors_only'}
     if command == 'check':
         result = preflight_sources(spec)
@@ -102,23 +143,7 @@ def run(config, command, *, output=None, input_path=None):
     if command == 'discover':
         return {**base, **discover(spec)}
     if command == 'refresh':
-        store = _open(spec)
-        from .joint_case_query import open_query
-        status = open_query(spec.database_path, spec.scope, spec.limits,
-                            catalog_min_seq=spec.catalog_min_seq).status()
-        if status['revalidation_pending']:
-            observed_discovery = status['discovery']
-            try:
-                preflight_sources(spec)
-            except (CaseStoreError, EvidenceReadError) as error:
-                store.record_discovery_failure(error.code,
-                    expected_cycle_id=observed_discovery['cycle_id'] if observed_discovery else None,
-                    expected_cursor=observed_discovery['cursor_seq'] if observed_discovery else None,
-                    expected_revalidation_pending=status['revalidation_pending'],
-                    expected_refresh_cycle_id=status['cycle']['cycle_id'] if status['cycle'] else None)
-                raise
-        store.begin_cycle()
-        return {**base, **reconcile_step(store, spec.network_database_path, spec.ssh_database_path)}
+        return {**base, **refresh(spec)}
     if command in ('migrate-v1', 'snapshot', 'restore'):
         # Imported only for an explicit offline operation; normal reads do not
         # expose a writable migration constructor through the API.
@@ -138,11 +163,50 @@ def run(config, command, *, output=None, input_path=None):
     raise CaseStoreError('joint_invalid_request')
 
 
+def _private_parent(path):
+    missing, directory = [], path.parent
+    while not directory.exists():
+        missing.append(directory)
+        directory = directory.parent
+    for directory in reversed(missing):
+        directory.mkdir(mode=0o700)
+
+
+def run(config, command, *, output=None, input_path=None):
+    """No file access when disabled; serialize explicit writes with update ticks."""
+    spec = compile_joint_config(config)
+    if spec is None:
+        return {'enabled': False, 'state': 'disabled'}
+    if command == 'tick':
+        from .joint_refresh import tick
+        return tick(spec)
+    if command not in ('check', 'init', 'discover', 'refresh', 'migrate-v1', 'snapshot', 'restore'):
+        raise CaseStoreError('joint_invalid_request')
+    _separate(spec, *((output,) if output is not None else ()),
+              *((input_path,) if input_path is not None else ()))
+    if command == 'check':
+        return _run_spec(spec, command)
+    from .joint_refresh_state import writer_lock
+    if command == 'init':
+        preflight_sources(spec)  # A bad source must not create a derived directory.
+        _private_parent(_path(spec.database_path))
+    elif command == 'restore':
+        # Recovery can be requested after loss of the original derived store.
+        _private_parent(_path(spec.database_path))
+    else:
+        try:
+            _identity(_path(spec.database_path))
+        except OSError:
+            raise CaseStoreError('joint_store_unavailable') from None
+    with writer_lock(spec):
+        return _run_spec(spec, command, output=output, input_path=input_path)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', required=True)
     sub = parser.add_subparsers(dest='command', required=True)
-    for command in ('check', 'init', 'discover', 'refresh'):
+    for command in ('check', 'init', 'discover', 'refresh', 'tick'):
         sub.add_parser(command)
     for command in ('migrate-v1', 'snapshot', 'restore'):
         option = sub.add_parser(command)

@@ -1,0 +1,51 @@
+[Unit]
+Description=Advance one bounded RiskOps joint-evidence refresh step
+After=secagent-riskops.service systemd-tmpfiles-setup.service
+
+[Service]
+Type=oneshot
+User=riskops
+Group=riskops
+Environment=PYTHONPATH=/opt/secagent-riskops/current/backend
+Environment=PYTHONDONTWRITEBYTECODE=1
+# Reuse the protected inode created by the existing backup tmpfiles rule.
+# Do not create, replace or manage this shared lock with RuntimeDirectory.
+ExecCondition=/usr/bin/test -f /run/secagent-riskops-backup/maintenance.lock
+ExecCondition=/usr/bin/test ! -L /run/secagent-riskops-backup/maintenance.lock
+ExecCondition=/usr/bin/test -r /run/secagent-riskops-backup/maintenance.lock
+ExecCondition=/usr/bin/test -w /run/secagent-riskops-backup/maintenance.lock
+# Yield to an exclusive backup/maintenance holder without queuing work.
+# The worker separately serializes all derived-store writers with its own lock.
+ExecStart=/usr/bin/flock --shared --nonblock --conflict-exit-code 75 --no-fork /run/secagent-riskops-backup/maintenance.lock /opt/secagent-riskops/venv/bin/python -m app.telemetry.joint_cli --config /etc/secagent-riskops/config.json tick
+SuccessExitStatus=75
+TimeoutStartSec=30
+TimeoutStopSec=5
+KillMode=control-group
+SendSIGKILL=yes
+Restart=no
+UMask=0077
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+CPUQuota=50%
+CPUWeight=10
+MemoryMax=256M
+TasksMax=24
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+PrivateNetwork=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX
+# Source connections use mode=ro and query_only. WAL readers may nevertheless
+# need writable -shm files in the source directory. This is not a filesystem
+# write prohibition on source data; use the existing riskops owner, never root.
+# The same parent contains the separately initialized derived database/sidecars.
+ReadWritePaths=/var/lib/secagent-riskops
+ReadWritePaths=/run/secagent-riskops-backup/maintenance.lock

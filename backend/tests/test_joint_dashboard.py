@@ -9,6 +9,7 @@ const jointStatus={enabled:true,state:'ready',store_id:'fixture',query_epoch:'on
 const jointEvent={kind:'ssh',event_id:'ssh-event',event_ts_us:1767268800000000,source_id:'ssh-a',src_ip:'198.51.100.23',event_type:'auth_failure',account:'<img src=x onerror=alert(1)>',incident_refs:[{incident_id:'SSH-original',canonical_incident_id:'SSH-canonical'}]};
 const jointProjection={case_id:jointID,state:'linked',asset_id:'asset-a',anchor:{incident_id:jointNetID,revision:3,source_id:'net-a',src_ip:'198.51.100.23',producer_id:'fixture'},window:{start_us:jointRow.window_start_us,end_us:jointRow.window_end_us},temporal_association_available:true,timeline:[jointEvent],timeline_complete:false,observed_evidence_count:35,reasons:['explicit_asset_mapping','same_observed_peer'],uncertainties:['timeline_truncated','shared_ip_does_not_establish_identity'],counts:{network:{'net-a':30},ssh:{'ssh-a':{evidence:5}}},mapping_sha256:'map',evidence_sha256:'evidence'};
 const jointResult={case_id:jointID,revision:1,projection:jointProjection,first_read_metadata:{network_observation:{started_at:'2026-01-01T12:00:00Z',finished_at:'2026-01-01T12:00:01Z'},ssh_observation:{state:'read',started_at:'2026-01-01T12:00:01Z',finished_at:'2026-01-01T12:00:02Z'}},current:{revision:2,refresh_state:'unavailable',last_success:'2026-01-01T12:00:02Z',error:'source_busy'}};
+const refreshMetadata={enabled:true,state:'waiting',phase:'idle',last_attempt_at:'2026-01-01T12:01:00Z',last_complete_at:'2026-01-01T12:01:02Z',last_success_at:'2026-01-01T12:01:02Z',next_attempt_at:'2026-01-01T12:02:02Z',age_seconds:65,stale:false,stalled:false,pending:0,failed:0,error:null,interval_seconds:60,stale_after_seconds:300};
 const jointDialog=$('joint-dialog');jointDialog.showModal=()=>{jointDialog.open=true;};jointDialog.close=()=>{jointDialog.open=false;jointDialog.listeners.close();};
 route=path=>{
  if(path==='/api/joint/status')return response(jointStatus);
@@ -93,6 +94,103 @@ await loadJoint();assert.match($('joint-health').textContent,/来源待重新核
 """)
 
 
+def test_refresh_metadata_is_optional_and_disabled_means_manual_without_losing_rows():
+    run_dashboard(FIXTURE + r"""
+await loadJoint(2);assert.match($('joint-refresh-health').textContent,/状态未提供.*人工更新/);
+const rows=$('joint-rows').textContent,snapshot=jointSnapshot;
+jointStatus.refresh={...refreshMetadata,enabled:false};await loadJoint();
+assert.match($('joint-refresh-health').textContent,/持续更新未启用.*人工更新/);assert.match($('joint-refresh-health').textContent,/只读取已保存/);
+assert.equal($('joint-rows').textContent,rows);assert.equal(jointPage,2);assert.equal(jointSnapshot,snapshot);
+assert.equal(calls.every(c=>(c.options.method||'GET')==='GET'),true);
+""")
+
+
+def test_refresh_age_backlog_stalled_and_unknown_values_do_not_claim_freshness():
+    run_dashboard(FIXTURE + r"""
+jointStatus.refresh={...refreshMetadata,state:'backoff',stale:true,stalled:true,pending:7,failed:2,age_seconds:3665,last_complete_at:'2026-01-01T12:03:00Z',error:'source_busy'};
+await loadJoint(2);const health=$('joint-refresh-health').textContent;
+assert.match(health,/等待重试/);assert.match(health,/更新进度停滞/);assert.match(health,/更新已延迟/);assert.match(health,/待处理：7.*失败：2/);assert.match(health,/距上次完整成功：1 小时 1 分/);assert.match(health,/结束不代表全部刷新成功/);assert.match(health,/来源暂忙/);
+assert.match($('joint-rows').textContent,/asset-page-two/);assert.equal(jointPage,2);
+for(const state of ['not_started','running','waiting','blocked','unavailable']){jointStatus.refresh={...refreshMetadata,state,phase:'discover'};jointHealth(jointStatus);assert.doesNotMatch($('joint-refresh-health').textContent,/后台更新状态未知/);}
+jointStatus.refresh={...refreshMetadata,state:'<img src=x onerror=alert(1)>',phase:'constructor',error:'<script>secret()</script>',last_attempt_at:'<img src=x onerror=alert(1)>',last_success_at:null,age_seconds:-5,pending:'<img>',failed:-1};
+jointHealth(jointStatus);const unknown=$('joint-refresh-health').textContent;
+assert.match(unknown,/状态未知/);assert.match(unknown,/时间不可用/);assert.match(unknown,/尚无完整成功记录/);assert.match(unknown,/距上次完整成功：未知.*待处理：未知.*失败：未知/);
+assert.match(unknown,/未识别的限制/);assert.doesNotMatch(unknown,/<img|<script|secret|constructor/);assert.equal($('joint-refresh-health').children.length,0);
+assert.equal(jointLabel('constructor'),'更新遇到未识别的限制');
+""")
+
+
+def test_waiting_between_steps_reports_continuation_instead_of_next_round():
+    run_dashboard(FIXTURE + r"""
+for(const phase of ['discover','refresh']){
+ jointStatus.refresh={...refreshMetadata,state:'waiting',phase,next_attempt_at:null};jointHealth(jointStatus);
+ const message=$('joint-refresh-health').textContent;
+ assert.match(message,/等待继续本轮更新/);assert.doesNotMatch(message,/等待下一轮更新/);
+ assert.match(message,phase==='discover'?/正在检查网络案件/:/正在刷新已登记案件/);
+}
+jointStatus.refresh={...refreshMetadata,state:'waiting',phase:'idle'};jointHealth(jointStatus);assert.match($('joint-refresh-health').textContent,/等待下一轮更新/);
+""")
+
+
+def test_status_poll_keeps_asset_option_nodes_until_registry_changes():
+    run_dashboard(FIXTURE + r"""
+setWorkspace('joint');await loadJoint(2);const select=$('joint-asset');select.value='asset-a';
+const original=[...select.children],snapshot=jointSnapshot,rows=$('joint-rows').textContent;
+jointStatus.generation=2;await pollJointStatus();
+assert.equal(select.children.length,original.length);for(let i=0;i<original.length;i++)assert.equal(select.children[i],original[i]);
+assert.equal(select.value,'asset-a');assert.equal(jointSnapshot,snapshot);assert.equal($('joint-rows').textContent,rows);
+jointStatus.assets=[{asset_id:'asset-b'}];await pollJointStatus();
+assert.notEqual(select.children[0],original[0]);assert.equal(select.value,'asset-a');assert.match(select.children[2].textContent,/asset-a（不在当前登记中）/);
+const updated=[...select.children];await pollJointStatus();for(let i=0;i<updated.length;i++)assert.equal(select.children[i],updated[i]);
+select.value='asset-b';await pollJointStatus();assert.equal(select.value,'asset-b');assert.equal(select.children.length,2);assert.equal(jointPage,2);
+""")
+
+
+def test_refresh_timestamps_require_timezone_and_render_equivalent_instants_locally():
+    run_dashboard(FIXTURE + r"""
+assert.equal(jointRefreshTime('2026-01-01T12:01:02Z'),jointRefreshTime('2026-01-01T20:01:02+08:00'));
+assert.equal(jointRefreshTime('2026-01-01T12:01:02.123456Z'),new Date('2026-01-01T12:01:02.123456Z').toLocaleString('zh-CN',{hour12:false}));
+for(const value of ['2026-01-01T12:01:02','not-a-date','2026-99-99T99:99:99Z',42])assert.equal(jointRefreshTime(value),'时间不可用');
+jointStatus.refresh=refreshMetadata;await loadJoint();assert.match($('joint-refresh-health').textContent,/最近尝试：.*本地时间/);assert.match($('joint-refresh-health').textContent,/最近完整成功：.*本地时间/);
+""")
+
+
+def test_status_poll_is_get_only_and_preserves_pinned_page_when_generation_advances():
+    run_dashboard(FIXTURE + r"""
+setWorkspace('joint');jointStatus.refresh=refreshMetadata;await loadJoint(2);
+const rows=$('joint-rows').textContent,page=$('joint-page').textContent,snapshot=jointSnapshot,count=calls.length;
+jointStatus.generation=3;jointStatus.refresh={...refreshMetadata,state:'running',phase:'refresh',pending:4};await pollJointStatus();
+assert.equal(calls.length,count+1);assert.equal(calls[calls.length-1].path,'/api/joint/status');
+assert.equal($('joint-rows').textContent,rows);assert.equal($('joint-page').textContent,page);assert.equal(jointSnapshot,snapshot);assert.equal(jointPage,2);assert.equal(jointPinnedGeneration,1);
+assert.match($('joint-new').textContent,/有新观察.*当前分页保持不变/);assert.match($('joint-refresh-health').textContent,/正在刷新已登记案件/);
+const before=calls.length;document.hidden=true;await pollJointStatus();document.hidden=false;setWorkspace('events');await pollJointStatus();assert.equal(calls.length,before);
+setWorkspace('joint');route=()=>({ok:false,status:503});await pollJointStatus();assert.match($('joint-refresh-health').textContent,/暂无法确认.*保留当前案件与分页/);assert.equal($('joint-rows').textContent,rows);assert.equal(jointSnapshot,snapshot);
+assert.equal(calls.every(c=>(c.options.method||'GET')==='GET'),true);
+""")
+
+
+def test_status_poll_single_inflight_and_late_response_cannot_override_new_list():
+    run_dashboard(FIXTURE + r"""
+setWorkspace('joint');jointStatus.refresh=refreshMetadata;await loadJoint();
+let release;const normal=route;route=path=>path==='/api/joint/status'?new Promise(resolve=>{release=()=>resolve(response({...jointStatus,generation:999,refresh:{...refreshMetadata,state:'blocked'}}));}):normal(path);
+const before=calls.length,pending=pollJointStatus();for(let i=0;i<8;i++)await Promise.resolve();await pollJointStatus();assert.equal(calls.length,before+1);
+route=normal;await loadJoint(2);release();await pending;assert.match($('joint-rows').textContent,/asset-page-two/);assert.doesNotMatch($('joint-refresh-health').textContent,/更新受阻/);assert.equal($('joint-new').textContent,'');
+route=path=>path==='/api/joint/status'?new Promise(resolve=>{release=()=>resolve(response({...jointStatus,refresh:{...refreshMetadata,state:'blocked'}}));}):normal(path);
+const leaving=pollJointStatus();for(let i=0;i<8;i++)await Promise.resolve();setWorkspace('events');setWorkspace('joint');release();await leaving;assert.doesNotMatch($('joint-refresh-health').textContent,/更新受阻/);
+""")
+
+
+def test_status_poll_timeout_keeps_previous_observation_and_can_retry():
+    run_dashboard(FIXTURE + r"""
+setWorkspace('joint');jointStatus.refresh=refreshMetadata;await loadJoint(2);const rows=$('joint-rows').textContent,snapshot=jointSnapshot,normal=route;
+route=(path,options)=>new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(Object.assign(new Error('timeout'),{name:'AbortError'}))));
+const pending=pollJointStatus();for(let i=0;i<8;i++)await Promise.resolve();const timer=timers[timers.length-1];assert.equal(timer.ms,10000);timer.fn();await pending;
+assert.equal(jointStatusLoading,false);assert.match($('joint-refresh-health').textContent,/暂无法确认/);assert.equal(jointSnapshot,snapshot);assert.equal($('joint-rows').textContent,rows);
+route=normal;await pollJointStatus();assert.match($('joint-refresh-health').textContent,/等待下一轮/);assert.equal(jointPage,2);
+assert.equal(timers.some(timer=>timer.ms===15000),true);
+""")
+
+
 def test_details_pin_revision_lazy_timeline_and_escape_observed_strings():
     run_dashboard(FIXTURE + r"""
 let restored=0;document.activeElement={isConnected:true,focus:()=>restored++};await showJointCase(jointID,1);
@@ -140,8 +238,8 @@ const {chromium}=require(process.env.RISKOPS_PLAYWRIGHT_MODULE);
  const browser=await chromium.launch({executablePath:process.env.RISKOPS_BROWSER_EXECUTABLE,headless:true,args:['--no-sandbox','--disable-gpu','--disable-dev-shm-usage']});
  const reports=[];
  try{for(const [name,viewport] of [['desktop',{width:1440,height:1000}],['mobile',{width:390,height:844}]]){
-  const context=await browser.newContext({viewport,serviceWorkers:'block'}),calls=[],writes=[],external=[],errors=[];
-  const {jointID,jointRow,jointStatus,jointEvent,jointResult}=new Function(input.fixture+';return {jointID,jointRow,jointStatus,jointEvent,jointResult};')();
+  const context=await browser.newContext({viewport,serviceWorkers:'block',timezoneId:'Asia/Shanghai'}),calls=[],writes=[],external=[],errors=[];
+  const {jointID,jointRow,jointStatus,jointEvent,jointResult,refreshMetadata}=new Function(input.fixture+';return {jointID,jointRow,jointStatus,jointEvent,jointResult,refreshMetadata};')();
   let disabled=false,holdNext=false,release=null;
   await context.addInitScript(()=>sessionStorage.setItem('riskops-workspace','joint'));
   await context.route('**/*',async route=>{
@@ -167,7 +265,14 @@ const {chromium}=require(process.env.RISKOPS_PLAYWRIGHT_MODULE);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   await page.locator('#joint-next').click();await page.waitForFunction(()=>document.getElementById('joint-page').textContent.includes('第 2 / 2 页'));
   assert(calls.some(path=>path.includes('page=2&limit=20&snapshot=snapshot-one')));
-  jointStatus.generation=2;await page.locator('#joint-refresh').click();await page.waitForFunction(()=>document.getElementById('joint-new').textContent.includes('有新观察'));
+  jointStatus.refresh={...refreshMetadata,state:'backoff',stale:true,stalled:true,pending:4,failed:2,error:'<img src=x onerror=alert(1)>'};jointStatus.generation=2;
+  const listCalls=calls.filter(path=>path.startsWith('/api/joint/cases?')).length;
+  await page.evaluate(()=>pollJointStatus());await page.waitForFunction(()=>document.getElementById('joint-new').textContent.includes('有新观察'));
+  assert.equal(calls.filter(path=>path.startsWith('/api/joint/cases?')).length,listCalls);
+  assert.match(await page.locator('#joint-refresh-health').textContent(),/更新进度停滞/);assert.match(await page.locator('#joint-refresh-health').textContent(),/更新已延迟/);
+  assert.match(await page.locator('#joint-refresh-health').textContent(),/20:01:02/);assert.match(await page.locator('#joint-refresh-health').textContent(),/本地时间/);
+  assert.equal(await page.locator('#joint-refresh-health img').count(),0);assert.doesNotMatch(await page.locator('#joint-refresh-health').textContent(),/<img/);
+  await page.locator('#joint-refresh').click();await page.waitForFunction(()=>document.getElementById('joint-status').textContent==='');
   assert.match(await page.locator('#joint-page').textContent(),/第 2/);
   await page.locator('#joint-rows').getByRole('button',{name:'查看详情',exact:true}).click();await page.waitForFunction(()=>document.getElementById('joint-revision').textContent.includes('历史观察'));
   assert.match(await page.locator('#joint-freshness').textContent(),/最近刷新失败/);

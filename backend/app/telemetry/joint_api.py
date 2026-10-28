@@ -43,7 +43,10 @@ def register_routes(application, operator):
     def status(request: Request):
         if request.app.state.config.joint_cases is None:
             return {"enabled": False}
-        return read(request, "status")
+        result = read(request, "status")
+        from .joint_refresh_state import read_refresh_status
+        result["refresh"] = read_refresh_status(specification(request), result)
+        return result
 
     @application.get("/api/joint/cases", dependencies=[Depends(operator)])
     def cases(request: Request, page: int = Query(1, ge=1, le=1000),

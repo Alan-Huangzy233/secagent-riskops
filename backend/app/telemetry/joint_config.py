@@ -32,12 +32,28 @@ def _path(value):
     return os.path.normpath(value)
 
 
+class JointRefreshConfig(BaseModel):
+    """Opt-in cadence for one bounded local update step, never an API worker."""
+    model_config = {'extra': 'forbid', 'frozen': True}
+    enabled: bool = Field(default=False, strict=True)
+    interval_seconds: int = Field(default=300, ge=60, le=86400, strict=True)
+    stale_after_seconds: int = Field(default=900, ge=60, le=604800, strict=True)
+    retry_seconds: int = Field(default=60, ge=10, le=3600, strict=True)
+
+    @model_validator(mode='after')
+    def cadence(self):
+        if self.stale_after_seconds < self.interval_seconds:
+            raise ValueError('invalid_joint_refresh_cadence')
+        return self
+
+
 class JointCasesConfig(BaseModel):
     model_config = {'extra': 'forbid', 'frozen': True}
     database_path: str = Field(strict=True, min_length=1, max_length=4096)
     scope: dict
     catalog_min_seq: int = Field(default=1, ge=1, le=2**63-1, strict=True)
     store_limits: dict = Field(default_factory=dict)
+    refresh: JointRefreshConfig | None = None
 
     @field_validator('database_path')
     @classmethod
@@ -64,6 +80,7 @@ class JointRuntimeSpec:
     ssh_database_path: str
     http_database_path: str | None
     config_sha256: str
+    refresh: JointRefreshConfig | None = None
 
 
 def compile_joint_config(live_config) -> JointRuntimeSpec | None:
@@ -77,6 +94,11 @@ def compile_joint_config(live_config) -> JointRuntimeSpec | None:
         return None
     try:
         if not isinstance(config, JointCasesConfig) or live_config.network_ingest is None:
+            raise ValueError
+        # Revalidate model_copy(update=...) inputs without any filesystem access.
+        refresh = (JointRefreshConfig.model_validate(config.refresh.model_dump())
+                   if isinstance(config.refresh, JointRefreshConfig) else None)
+        if config.refresh is not None and refresh is None:
             raise ValueError
         scope = CaseScope.from_json(_json(config.scope))
         limits = StoreLimits(**config.store_limits)
@@ -106,6 +128,7 @@ def compile_joint_config(live_config) -> JointRuntimeSpec | None:
             'network_database_path': net, 'http_database_path': http,
             'scope': scope.to_dict(), 'limits': json.loads(limits.to_json()),
             'catalog_min_seq': config.catalog_min_seq}).encode('ascii')).hexdigest()
-        return JointRuntimeSpec(derived, scope, limits, config.catalog_min_seq, net, ssh, http, digest)
+        # Cadence does not change the immutable evidence scope or store identity.
+        return JointRuntimeSpec(derived, scope, limits, config.catalog_min_seq, net, ssh, http, digest, refresh)
     except (AttributeError, CaseStoreError, ValueError, TypeError, OverflowError):
         raise ValueError('invalid_joint_configuration') from None

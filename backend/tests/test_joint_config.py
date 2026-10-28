@@ -9,7 +9,7 @@ from pydantic import ValidationError
 
 from app.telemetry.config import NetworkSourceConfig
 from app.telemetry.joint_case_contract import CaseScope
-from app.telemetry.joint_config import JointCasesConfig, compile_joint_config
+from app.telemetry.joint_config import JointCasesConfig, JointRefreshConfig, compile_joint_config
 from app.telemetry.joint_evidence import AssetMapping, NetworkBinding
 from test_network_detection import profile, DESTINATION
 
@@ -95,3 +95,41 @@ def test_low_limits_and_explicit_catalog_floor_are_immutable_values(tmp_path):
     spec = compile_joint_config(config)
     assert spec.catalog_min_seq == 42 and spec.limits.registration_limit == 3
     assert replace(spec, catalog_min_seq=43).catalog_min_seq == 43
+
+
+@pytest.mark.parametrize('fields', [{}, {'enabled': False}, {'enabled': True}])
+def test_refresh_configuration_is_explicit_and_does_not_change_evidence_identity(tmp_path, monkeypatch, fields):
+    config = config_for(tmp_path)
+    original = compile_joint_config(config)
+    config.joint_cases = config.joint_cases.model_copy(update={'refresh': JointRefreshConfig(**fields)})
+    monkeypatch.setattr(Path, 'stat', lambda *a, **k: pytest.fail('refresh compilation stat'))
+    monkeypatch.setattr(Path, 'resolve', lambda *a, **k: pytest.fail('refresh compilation resolve'))
+    result = compile_joint_config(config)
+    assert original.refresh is None
+    assert result.refresh.enabled is fields.get('enabled', False)
+    assert result.config_sha256 == original.config_sha256
+    assert result.scope == original.scope and result.limits == original.limits
+
+
+@pytest.mark.parametrize('fields', [
+    {'enabled': 1}, {'enabled': 'true'}, {'interval_seconds': True},
+    {'interval_seconds': 59}, {'interval_seconds': 86401}, {'interval_seconds': 300.5},
+    {'stale_after_seconds': 299}, {'stale_after_seconds': 604801},
+    {'retry_seconds': 9}, {'retry_seconds': 3601}, {'retry_seconds': '60'}, {'unknown': 1},
+])
+def test_invalid_refresh_settings_are_rejected_at_configuration_boundary(fields):
+    with pytest.raises(ValidationError):
+        JointRefreshConfig(**fields)
+
+
+@pytest.mark.parametrize('value', [
+    {'enabled': True},
+    JointRefreshConfig().model_copy(update={'enabled': 'true'}),
+    JointRefreshConfig().model_copy(update={'retry_seconds': 0}),
+    JointRefreshConfig().model_copy(update={'interval_seconds': 1000}),
+])
+def test_compilation_revalidates_refresh_model_copy_inputs(tmp_path, value):
+    config = config_for(tmp_path)
+    config.joint_cases = config.joint_cases.model_copy(update={'refresh': value})
+    with pytest.raises(ValueError, match='^invalid_joint_configuration$'):
+        compile_joint_config(config)

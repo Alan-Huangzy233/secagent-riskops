@@ -117,6 +117,7 @@ function renderRecordOverview(record){
  for(const [label,value] of values){if(value===undefined||value===null||value===''||Array.isArray(value)&&!value.length)continue;const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=label;detail.textContent=Array.isArray(value)?value.join('、'):String(value);box.append(term,detail);}
 }
 function setWorkspace(name){
+ if(typeof cancelJointStatusPoll==='function')cancelJointStatusPoll();
  if(!workspaceViews.includes(name))name='incidents';workspaceView=name;
  for(const key of workspaceViews){$('workspace-'+key).hidden=key!==name;$('workspace-tab-'+key).setAttribute('aria-selected',String(key===name));$('workspace-tab-'+key).tabIndex=key===name?0:-1;}
  $('source-filter').disabled=['http','network','joint'].includes(name);
