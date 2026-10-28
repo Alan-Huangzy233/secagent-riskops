@@ -29,16 +29,18 @@ console notifications and UTC daily briefings are implemented. Current position:
 - **IP search and investigation pivots delivered** ([#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145), PR #172).
   Visible SSH alert/log filters and network-to-SSH pivots are deployed and checked
   on desktop/mobile, including protected-address search and exact-IP paging.
-- **Next: SSH + network joint cases** ([#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147)).
+- **SSH + network joint cases** ([#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147)).
   The [offline evidence foundation](./docs/joint-evidence.md) defines explicit
   asset ownership, typed evidence, bounded time association and reproducible
   counterexamples. Explicit bounded readers now select a fixed network revision
   and retained SSH incident evidence. An independent derived store and explicit
-  finite refresh of registered anchors are implemented and tested in isolation;
+  finite refresh of registered anchors preserve historical observations;
   unchanged network revisions are revisited for SSH-only late evidence. The
   [joint console](./docs/joint-console.md) adds validated optional mapping, bounded
   explicit discovery/update commands, derived-store recovery and a read-only
-  paginated table. Production activation and a refresh schedule remain pending. Scoped cross-type lookup ([#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146)) can progress alongside it;
+  paginated table. Optional [bounded continuous refresh](./docs/joint-refresh.md)
+  adds resumable steps and full-round freshness indicators, with scheduling off
+  by default. Scoped cross-type lookup ([#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146)) can progress alongside it;
   manual joint AI review ([#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148)) follows separately.
 - Linux #121 retains the Web → network → Linux detection order; source inventory
   can proceed alongside search/correlation. A missing business website or pending

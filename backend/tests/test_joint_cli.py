@@ -56,7 +56,7 @@ def test_disabled_commands_do_not_access_files_or_source(configured,monkeypatch)
     config,_=configured
     config.joint_cases=None
     monkeypatch.setattr(cli,'_separate',lambda *a,**k:pytest.fail('disabled I/O'))
-    for command in ('check','init','discover','refresh','migrate-v1','snapshot','restore'):
+    for command in ('check','init','discover','refresh','tick','migrate-v1','snapshot','restore'):
         assert cli.run(config,command)=={'enabled':False,'state':'disabled'}
     assert cli.run(SimpleNamespace(joint_cases=None),'check')['enabled'] is False
 
@@ -235,8 +235,10 @@ def test_slow_discovery_start_failure_cannot_overwrite_new_round_success(configu
     original=cli.catalog_target
     def slow_failure(*args,**kwargs):
         monkeypatch.setattr(cli,'catalog_target',original)
-        assert cli.run(config,'discover')['discovery']['complete']
-        assert cli.run(config,'refresh')['outcomes']['unchanged']==1
+        # Simulate an older/uncoordinated low-level writer. Current CLI
+        # commands are serialized; storage CAS must still reject a stale result.
+        assert cli.discover(spec)['discovery']['complete']
+        assert cli.refresh(spec)['outcomes']['unchanged']==1
         raise EvidenceReadError('source_unavailable')
     monkeypatch.setattr(cli,'catalog_target',slow_failure)
     with pytest.raises(EvidenceReadError,match='source_unavailable'):
@@ -290,7 +292,8 @@ def test_slow_recovery_preflight_cannot_overwrite_completed_refresh(configured,m
     original=cli.preflight_sources
     def slow_failure(*args,**kwargs):
         monkeypatch.setattr(cli,'preflight_sources',original)
-        assert cli.run(config,'refresh')['outcomes']['unchanged']==1
+        # Bypass admission only to exercise the storage-level stale-write guard.
+        assert cli.refresh(spec)['outcomes']['unchanged']==1
         assert not open_query(spec.database_path,spec.scope,spec.limits).status()['revalidation_pending']
         raise EvidenceReadError('source_busy')
     monkeypatch.setattr(cli,'preflight_sources',slow_failure)
@@ -298,3 +301,100 @@ def test_slow_recovery_preflight_cannot_overwrite_completed_refresh(configured,m
         cli.run(config,'refresh')
     status=open_query(spec.database_path,spec.scope,spec.limits).status()
     assert status['state']=='ready' and status['error'] is None
+
+
+@pytest.mark.parametrize('settings', [None, {}])
+def test_tick_default_off_does_not_touch_files(configured, monkeypatch, settings):
+    from app.telemetry.joint_config import JointRefreshConfig
+    config, _ = configured
+    config.joint_cases = config.joint_cases.model_copy(update={
+        'refresh': None if settings is None else JointRefreshConfig(**settings)})
+    monkeypatch.setattr(Path, 'stat', lambda *a, **k: pytest.fail('disabled tick stat'))
+    monkeypatch.setattr(Path, 'resolve', lambda *a, **k: pytest.fail('disabled tick resolve'))
+    monkeypatch.setattr(JointCaseStore, 'open', lambda *a, **k: pytest.fail('disabled tick open'))
+    assert cli.run(config, 'tick') == {'enabled': False, 'state': 'disabled'}
+
+
+def test_enabled_tick_does_not_initialize_missing_store(configured, tmp_path):
+    from app.telemetry.joint_config import JointRefreshConfig
+    config, _ = configured
+    missing = tmp_path/'not-initialized'/'cases.sqlite'
+    config.joint_cases = config.joint_cases.model_copy(update={
+        'database_path': str(missing), 'refresh': JointRefreshConfig(enabled=True)})
+    with pytest.raises(CaseStoreError, match='joint_store_unavailable'):
+        cli.run(config, 'tick')
+    assert not missing.parent.exists()
+
+
+@pytest.mark.parametrize('command', ['init', 'discover', 'refresh', 'snapshot', 'restore', 'migrate-v1'])
+def test_manual_writes_share_nonblocking_worker_lock(configured, tmp_path, command):
+    from app.telemetry.joint_refresh_state import writer_lock
+    config, spec = configured
+    cli.run(config, 'init')
+    before = store_digest(spec.database_path)
+    output = tmp_path/'output.sqlite'
+    with writer_lock(spec):
+        with pytest.raises(CaseStoreError, match='joint_store_busy'):
+            cli.run(config, command, output=str(output), input_path=str(tmp_path/'input.sqlite'))
+        assert cli.run(config, 'check')['store'] == 'available'
+    assert not output.exists() and store_digest(spec.database_path) == before
+    assert cli.run(config, 'discover')['discovery']['complete']
+
+
+@pytest.mark.parametrize('kind', ['lock', 'state', 'lock_hardlink', 'state_symlink'])
+def test_snapshot_cannot_overwrite_reserved_refresh_paths(configured, tmp_path, kind):
+    from app.telemetry.joint_refresh_state import reserved_paths
+    config, spec = configured
+    cli.run(config, 'init')
+    lock, state = reserved_paths(spec)
+    state.write_text('{}')
+    state.chmod(0o600)
+    target = lock if kind.startswith('lock') else state
+    before = {path: path.read_bytes() for path in (lock, state)}
+    if kind.endswith('hardlink'):
+        output = tmp_path/'output.sqlite'
+        os.link(target, output)
+    elif kind.endswith('symlink'):
+        output = tmp_path/'output.sqlite'
+        output.symlink_to(target)
+    else:
+        output = target
+    with pytest.raises(CaseStoreError, match='joint_source_alias'):
+        cli.run(config, 'snapshot', output=str(output))
+    assert {path: path.read_bytes() for path in (lock, state)} == before
+    assert not Path(str(output)+'.manifest.json').exists()
+
+
+@pytest.mark.parametrize('output', [123, '', '/bad\x00name', '/bad\ud800name'])
+def test_invalid_output_is_rejected_before_path_access(configured, monkeypatch, output):
+    config, _ = configured
+    monkeypatch.setattr(Path, 'resolve', lambda *a, **k: pytest.fail('invalid output path accessed'))
+    with pytest.raises(CaseStoreError, match='joint_invalid_request'):
+        cli.run(config, 'snapshot', output=output)
+
+
+def test_explicit_restore_can_recover_after_original_store_directory_was_lost(configured, tmp_path):
+    config, spec = configured
+    cli.run(config, 'init')
+    cli.run(config, 'discover')
+    cli.run(config, 'refresh')
+    snapshot = tmp_path/'snapshot.sqlite'
+    cli.run(config, 'snapshot', output=str(snapshot))
+    lost = tmp_path/'lost-parent'/'old.sqlite'
+    config.joint_cases = config.joint_cases.model_copy(update={'database_path': str(lost)})
+    restored = tmp_path/'restored.sqlite'
+    assert cli.run(config, 'restore', input_path=str(snapshot), output=str(restored))['state'] == 'completed'
+    assert not lost.exists()
+    assert open_query(restored, spec.scope, spec.limits).status()['revalidation_pending']
+
+
+def test_manual_v1_upgrade_still_works_with_shared_writer_lock(configured, tmp_path):
+    from test_joint_case_migration import downgrade_fixture
+    config, spec = configured
+    cli.run(config, 'init')
+    cli.run(config, 'discover')
+    cli.run(config, 'refresh')
+    downgrade_fixture(JointCaseStore.open(spec.database_path))
+    output = tmp_path/'v2.sqlite'
+    assert cli.run(config, 'migrate-v1', output=str(output))['state'] == 'completed'
+    assert open_query(output, spec.scope, spec.limits).list_cases()['total'] == 1

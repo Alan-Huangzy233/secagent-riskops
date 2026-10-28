@@ -3,7 +3,8 @@
 SECTION = """<section id="joint-section" aria-busy="false"><h2>联合案件</h2>
 <p id="joint-boundary">按明确资产映射，查看同一来源 IP 在相邻时间内的 SSH 与 TCP 证据。关联不代表同一攻击者或入侵成功；只覆盖已登记案件与保留的告警证据，没有匹配不代表安全。</p>
 <p id="joint-health" role="status" aria-live="polite">切换到此页后读取已生成的联合观察。</p>
-<p id="joint-update-note">观察由操作员在服务器显式运行更新命令生成。这里的刷新只读取已有结果，不会启动检测、AI 或封禁。</p>
+<p id="joint-update-note">后台持续更新默认关闭，未启用时由操作员人工更新。这里的刷新只读取已有结果，不会启动检测、AI 或封禁。“刷新当前页”保留分页快照；“读取最新观察”重新查询并回到第一页。</p>
+<p id="joint-refresh-health" role="status" aria-live="polite">更新状态尚未读取。</p>
 <form id="joint-search" class="search-fields"><label>完整来源 IP<input id="joint-ip" type="text" maxlength="64" placeholder="IPv4 / IPv6，不支持 CIDR" autocomplete="off"></label><label>资产<select id="joint-asset"><option value="">全部已登记资产</option></select></label><label>关联状态<select id="joint-state"><option value="">全部状态</option><option value="linked">发现关联证据</option><option value="unmatched">未找到匹配证据</option><option value="partial">观察不完整</option><option value="stale">原网络案件待核验</option><option value="retracted">原网络模式已撤回</option></select></label><label>窗口起点（本地）<input id="joint-start" type="datetime-local" step="1"></label><label>窗口终点（本地）<input id="joint-end" type="datetime-local" step="1"></label><div class="actions"><button type="submit">查询案件</button><button id="joint-clear" type="button">清空条件</button></div></form>
 <p id="joint-query-scope" class="muted"></p><div class="actions"><button id="joint-refresh" type="button">刷新当前页</button><button id="joint-latest" type="button">读取最新观察</button><span id="joint-new" role="status"></span></div>
 <div class="table-wrap"><table aria-describedby="joint-boundary"><thead><tr><th>关联时间窗</th><th>资产</th><th>来源 IP</th><th>SSH / 网络证据</th><th>关联 / 保存范围</th><th>详情</th></tr></thead><tbody id="joint-rows"></tbody></table></div>
@@ -18,18 +19,19 @@ DIALOG = """<dialog id="joint-dialog" aria-labelledby="joint-detail-title"><div 
 </div></dialog>"""
 
 STYLE = """
-#joint-health,#joint-query-scope,#joint-reasons,#joint-uncertainties,#joint-freshness{white-space:pre-line;overflow-wrap:anywhere}#joint-section>.table-wrap table{min-width:790px}#joint-search{grid-template-columns:repeat(3,minmax(0,1fr))}#joint-search label{display:flex;flex-direction:column;gap:6px;min-width:0}#joint-search input,#joint-search select{min-width:0;max-width:100%}#joint-new{color:#dec080;font-size:13px}#joint-dialog{position:fixed;inset:0 0 0 auto;margin:0;width:min(930px,100vw);max-width:100vw;height:100dvh;max-height:100dvh;border:0;border-left:1px solid #385475;background:#101d2e;color:#e7edf5;padding:22px}#joint-dialog::backdrop{background:#030b17a6}.joint-detail-body{height:100%;display:flex;flex-direction:column;gap:12px;min-width:0}.joint-detail-scroll{min-height:0;overflow:auto;flex:1}#joint-dialog .actions{margin:0;flex-shrink:0}#joint-dialog .detail-tabs{margin:0;padding:0 0 10px;flex-shrink:0}#joint-pane-timeline{display:flex;flex-direction:column;overflow:hidden}.joint-detail-scroll .table-wrap{overflow:auto;min-height:0;flex:1}.joint-detail-scroll table{min-width:720px}.joint-detail-scroll .pager{flex-shrink:0;flex-wrap:wrap}.joint-detail-scroll p{font-size:13px}.joint-detail-scroll dd{overflow-wrap:anywhere}#joint-detail-status:empty,#joint-timeline-status:empty{display:none}#joint-detail-status,#joint-timeline-status{font-size:13px;margin:0}
+#joint-health,#joint-refresh-health,#joint-query-scope,#joint-reasons,#joint-uncertainties,#joint-freshness{white-space:pre-line;overflow-wrap:anywhere}#joint-section>.table-wrap table{min-width:790px}#joint-search{grid-template-columns:repeat(3,minmax(0,1fr))}#joint-search label{display:flex;flex-direction:column;gap:6px;min-width:0}#joint-search input,#joint-search select{min-width:0;max-width:100%}#joint-new{color:#dec080;font-size:13px}#joint-dialog{position:fixed;inset:0 0 0 auto;margin:0;width:min(930px,100vw);max-width:100vw;height:100dvh;max-height:100dvh;border:0;border-left:1px solid #385475;background:#101d2e;color:#e7edf5;padding:22px}#joint-dialog::backdrop{background:#030b17a6}.joint-detail-body{height:100%;display:flex;flex-direction:column;gap:12px;min-width:0}.joint-detail-scroll{min-height:0;overflow:auto;flex:1}#joint-dialog .actions{margin:0;flex-shrink:0}#joint-dialog .detail-tabs{margin:0;padding:0 0 10px;flex-shrink:0}#joint-pane-timeline{display:flex;flex-direction:column;overflow:hidden}.joint-detail-scroll .table-wrap{overflow:auto;min-height:0;flex:1}.joint-detail-scroll table{min-width:720px}.joint-detail-scroll .pager{flex-shrink:0;flex-wrap:wrap}.joint-detail-scroll p{font-size:13px}.joint-detail-scroll dd{overflow-wrap:anywhere}#joint-detail-status:empty,#joint-timeline-status:empty{display:none}#joint-detail-status,#joint-timeline-status{font-size:13px;margin:0}
 @media(max-width:850px){#joint-dialog{padding:16px}#joint-dialog .drawer-heading h2{font-size:17px}#joint-dialog .actions,#joint-dialog .pager{gap:6px;font-size:12px}#joint-dialog button{font-size:12px;padding:7px 9px}#joint-search{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:480px){#joint-search{grid-template-columns:1fr}#joint-dialog .detail-tabs{gap:4px}}
 """
 
 SCRIPT = r"""
+let jointStatusTimer=null,jointStatusRequest=0,jointStatusController=null,jointStatusLoading=false;
 let jointPage=1,jointPages=1,jointSnapshot=null,jointPinnedGeneration=null,jointFilters={},jointRequest=0,jointController=null,jointLoading=false,jointAvailable=false;
 let jointDetail=null,jointDetailRequest=0,jointDetailController=null,jointReturnFocus=null,jointTimelineRequest=0,jointTimelineController=null;
 let jointTimelinePage=1,jointTimelinePages=1,jointTimelineLoaded=false,jointTimelineLoading=false,jointTimelineAvailable=false;
 const jointStates={linked:'发现关联证据',unmatched:'未找到匹配证据',partial:'观察不完整',stale:'原网络案件待核验',retracted:'原网络模式已撤回'};
-const jointRefreshStates={fresh:'最近一次刷新成功',pending:'等待操作员更新',current:'最近一次刷新成功',available:'最近一次刷新成功',unavailable:'最近刷新失败，保留历史',needs_review:'需要重新核验',not_eligible:'不符合关联范围'};
+const jointRefreshStates={fresh:'最近一次刷新成功',pending:'等待刷新',current:'最近一次刷新成功',available:'最近一次刷新成功',unavailable:'最近刷新失败，保留历史',needs_review:'需要重新核验',not_eligible:'不符合关联范围'};
 const jointCodes={shared_ip_does_not_establish_identity:'相同来源 IP 不能确认是同一使用者',cross_source_clock_alignment_unknown:'不同来源的时钟对齐情况未知',single_network_observation_clock_unverifiable:'单条网络观察无法核验时钟连续性',ssh_authentication_failure_observed:'观察到 SSH 认证失败',ssh_authentication_success_observed:'观察到 SSH 认证成功，但不证明入侵',ssh_preauth_abort_observed:'观察到 SSH 认证前断开',no_matching_retained_ssh_evidence:'本次未找到匹配的保留 SSH 告警证据',ssh_association_not_evaluated:'本次未评估 SSH 时间关联',network_evidence_unavailable:'没有可用于关联的网络证据',explicit_asset_mapping:'已按明确资产映射核对来源',network_anchor_retained:'引用已保留的网络证据',same_observed_peer:'观察到相同来源 IP',mapped_ssh_evidence_in_window:'映射的 SSH 来源在关联时间窗内有实际证据',no_mapped_ssh_evidence_in_window:'本次未找到时间窗内的匹配 SSH 证据',timeline_truncated:'时间线已截断，只保存部分记录',temporal_association_unavailable:'无法可靠使用时间建立关联',network_clock_discontinuity:'网络来源时钟异常',ssh_clock_discontinuity:'SSH 来源时钟异常',network_anchor_time_span_exceeded:'网络证据时间跨度超限',network_anchor_retracted:'原网络探测模式已撤回',network_anchor_stale:'原网络案件待重新核验',network_evidence_incomplete:'提供的网络证据不完整',ssh_candidate_evidence_incomplete:'提供的 SSH 候选证据不完整',shared_ip_not_actor_identity:'共享 IP 不能确认人员身份',coverage_unknown:'来源覆盖未知',source_unavailable:'来源不可用',source_busy:'来源暂忙',source_schema_unavailable:'来源结构不兼容',network_revision_missing:'缺少所需网络版本',adapter_limit_exceeded:'来源读取达到上限',query_deadline_exceeded:'来源读取超时',joint_capacity_exceeded:'派生存储达到容量上限'};
-function jointLabel(code){const parts=String(code).split(':');if(parts.length===2&&['network','ssh'].includes(parts[0]))return `${parts[0]==='ssh'?'SSH':'网络'}：${jointCodes[parts[1]]||networkCoverage[parts[1]]||parts[1]}`;return jointCodes[code]||networkCoverage[code]||String(code);}
+function jointLabel(code){if(typeof code!=='string')return '更新遇到未识别的限制';const label=key=>Object.hasOwn(jointCodes,key)?jointCodes[key]:Object.hasOwn(networkCoverage,key)?networkCoverage[key]:'更新遇到未识别的限制';const parts=code.split(':');return parts.length===2&&['network','ssh'].includes(parts[0])?`${parts[0]==='ssh'?'SSH':'网络'}：${label(parts[1])}`:label(code);}
 const jointEventTypes={auth_failure:'认证失败',ssh_failure:'认证失败',invalid_user:'无效账号',auth_success:'认证成功（不证明入侵）',ssh_success:'认证成功（不证明入侵）',preauth_abort:'认证前断开',probe:'协议探测',disconnect:'断开连接',session_open:'会话打开',session_close:'会话关闭',daemon:'服务状态',other:'其他'};
 function jointNumber(value){return Number.isSafeInteger(value)&&value>=0;}
 function jointDate(value){return Number.isSafeInteger(value)?when(value/1000):'不可用';}
@@ -46,8 +48,51 @@ function jointPager(){
  $('joint-prev').disabled=jointLoading||!jointAvailable||jointPage<=1;$('joint-next').disabled=jointLoading||!jointAvailable||jointPage>=jointPages;
  $('joint-section').setAttribute('aria-busy',String(jointLoading));
 }
+function jointRefreshTime(value,empty='尚无记录'){
+ if(value===null||value===undefined)return empty;
+ if(typeof value!=='string'||value.length>64||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(value))return '时间不可用';
+ const date=new Date(value);return Number.isFinite(date.valueOf())?date.toLocaleString('zh-CN',{hour12:false}):'时间不可用';
+}
+function jointAge(value){if(!jointNumber(value))return '未知';if(value<60)return `${value} 秒`;if(value<3600)return `${Math.floor(value/60)} 分 ${value%60} 秒`;return `${Math.floor(value/3600)} 小时 ${Math.floor(value%3600/60)} 分`;}
+function jointRefreshHealth(data){
+ const node=$('joint-refresh-health'),refresh=data.refresh;
+ node.className='';
+ if(!data.enabled){node.textContent='联合案件尚未启用；这里不会启动后台更新。';return;}
+ if(!refresh||typeof refresh.enabled!=='boolean'){node.textContent='持续更新状态未提供；不能确认自动更新已启用，请沿用人工更新。已有观察仍可查看。';return;}
+ if(!refresh.enabled){node.textContent='持续更新未启用：当前使用人工更新。这里的按钮只读取已保存的观察，不会启动更新任务。';return;}
+ const states={not_started:'后台持续更新已启用，尚未开始',running:'后台正在更新联合观察',waiting:['discover','refresh'].includes(refresh.phase)?'后台等待继续本轮更新':'后台等待下一轮更新',backoff:'最近更新失败，等待重试',blocked:'后台更新受阻，需要操作员处理',unavailable:'无法确认后台更新状态'};
+ const notes=[Object.hasOwn(states,refresh.state)?states[refresh.state]:'后台更新状态未知'];
+ if(['running','waiting'].includes(refresh.state)){const phases={discover:'正在检查网络案件',refresh:'正在刷新已登记案件'};if(Object.hasOwn(phases,refresh.phase))notes.push(phases[refresh.phase]);}
+ if(refresh.stalled===true)notes.push('更新进度停滞，已有观察仍保留，暂不能视为最新结果。');
+ if(refresh.stale===true)notes.push('更新已延迟，以下观察可能已过时；不影响查阅已有历史。');
+ if(refresh.stale===true||refresh.stalled===true||['backoff','blocked','unavailable'].includes(refresh.state))node.className='error';
+ notes.push(`最近尝试：${jointRefreshTime(refresh.last_attempt_at)}（本地时间）`);
+ notes.push(`最近完整成功：${jointRefreshTime(refresh.last_success_at,'尚无完整成功记录')}（本地时间）`);
+ if(refresh.last_complete_at!==null&&refresh.last_complete_at!==undefined&&refresh.last_complete_at!==refresh.last_success_at)notes.push(`最近一轮结束：${jointRefreshTime(refresh.last_complete_at)}；结束不代表全部刷新成功。`);
+ notes.push(`距上次完整成功：${jointAge(refresh.age_seconds)} · 待处理：${jointNumber(refresh.pending)?refresh.pending:'未知'} · 失败：${jointNumber(refresh.failed)?refresh.failed:'未知'}`);
+ if(refresh.next_attempt_at!==null&&refresh.next_attempt_at!==undefined)notes.push(`下次尝试：${jointRefreshTime(refresh.next_attempt_at)}（本地时间）`);
+ if(jointNumber(refresh.interval_seconds)&&refresh.interval_seconds>0)notes.push(`更新间隔约 ${jointAge(refresh.interval_seconds)}${jointNumber(refresh.stale_after_seconds)&&refresh.stale_after_seconds>0?` · 超过 ${jointAge(refresh.stale_after_seconds)} 未完整成功会提示延迟`:''}。`);
+ if(refresh.error)notes.push('更新限制：'+jointLabel(refresh.error));
+ notes.push('页面每 15 秒只读取更新状态；有新观察时会提示，当前案件和分页不会自动替换。');
+ node.textContent=notes.join('\n');
+}
+function cancelJointStatusPoll(){++jointStatusRequest;if(jointStatusController)jointStatusController.abort();jointStatusController=null;jointStatusLoading=false;}
+async function pollJointStatus(){
+ if(document.hidden||workspaceView!=='joint'||jointLoading||jointStatusLoading)return;
+ const request=++jointStatusRequest,listRequest=jointRequest,controller=new AbortController();jointStatusController=controller;jointStatusLoading=true;
+ const timeout=setTimeout(()=>controller.abort(),10000);
+ try{
+  const status=await jointGet('/api/joint/status',controller.signal);
+  if(request!==jointStatusRequest||listRequest!==jointRequest||workspaceView!=='joint'||document.hidden)return;
+  if(controller.signal.aborted)throw new Error('更新状态读取超时。');
+  jointHealth(status);
+ }catch(error){if(request===jointStatusRequest&&listRequest===jointRequest&&workspaceView==='joint'&&!document.hidden){$('joint-refresh-health').className='error';text('joint-refresh-health','更新状态暂无法确认，已保留当前案件与分页。稍后自动重试；可点击“刷新当前页”重新读取。');}}
+ finally{clearTimeout(timeout);if(request===jointStatusRequest){jointStatusLoading=false;jointStatusController=null;}}
+}
+function scheduleJointStatus(){if(jointStatusTimer!==null)clearTimeout(jointStatusTimer);jointStatusTimer=setTimeout(async()=>{jointStatusTimer=null;try{await pollJointStatus();}finally{scheduleJointStatus();}},15000);}
 function jointHealth(data){
  if(typeof data?.enabled!=='boolean')throw new Error('联合案件状态返回异常。');
+ jointRefreshHealth(data);
  if(!data.enabled){text('joint-health','联合案件尚未配置，暂无已生成的联合观察。');return;}
  const labels={ready:'可以查看已保存的观察',empty:'尚未生成联合观察',processing:'登记或刷新尚未完成',unavailable:'最近更新不可用，已有历史仍可查阅',revalidation_pending:'来源待重新核验，历史不代表当前状态'};
  const notes=[labels[data.state]||'仅查看已保存的观察；最新状态未知'];
@@ -59,15 +104,21 @@ function jointHealth(data){
  const capacity=data.capacity;if(capacity&&jointNumber(capacity.registrations)&&jointNumber(capacity.registration_limit)&&jointNumber(capacity.revisions)&&jointNumber(capacity.revision_limit)){notes.push(`保存范围：${capacity.registrations} / ${capacity.registration_limit} 个登记案件 · ${capacity.revisions} / ${capacity.revision_limit} 个观察版本`);if(capacity.registrations>=capacity.registration_limit||capacity.revisions>=capacity.revision_limit||(jointNumber(capacity.payload_bytes)&&jointNumber(capacity.payload_byte_limit)&&capacity.payload_bytes>=capacity.payload_byte_limit))notes.push('部分派生容量已达到上限，需要操作员处理。');}
  text('joint-health',notes.join('\n'));
  if(Array.isArray(data.assets)){
-  const select=$('joint-asset'),selected=select.value;select.replaceChildren();
-  for(const asset of [{asset_id:''},...data.assets]){if(typeof asset?.asset_id!=='string')throw new Error('联合案件资产返回异常。');const option=document.createElement('option');option.value=asset.asset_id;option.textContent=asset.asset_id||'全部已登记资产';select.append(option);}
-  if(selected&&!data.assets.some(asset=>asset.asset_id===selected)){const option=document.createElement('option');option.value=selected;option.textContent=selected+'（不在当前登记中）';select.append(option);}select.value=selected;
+  const select=$('joint-asset'),selected=select.value;
+  const assets=data.assets.map(asset=>{if(typeof asset?.asset_id!=='string')throw new Error('联合案件资产返回异常。');return asset.asset_id;});
+  const missing=selected&&!assets.includes(selected)?selected:null,signature=JSON.stringify([assets,missing]);
+  if(select.dataset.jointOptions!==signature){
+   select.replaceChildren();for(const id of ['',...assets]){const option=document.createElement('option');option.value=id;option.textContent=id||'全部已登记资产';select.append(option);}
+   if(missing){const option=document.createElement('option');option.value=missing;option.textContent=missing+'（不在当前登记中）';select.append(option);}
+   select.value=selected;select.dataset.jointOptions=signature;
+  }
  }
  if(jointPinnedGeneration!==null&&jointNumber(data.generation)&&data.generation>jointPinnedGeneration)text('joint-new','有新观察，点击“读取最新观察”查看；当前分页保持不变。');
 }
 function jointScope(){text('joint-query-scope',`当前查询：${jointFilters.ip||'全部来源 IP'} · ${jointFilters.asset_id||'全部已登记资产'} · ${jointStates[jointFilters.state]||'全部关联状态'}\n${jointFilters.start?when(jointFilters.start):'未限定起点'} — ${jointFilters.end?when(jointFilters.end):'未限定终点'}；按关联时间窗重叠筛选，时间异常的案件不匹配时间条件。`);}
 function jointClearRows(message){$('joint-rows').replaceChildren();empty($('joint-rows'),6,message);jointAvailable=false;text('joint-page','');jointPager();}
 async function loadJoint(page=jointPage){
+ cancelJointStatusPoll();
  const request=++jointRequest;if(jointController)jointController.abort();const controller=new AbortController();jointController=controller;
  const filters={...jointFilters},snapshot=jointSnapshot;const query=new URLSearchParams({page:String(page),limit:'20'});for(const [key,value] of Object.entries(filters))if(value)query.set(key,value);if(snapshot)query.set('snapshot',snapshot);
  jointLoading=true;jointPager();jointScope();text('joint-status','正在读取已保存的联合观察…');
@@ -83,7 +134,7 @@ async function loadJoint(page=jointPage){
   if(data.current_generation>jointPinnedGeneration)text('joint-new','有新观察，点击“读取最新观察”查看；当前分页保持不变。');
   text('joint-page',`第 ${data.page} / ${data.total_pages} 页 · 共 ${data.total} 个案件`);text('joint-status','');
  }catch(error){if(request===jointRequest&&error.name!=='AbortError')text('joint-status',error.message+(jointAvailable?' 已保留上次读取的案件与页码。':' 当前没有可展示的查询结果。'));}
- finally{if(request===jointRequest){jointLoading=false;jointPager();}}
+ finally{if(request===jointRequest){jointLoading=false;jointPager();scheduleJointStatus();}}
 }
 function jointReadFilters(){
  const filters={};for(const [id,key] of [['joint-ip','ip'],['joint-asset','asset_id'],['joint-state','state']]){const value=$(id).value.trim();if(value)filters[key]=value;}
@@ -142,6 +193,7 @@ function closeJointDetail(){const dialog=$('joint-dialog');if(typeof dialog.clos
 function setJointTab(name){const names=['overview','timeline','sources'];if(!names.includes(name))return;for(const key of names){$('joint-pane-'+key).hidden=key!==name;$('joint-tab-'+key).setAttribute('aria-selected',String(key===name));$('joint-tab-'+key).tabIndex=key===name?0:-1;}if(name==='timeline'&&!jointTimelineLoaded&&!jointTimelineLoading&&jointDetail)return loadJointTimeline();}
 function initializeJoint(){
  setJointTab('overview');jointScope();
+ if(typeof document.addEventListener==='function')document.addEventListener('visibilitychange',()=>{if(document.hidden)cancelJointStatusPoll();});
  $('joint-search').addEventListener('submit',event=>{event.preventDefault();return submitJointSearch();});
  $('joint-clear').addEventListener('click',()=>{for(const id of ['joint-ip','joint-asset','joint-state','joint-start','joint-end'])$(id).value='';jointResetQuery({});return loadJoint(1);});
  $('joint-refresh').addEventListener('click',()=>loadJoint());$('joint-latest').addEventListener('click',()=>{jointResetQuery({...jointFilters});return loadJoint(1);});

@@ -7,10 +7,10 @@ UTC window filters. Details keep the selected revision's reasons, timeline and
 source references together. A shared IP and a matching time window establish an
 association to inspect, not an attacker identity or a compromise verdict.
 
-The repository default is off. This implementation does not activate production
-mapping, create a production derived store or run a background refresh job.
-The existing manual SSH AI pilot is separate: these routes make no model calls
-and add no response actions.
+The repository default is off. Explicit mapping and a separately initialized
+derived store are required. Optional [bounded continuous refresh](joint-refresh.md)
+is also disabled by default. These routes make no model calls and add no response
+actions; manual SSH AI review remains separate.
 
 ## Configure and prepare an isolated pilot
 
@@ -22,6 +22,7 @@ and add no response actions.
 | `scope` | Canonical `CaseScope.to_dict()` JSON, including policy versions and expected network producer |
 | `catalog_min_seq` | Fixed inclusive network-catalog sequence floor; default 1 |
 | `store_limits` | Optional lower `StoreLimits` values; omitted fields retain defaults |
+| `refresh` | Optional bounded update cadence; defaults to disabled; see [joint-refresh.md](joint-refresh.md) |
 
 Explicit mappings name each asset's enrolled SSH sources and network source,
 exact destination addresses and accepted profile revisions. The compiler checks
@@ -49,7 +50,9 @@ PYTHONPATH=backend python -m app.telemetry.joint_cli --config /absolute/live.jso
 `check` is read-only. `init` explicitly creates a new private v2 file and refuses
 to overwrite an existing path. Discovery and refresh each perform one bounded
 step; inspect the returned progress and repeat the relevant command as needed.
-There is no unbounded “run until caught up” command and no automatic scheduler.
+There is no unbounded “run until caught up” command. Optional `tick` scheduling
+advances one step at a time; see [bounded refresh](joint-refresh.md). Manual writes
+and scheduled steps share the same private per-store writer lock.
 
 Discovery pins a maximum network sequence for a finite catalog round. Each call
 reads at most 50 catalog candidates with a five-second cooperative budget,
@@ -72,6 +75,12 @@ retrieves saved observations; it does not scan source logs or initiate a refresh
 The page distinguishes absent configuration, unavailable storage, empty results,
 ongoing work and source revalidation required after a restore or failed discovery. Asset filtering belongs to this
 page; the global SSH-source selector does not silently narrow joint observations.
+
+A separate update summary shows the latest attempt, complete-round success,
+delay and pending/failed items. While the workspace is visible, status-only polls
+can announce newer observations without replacing the pinned page. Missing or
+unreadable refresh metadata cannot establish freshness and does not hide saved
+cases. A failed attempt retains the previous success time instead of resetting it.
 
 The first page pins a generation and normalized filters in an opaque snapshot.
 Subsequent pages select each case's last revision at or before that generation,

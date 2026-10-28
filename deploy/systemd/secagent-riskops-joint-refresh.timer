@@ -1,0 +1,12 @@
+[Unit]
+Description=Offer bounded refresh opportunities for saved joint evidence
+
+[Timer]
+OnBootSec=90s
+OnUnitInactiveSec=15s
+RandomizedDelaySec=1s
+AccuracySec=1s
+Unit=secagent-riskops-joint-refresh.service
+
+[Install]
+WantedBy=timers.target
