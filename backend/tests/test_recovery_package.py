@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 from contextlib import closing
+import errno
+import fcntl
 import grp
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -11,6 +14,7 @@ import shutil
 import sqlite3
 import stat
 import subprocess
+import tarfile
 
 import pytest
 
@@ -89,6 +93,89 @@ def test_package_round_trip_restores_every_captured_component(deployment, tmp_pa
     assert names["telemetry"]["table_rows"] == {"events": 5}
     assert names["release"]["points_to"] == str(deployment["live"])
     assert result["manifest"]["encryption"] is None
+
+
+@pytest.fixture
+def padded_archive(tmp_path):
+    zstd = shutil.which("zstd")
+    if zstd is None:
+        pytest.skip("zstd is not installed")
+
+    def make(name="payload.txt", *, corrupt_tail=False):
+        payload = b"synthetic recovered content\n"
+        buffer = io.BytesIO()
+        with tarfile.open(fileobj=buffer, mode="w") as archive:
+            member = tarfile.TarInfo(name)
+            member.size = len(payload)
+            archive.addfile(member, io.BytesIO(payload))
+        # Valid tar padding larger than a pipe must still be consumed by the
+        # decompressor after the tar reader recognizes its end marker.
+        compressed = subprocess.run([zstd, "-q", "-c"],
+            input=buffer.getvalue() + b"\0" * (256 * 1024), capture_output=True, check=True).stdout
+        source = tmp_path / "synthetic.tar.zst"
+        source.write_bytes(compressed + (b"not-a-zstd-frame" if corrupt_tail else b""))
+        destination = tmp_path / "restored"
+        destination.mkdir()
+        manifest = {"stored_object": source.name, "encryption": None}
+        return manifest, destination, zstd, payload
+
+    return make
+
+
+@pytest.fixture
+def small_decompression_pipe(monkeypatch):
+    def install():
+        if not hasattr(fcntl, "F_SETPIPE_SZ"):
+            pytest.skip("small subprocess pipes are not supported")
+        original = subprocess.Popen
+        children = []
+
+        def start(*args, **kwargs):
+            try:
+                child = original(*args, **kwargs, pipesize=4096)
+            except OSError as error:
+                if error.errno not in (errno.EPERM, errno.EINVAL, errno.ENOSYS, errno.ENOTSUP):
+                    raise
+                pytest.skip("a small subprocess pipe is unavailable")
+            children.append(child)
+            return child
+
+        monkeypatch.setattr(recovery.subprocess, "Popen", start)
+        return children
+
+    return install
+
+
+def test_unpack_consumes_tar_padding_without_breaking_decompressor_pipe(tmp_path, padded_archive,
+                                                                       small_decompression_pipe):
+    manifest, destination, zstd, payload = padded_archive()
+    children = small_decompression_pipe()
+    names = recovery.unpack(tmp_path, manifest, destination, tmp_path, zstd, "unused-gpg")
+    assert names == {"payload.txt"}
+    assert (destination / "payload.txt").read_bytes() == payload
+    assert len(children) == 1 and children[0].returncode == 0
+
+
+def test_unpack_rejects_decompression_error_after_complete_tar(tmp_path, padded_archive,
+                                                               small_decompression_pipe):
+    manifest, destination, zstd, payload = padded_archive(corrupt_tail=True)
+    children = small_decompression_pipe()
+    with pytest.raises(recovery.PackageError, match="exited with status .* while decompressing"):
+        recovery.unpack(tmp_path, manifest, destination, tmp_path, zstd, "unused-gpg")
+    # Reading all tar members is insufficient: the compressed stream itself
+    # must finish successfully, even when every payload file was recovered.
+    assert (destination / "payload.txt").read_bytes() == payload
+    assert len(children) == 1 and children[0].returncode not in (None, 0)
+
+
+def test_unpack_rejects_unsafe_tar_and_reaps_its_decompressor(tmp_path, padded_archive,
+                                                           small_decompression_pipe):
+    manifest, destination, zstd, _ = padded_archive("../escaped.txt")
+    children = small_decompression_pipe()
+    with pytest.raises(recovery.PackageError, match="unsafe path"):
+        recovery.unpack(tmp_path, manifest, destination, tmp_path, zstd, "unused-gpg")
+    assert not (tmp_path / "escaped.txt").exists()
+    assert len(children) == 1 and children[0].returncode is not None
 
 
 def test_cursors_are_captured_before_the_snapshots_they_belong_to(deployment, monkeypatch):

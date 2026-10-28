@@ -873,6 +873,11 @@ def unpack(package: Path, manifest: dict, destination: Path, scratch: Path,
         try:
             with tarfile.open(fileobj=process.stdout, mode='r|') as tar:
                 tar.extractall(path=destination, members=_safe_members(tar, names), filter='data')
+            # Tar stops at its end marker, before all padding or compressed
+            # frames have been consumed. Drain bounded chunks so zstd can
+            # finish and report stream errors instead of receiving SIGPIPE.
+            while process.stdout.read(64 * 1024):
+                pass
         finally:
             if process.stdout is not None:
                 process.stdout.close()

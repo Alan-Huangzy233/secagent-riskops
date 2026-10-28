@@ -42,6 +42,9 @@ console notifications and UTC daily briefings are implemented. Current position:
   adds resumable steps and full-round freshness indicators, with scheduling off
   by default. Scoped cross-type lookup ([#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146)) can progress alongside it;
   manual joint AI review ([#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148)) follows separately.
+  Its [offline evidence contract](./docs/joint-ai-contract.md) defines bounded
+  aliased dossiers and revision-bound advisory checks; manual workflow integration
+  and approval of any live network summaries remain subsequent steps.
 - Linux #121 retains the Web → network → Linux detection order; source inventory
   can proceed alongside search/correlation. A missing business website or pending
   AI permission does not block already-authorized source engineering. Broader
