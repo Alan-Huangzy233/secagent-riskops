@@ -115,7 +115,9 @@ Unknown fields, duplicate JSON keys, invalid types, oversized output, invented
 references and unsupported claims produce an abstaining review result. Errors
 use fixed codes instead of echoing rejected values. Historical, stale,
 unavailable, unknown or revalidation-pending observations cannot support a
-current escalation. A changed dossier revision invalidates a previous response.
+current escalation. An association marked `stale` or `retracted` requires
+abstention even if its `review_state` is `current`. A changed dossier revision
+invalidates a previous response.
 
 | Typed claim | Required cited evidence |
 | --- | --- |
@@ -123,10 +125,15 @@ current escalation. A changed dossier revision invalidates a previous response.
 | `multiple_destination_ports` | Two distinct ports for the same source, mapped asset, peer and destination |
 | `ssh_failure_observed` | Explicit retained failure or invalid-user records; pre-authentication aborts and disconnects do not qualify |
 | `authentication_succeeded` | Explicit retained SSH success with an account; this does not prove exploitation |
-| `ssh_network_associated` | Both domains for the same mapped asset/peer, within a usable window and without temporal uncertainty blockers |
+| `ssh_network_associated` | Both domains for the same mapped asset/peer, with association state `linked` or `partial`, within a usable window and without temporal uncertainty blockers |
 
 Escalation needs a supported positive claim. Partial evidence can support a
 positive observation, but cannot establish absence, authorization or safety.
+Claim checks also apply to an abstaining response. A stale or retracted
+association may retain supported network or SSH observations, but cannot support
+an `ssh_network_associated` claim. The prompt and validator share their state
+and temporal limitation gates; these requirements do not change the validator
+version or its accepted response contract.
 TCP observations do not establish a completed connection, open service or
 compromise. Matching peer/time does not identify an attacker or prove causality.
 

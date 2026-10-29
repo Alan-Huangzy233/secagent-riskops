@@ -13,7 +13,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 VERSION = 3
-VALIDATOR_VERSION = 2
+VALIDATOR_VERSION = 3
 KINDS = ("authentication_succeeded", "exploitation_confirmed", "source_familiar",
          "source_unfamiliar", "account_owned", "generic_account",
          "activity_authorized", "http_operation_expected")
@@ -196,6 +196,18 @@ Only exploit_confirmation supports confirmed exploitation. Describe attempts
 as attempts. List each of the enumerated factual claims used by your rationale
 in claims, citing supporting evidence. Other reasoning still needs human review.
 
+An activity_authorized or http_operation_expected claim describes the observed
+events cited in that claim, not necessarily the entire incident. Cite both the
+typed context and the observed event IDs to make this scope explicit. A claim
+citing only context asserts coverage of every observed event in the dossier.
+An expected request or authorized attempt can coexist with an attack; a local
+claim never justifies dismissing other, uncovered observations.
+For SSH authorization, source, host, time and account must all match. HTTP
+methods and paths do not apply to SSH and may be empty. For HTTP authorization,
+source, host, time, method and path must all match; empty methods
+or paths do not mean a wildcard. HTTP expected routes also require an exact
+host, method, path and status match.
+
 A dismiss decision must have complete current evidence, confidence medium/high,
 supporting observed event AND context IDs, and exactly one dismissal_basis:
 - generic_scan: only failed/invalid SSH activity, every targeted host/account
@@ -265,10 +277,13 @@ def _supports(kind: str, proof: list, observations: list) -> bool:
     if not direct or any(not checks[kind](r) and
                          not isinstance(r, (AuthRecord, HTTPRecord, ExploitRecord)) for r in proof):
         return False
-    if kind == "activity_authorized":
-        return all(any(_covers(r, e) for r in direct) for e in observations)
-    if kind == "http_operation_expected":
-        return all(any(_expected(r, e) for r in direct) for e in observations)
+    if kind in ("activity_authorized", "http_operation_expected"):
+        # Explicit observations bound this factual claim, not the verdict.
+        # Context-only proofs retain their whole-dossier coverage semantics.
+        # Never drop an unsupported observation or accept vacuous coverage.
+        scoped = _observed(proof) or observations
+        covers = _covers if kind == "activity_authorized" else _expected
+        return bool(scoped) and all(any(covers(r, e) for r in direct) for e in scoped)
     return True
 
 
