@@ -121,11 +121,41 @@ invalidates a previous response.
 
 | Typed claim | Required cited evidence |
 | --- | --- |
-| `network_observed` | Local-input TCP observations |
-| `multiple_destination_ports` | Two distinct ports for the same source, mapped asset, peer and destination |
-| `ssh_failure_observed` | Explicit retained failure or invalid-user records; pre-authentication aborts and disconnects do not qualify |
-| `authentication_succeeded` | Explicit retained SSH success with an account; this does not prove exploitation |
+| `network_observed` | One or more local-input TCP observations only; different network groups may be cited without asserting a shared port group |
+| `multiple_destination_ports` | Only network records with identical `source`, `destination`, `asset` and `peer`, containing at least two distinct `dst_port` values |
+| `ssh_failure_observed` | Only SSH records of type `auth_failure`, `ssh_failure` or `invalid_user`; pre-authentication aborts and disconnects do not qualify |
+| `authentication_succeeded` | Only SSH records of type `auth_success` or `ssh_success`, each with an account; this does not prove exploitation |
 | `ssh_network_associated` | Both domains for the same mapped asset/peer, with association state `linked` or `partial`, within a usable window and without temporal uncertainty blockers |
+
+Each claim has its own supporting event list. Every cited record must satisfy
+that claim's requirements; a valid subset does not make unrelated appended
+records valid. For a multiple-port claim, `source` is the collecting source alias,
+while `peer` is the observed remote-peer alias. Matching `peer` alone does not
+make different `source` or `destination` values one port group. Select records
+from one qualifying group and keep other groups in separate claims. Repeated
+ports within a group are allowed when that same group still contains at least
+two distinct ports; single-port groups cannot be combined to qualify.
+
+The current summary builder emits network observations from one source and
+destination group. The dossier contract also accepts multiple groups, so claim
+checks retain the same boundaries for alternate or future dossier producers.
+A mixed-group synthetic dossier exercises this defensive contract; it does not
+represent the current summary builder's usual output.
+
+The prompt states each typed claim's evidence requirements using shared immutable
+port-group fields, SSH event types and association gates. The baseline
+`clock_alignment_unknown` and `source_coverage_unknown` limitations preserve
+uncertainty but do not themselves prohibit a scoped association claim. The
+association still requires the states and usable temporal relation above, and
+must exclude `temporal_association_unavailable`, `network_anchor_span_exceeded`
+and `network_clock_unverifiable`.
+
+Responses must copy event IDs and the revision exactly. Rationale should match
+the typed claims and their cited evidence. Exact counts of network observations,
+SSH failures, SSH successes or distinct ports refer only to the matching cited
+records, not unrelated record types or uncited observations. Included records
+and retained counts never establish a complete attack count or coverage.
+These instructions do not turn narrative into a deterministically verified fact.
 
 Escalation needs a supported positive claim. Partial evidence can support a
 positive observation, but cannot establish absence, authorization or safety.

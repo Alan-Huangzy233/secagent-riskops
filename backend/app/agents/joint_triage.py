@@ -31,8 +31,11 @@ CLAIM_KINDS = (
 )
 SSH_KINDS = frozenset({"auth_failure", "invalid_user", "preauth_abort", "auth_success",
                        "ssh_failure", "ssh_success", "disconnect"})
-# Share state gates with the prompt so model instructions cannot omit a gate
-# enforced by the deterministic checks below.
+# Share claim requirements with the prompt so model instructions cannot omit a
+# gate enforced by the deterministic checks below.
+NETWORK_PORT_GROUP_FIELDS = ("source", "destination", "asset", "peer")
+SSH_FAILURE_TYPES = frozenset({"auth_failure", "ssh_failure", "invalid_user"})
+SSH_SUCCESS_TYPES = frozenset({"auth_success", "ssh_success"})
 CURRENT_REVIEW_STATE = "current"
 ABSTAIN_ASSOCIATION_STATES = frozenset({"stale", "retracted"})
 JOINT_CLAIM_ASSOCIATION_STATES = frozenset({"linked", "partial"})
@@ -214,15 +217,43 @@ Missing or truncated evidence never proves no activity or safety.
 Escalation requires review_state={CURRENT_REVIEW_STATE}; every other review_state
 requires abstain. association_state in {canonical(sorted(ABSTAIN_ASSOCIATION_STATES))}
 also requires abstain, even when review_state={CURRENT_REVIEW_STATE}.
-Use only the listed typed claims and cite their supporting included records.
-The ssh_network_associated claim requires cited records from both domains,
-association_state in {canonical(sorted(JOINT_CLAIM_ASSOCIATION_STATES))},
-temporal_association_available=true, and none of these limitations:
-{canonical(sorted(JOINT_CLAIM_BLOCKING_LIMITATIONS))}.
+Use only these typed claims, with a separate supporting evidence_ids list for
+each claim. Every record cited by a claim must meet that claim's requirements:
+- network_observed: one or more network_tcp records only; no SSH records. This
+  claim may cite observations from different network groups without asserting
+  that their ports belong to one group.
+- multiple_destination_ports: network_tcp records only, all with identical
+  values for {canonical(NETWORK_PORT_GROUP_FIELDS)}, and at least two distinct
+  dst_port values among those cited records. source identifies the collecting
+  source, not the remote peer; peer identifies the observed remote peer.
+  Group network records by all four fields before counting ports. Repeated
+  ports within one group are allowed if that group has at least two distinct
+  ports. Different groups each containing one port cannot be combined to make
+  this claim. Select the supporting records from one qualifying group; do not
+  append records from other groups. Other groups may support separate claims,
+  including network_observed when they do not qualify for multiple ports.
+- ssh_failure_observed: SSH records only, each with event_type in
+  {canonical(sorted(SSH_FAILURE_TYPES))}.
+- authentication_succeeded: SSH records only, each with event_type in
+  {canonical(sorted(SSH_SUCCESS_TYPES))} and a non-null account.
+- ssh_network_associated: at least one network_tcp and one SSH record,
+  association_state in {canonical(sorted(JOINT_CLAIM_ASSOCIATION_STATES))},
+  temporal_association_available=true, and none of these limitations:
+  {canonical(sorted(JOINT_CLAIM_BLOCKING_LIMITATIONS))}.
+The baseline limitations clock_alignment_unknown and source_coverage_unknown
+do not themselves prohibit a scoped association claim; all the state, temporal
+and blocking-limitation requirements above still apply.
 This association is a scoped observation, not a causal attack chain. All claim
 support requirements also apply to abstain responses: abstention may cite
 supported network or SSH facts, but must omit any unsupported association claim.
-Escalation needs at least one supported claim. Copy revision exactly. Rationale and ATT&CK
+Escalation needs at least one supported claim. Copy revision and each cited
+event_id exactly from the dossier; never shorten, reconstruct or invent IDs.
+Keep rationale consistent with the cited records and typed claims. When stating
+an exact number of network observations, SSH failures, SSH successes or distinct
+ports in a claim, count only its cited records of the matching type; do not add
+unrelated records or counts from outside the claim's cited scope. Included
+evidence does not prove the total number of attempts or complete coverage.
+Rationale and ATT&CK
 suggestions require human review even when typed checks pass.
 Return only JSON matching this schema:
 """ + canonical(SCHEMA)
@@ -272,13 +303,14 @@ def _supports(kind, rows, dossier):
         return bool(network) and not ssh
     if kind == "multiple_destination_ports":
         return (len({r.dst_port for r in network}) >= 2 and not ssh
-                and len({(r.source, r.destination, r.asset, r.peer) for r in network}) == 1)
+                and len({tuple(getattr(r, field) for field in NETWORK_PORT_GROUP_FIELDS)
+                         for r in network}) == 1)
     if kind == "ssh_failure_observed":
         return bool(ssh) and not network and all(
-            r.event_type in {"auth_failure", "ssh_failure", "invalid_user"} for r in ssh)
+            r.event_type in SSH_FAILURE_TYPES for r in ssh)
     if kind == "authentication_succeeded":
         return bool(ssh) and not network and all(
-            r.event_type in {"auth_success", "ssh_success"} and r.account is not None for r in ssh)
+            r.event_type in SSH_SUCCESS_TYPES and r.account is not None for r in ssh)
     return (bool(network) and bool(ssh) and dossier.temporal_association_available
             and dossier.association_state in JOINT_CLAIM_ASSOCIATION_STATES
             and not JOINT_CLAIM_BLOCKING_LIMITATIONS.intersection(dossier.limitations))
