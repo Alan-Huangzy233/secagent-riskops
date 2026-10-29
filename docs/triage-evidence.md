@@ -31,6 +31,18 @@ observed events alone cannot establish trusted context. Typed success claims req
 authentication-success or application-side exploitation-confirmation evidence:
 an HTTP 200/302 or a requested sensitive path is insufficient.
 
+An `activity_authorized` or `http_operation_expected` claim that cites observed
+events applies to **every observation cited in that claim**. Each must match
+typed context in the same claim. A context-only claim retains whole-dossier
+coverage and needs at least one observation. This permits a configured request
+or authorized attempt to coexist with independent attack evidence without
+misrepresenting the entire incident as expected. Dismissal still checks every
+observation in the dossier, including observations omitted from the claims.
+
+SSH authorization matches source, host, account and time. HTTP authorization
+matches source, host, method, path and time; empty method/path lists are not
+wildcards. Configured HTTP routes require exact host, method, path and status.
+
 Noise recommendations additionally require medium/high confidence, complete
 current evidence and one of these checked conditions:
 
@@ -55,7 +67,10 @@ unverified in the proposal for human review. Passing typed checks is not proof
 that an incident is benign or that a model's attack interpretation is correct.
 
 The v3 request fingerprint includes the prompt, schema, complete dossier,
-provider request and validator version. Existing v2 authentication requests
+provider request and validator version. Validator version 3 introduces the
+explicitly scoped context claims above; recordings made with earlier prompts
+or validator versions retain their original fingerprints and must not be
+silently reused as a new evaluation. Existing v2 authentication requests
 and historical Claude replay retain their original fingerprints and outputs.
 
 ## Synthetic comparison
@@ -141,8 +156,8 @@ suite or its historical protocol. The generator registry remains closed to
 arbitrary data. Replays must select the same suite as the original run.
 
 The October 3 [three-model comparison](eval/triage-pilot-model-comparison.md)
-uses these fresh cases and the unchanged v3 prompt / v2 validator. All responses
-were recorded before any analysis of results; subsequent workflow integration
-changes do not alter the frozen evaluator. The same limitations and predeclared
+used these cases and the then-current v3 prompt / v2 validator. All responses
+were recorded before any analysis of results; its archived protocol remains
+pinned to that implementation. The same limitations and predeclared
 gates above apply. These cases are now used evaluation evidence and must not be
 reused as an untouched holdout after tuning.

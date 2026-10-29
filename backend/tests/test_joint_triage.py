@@ -118,28 +118,65 @@ def test_repeated_port_is_not_multiple_ports():
 
 
 @pytest.mark.parametrize("state", ["historical", "stale", "unavailable", "revalidation_required", "unknown"])
-def test_noncurrent_evidence_requires_abstention(state):
+@pytest.mark.parametrize("kind,indices", [
+    ("network_observed", [0]), ("ssh_failure_observed", [2]), ("ssh_network_associated", [0, 2]),
+])
+def test_noncurrent_evidence_requires_abstention(state, kind, indices):
     case = fixture()
     case["review_state"] = state
-    result, details = judged(case)
+    value = proposal(case, kind, [case["evidence"][i]["event_id"] for i in indices])
+    result, details = judged(case, value)
     assert result["verdict"] == "abstain" and "evidence_not_current" in codes(details)
-    value = proposal(case, verdict="abstain")
+    value["verdict"] = "abstain"
     assert judged(case, value)[1]["status"] == "valid"
 
 
 @pytest.mark.parametrize("state", ["stale", "retracted"])
-def test_bad_anchor_cannot_escalate_even_if_review_state_claims_current(state):
+@pytest.mark.parametrize("kind,indices", [
+    ("network_observed", [0]), ("ssh_failure_observed", [2]), ("ssh_network_associated", [0, 2]),
+])
+def test_bad_anchor_cannot_escalate_even_if_review_state_claims_current(state, kind, indices):
     case = fixture()
     case["association_state"] = state
-    value = proposal(case, "network_observed", [case["evidence"][0]["event_id"]])
-    assert "evidence_not_current" in codes(judged(case, value)[1])
+    assert case["review_state"] == "current"
+    value = proposal(case, kind, [case["evidence"][i]["event_id"] for i in indices])
+    result, details = judged(case, value)
+    assert result["verdict"] == "abstain" and "evidence_not_current" in codes(details)
+
+
+@pytest.mark.parametrize("state", ["stale", "retracted"])
+def test_bad_anchor_abstention_can_keep_local_facts_but_not_joint_claim(state):
+    case = fixture()
+    case["association_state"] = state
+    value = proposal(case, "network_observed", [case["evidence"][0]["event_id"]], verdict="abstain")
+    value["claims"].append({"kind": "ssh_failure_observed", "evidence_ids": [case["evidence"][2]["event_id"]]})
+    result, details = judged(case, value)
+    assert result["verdict"] == "abstain" and details["status"] == "valid"
+    assert set(result["evidence_ids"]) == {case["evidence"][i]["event_id"] for i in (0, 2)}
+    value["claims"].append({"kind": "ssh_network_associated", "evidence_ids": result["evidence_ids"]})
+    result, details = judged(case, value)
+    assert result["verdict"] == "abstain" and codes(details) == {"unsupported_claim"}
+    assert result["evidence_ids"] == []
+
+
+@pytest.mark.parametrize("state", ["linked", "partial"])
+@pytest.mark.parametrize("verdict", ["escalate", "abstain"])
+def test_current_usable_association_accepts_supported_joint_claim(state, verdict):
+    case = fixture()
+    case["association_state"] = state
+    if state == "partial":
+        case["input_complete"] = False
+        case["limitations"].append("projection_input_incomplete")
+    result, details = judged(case, proposal(case, verdict=verdict))
+    assert result["verdict"] == verdict and details["status"] == "valid"
 
 
 @pytest.mark.parametrize("limit", ["network_anchor_span_exceeded", "network_clock_unverifiable"])
-def test_unverifiable_temporal_relation_cannot_support_joint_claim(limit):
+@pytest.mark.parametrize("verdict", ["escalate", "abstain"])
+def test_unverifiable_temporal_relation_cannot_support_joint_claim(limit, verdict):
     case = fixture()
     case["limitations"].append(limit)
-    assert "unsupported_claim" in codes(judged(case)[1])
+    assert "unsupported_claim" in codes(judged(case, proposal(case, verdict=verdict))[1])
 
 
 def test_temporal_unavailable_keeps_local_order_but_forbids_association():
