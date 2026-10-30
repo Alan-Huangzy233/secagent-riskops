@@ -1,11 +1,12 @@
-"""Operator-only reads of explicitly generated joint observations.
+"""Operator-only saved observations and an optional local rehearsal workflow.
 
-These routes never initialize a store, read telemetry sources, run a model or
-refresh evidence. The offline CLI owns those derived-store writes.
+Reads never initialize storage, run a model or refresh evidence. Explicit workflow
+submission writes only the separately configured queue, never source evidence.
 """
 from typing import Literal
 
-from fastapi import Depends, HTTPException, Query, Request, Response
+from fastapi import Depends, HTTPException, Path, Query, Request, Response
+from pydantic import BaseModel, Field
 
 from .ai_summary import Aliases
 from .joint_ai_preview import JointPreviewError, preview
@@ -77,6 +78,11 @@ def register_routes(application, operator):
     @application.get("/api/joint/cases/{identity}/ai/preview", dependencies=[Depends(operator)])
     def ai_preview(request: Request, response: Response, identity: str,
                    revision: int = Query(ge=1, le=2**31-1)):
+        service = getattr(request.app.state, "joint_ai", None)
+        if service is not None and service.enabled:
+            result = _workflow_result(lambda: service.preview(identity, revision))
+            response.headers["Cache-Control"] = "no-store"
+            return result
         spec = specification(request)
         # Reuse the already loaded local alias key. Never open jobs or a provider.
         aliases = getattr(getattr(request.app.state, "ai", None), "aliases", None)
@@ -98,3 +104,56 @@ def register_routes(application, operator):
             raise HTTPException(404, "joint_revision_not_found")
         response.headers["Cache-Control"] = "no-store"
         return result
+
+
+class JointAnalysisRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+    revision: int = Field(strict=True, ge=1, le=2**31-1)
+    preview_key: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+def _workflow_result(action):
+    try:
+        return action()
+    except JointPreviewError:
+        raise HTTPException(409, "joint_preview_changed") from None
+    except KeyError:
+        raise HTTPException(404, "joint_ai_record_not_found") from None
+    except (JointSummaryError, CaseStoreError):
+        raise HTTPException(409, "joint_ai_request_changed") from None
+    except ValueError:
+        raise HTTPException(409, "joint_ai_request_changed") from None
+    except Exception:
+        # Do not reflect paths, rejected data, provider text or SQLite details.
+        raise HTTPException(503, "joint_ai_unavailable") from None
+
+
+def register_workflow_routes(application, operator, operator_write):
+    def service(request):
+        value = getattr(request.app.state, "joint_ai", None)
+        if value is None or not value.enabled:
+            raise HTTPException(503, "joint_ai_disabled")
+        return value
+
+    @application.get("/api/joint/ai/status", dependencies=[Depends(operator)])
+    def ai_status(request: Request):
+        return {**request.app.state.joint_ai.status(),
+                "csrf_token": getattr(request.app.state.control, "csrf_token", "")}
+
+    @application.post("/api/joint/cases/{identity}/ai",
+                      dependencies=[Depends(operator_write)], status_code=202)
+    def ai_enqueue(request: Request, body: JointAnalysisRequest,
+                   identity: str = Path(pattern=r"^JOINT-[a-f0-9]{32}$")):
+        worker = service(request)
+        return _workflow_result(lambda: worker.enqueue(
+            identity, body.revision, body.preview_key, request.app.state.config.operator_username))
+
+    @application.get("/api/joint/cases/{identity}/ai/history", dependencies=[Depends(operator)])
+    def ai_history(request: Request, identity: str = Path(pattern=r"^JOINT-[a-f0-9]{32}$")):
+        worker = service(request)
+        return {"case_id": identity, "items": _workflow_result(lambda: worker.history(identity))}
+
+    @application.get("/api/joint/ai/jobs/{job_id}", dependencies=[Depends(operator)])
+    def ai_job(request: Request, job_id: str = Path(pattern=r"^[a-f0-9]{32}$")):
+        worker = service(request)
+        return _workflow_result(lambda: worker.job(job_id))

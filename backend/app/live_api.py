@@ -156,8 +156,31 @@ class TelemetryBatch(BaseModel):
         return _valid_time(value) if value is not None else None
 
 
+def _joint_ai_service(config, ai, control):
+    """Load the optional local workflow without broadening SSH authorization."""
+    from .telemetry.joint_ai_service import Service
+    if not os.environ.get("RISKOPS_JOINT_AI_CONFIG"):
+        return Service(None)
+    from .telemetry.joint_config import compile_joint_config
+    try:
+        excluded = [os.environ.get(name) for name in
+                    ("RISKOPS_CONFIG", "RISKOPS_AI_CONFIG", "RISKOPS_CONTROL_CONFIG")]
+        settings = getattr(ai, "settings", None)
+        excluded.extend(getattr(settings, name, None) for name in
+                        ("database_path", "context_file", "profile_path", "recording_path", "keys_file"))
+        excluded.extend((getattr(getattr(ai, "jobs", None), "path", None),
+                         getattr(control, "path", None),
+                         getattr(getattr(control, "transport", None), "config_path", None)))
+        return Service.from_environment(compile_joint_config(config),
+            aliases=getattr(ai, "aliases", None), excluded_paths=tuple(p for p in excluded if p))
+    except Exception:
+        # Optional local rehearsal must not stop telemetry on invalid configuration.
+        return Service(None, error="joint_ai_configuration_unavailable")
+
+
 def create_app(config: LiveConfig | None = None, store: Any | None = None,
-               control: Any | None = None, ai: Any | None = None) -> FastAPI:
+               control: Any | None = None, ai: Any | None = None,
+               joint_ai: Any | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI):
         from .telemetry.store import TelemetryStore
@@ -210,6 +233,19 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
         application.state.ai = ai if ai is not None else AIService.from_environment(live_store)
         if ai is None:
             application.state.ai.start()
+        application.state.joint_ai = (joint_ai if joint_ai is not None else
+            _joint_ai_service(application.state.config, application.state.ai,
+                              application.state.control))
+        if joint_ai is None:
+            try:
+                application.state.joint_ai.start()
+            except Exception:
+                try:
+                    application.state.joint_ai.close()
+                except Exception:
+                    pass
+                from .telemetry.joint_ai_service import Service as JointAIService
+                application.state.joint_ai = JointAIService(None, error="joint_ai_worker_unavailable")
         from .telemetry.http_worker import HttpWorker
         http_worker = None
         if application.state.http_store is not None:
@@ -238,6 +274,8 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
             if http_worker:
                 await run_in_threadpool(http_worker.close)
             await run_in_threadpool(application.state.console_cache.close)
+            if joint_ai is None:
+                await run_in_threadpool(application.state.joint_ai.close)
             if ai is None:
                 await run_in_threadpool(application.state.ai.close)
             if notification_worker:
@@ -426,6 +464,9 @@ def create_app(config: LiveConfig | None = None, store: Any | None = None,
             raise HTTPException(403, "不允许跨站操作")
         if request.headers.get("content-type", "").split(";", 1)[0].strip() != "application/json":
             raise HTTPException(415, "Expected application/json")
+
+    from .telemetry.joint_api import register_workflow_routes
+    register_workflow_routes(application, operator, operator_write)
 
     def ai_service(request: Request):
         service = request.app.state.ai

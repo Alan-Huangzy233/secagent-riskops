@@ -63,16 +63,17 @@ have explicit coverage limits. Repository defaults remain off. Sustained
 operation and long-term receipt/capacity work continue in #120 and
 [#152](https://github.com/Alan-Huangzy233/secagent-riskops/issues/152); new rule families belong to [#151](https://github.com/Alan-Huangzy233/secagent-riskops/issues/151).
 
-Visible IP search and network→SSH pivots ([#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145)) are deployed.
-The next step is [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147) (joint evidence cases): the
-[foundation and read adapters](joint-evidence.md) supply bounded typed association
+Visible IP search and network→SSH pivots ([#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145)) are implemented.
+Joint evidence cases in [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147) use the
+[foundation and read adapters](joint-evidence.md) for bounded typed association
 and explicit retained-source reads. An independent derived store and finite,
-explicitly invoked refresh of registered anchors are implemented and tested in
-isolation. Semantic changes create immutable case revisions; read metadata and
+explicitly invoked refresh of registered anchors are implemented. Semantic changes create immutable case revisions; read metadata and
 failures do not overwrite previous evidence. The [joint console](joint-console.md)
 adds optional mapping validation, explicit bounded catalog discovery/refresh,
-derived-store migration/recovery and a read-only paginated view. Production
-activation and a refresh schedule remain subsequent #147 work. Then follow with [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148) (manual joint AI). Grouped cross-type search [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) ships in
+derived-store migration/recovery and a read-only paginated view. Optional bounded
+continuous refresh is implemented. The current [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148)
+increment adds [local manual joint jobs/history](joint-ai-workflow.md);
+recorded/live integration and its field/budget approval remain separate. Grouped cross-type search [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) ships in
 bounded increments; its raw-log index/migration work does not block retained-case
 correlation. Linux #121 source inventory can run alongside these steps and does
 not wait for paid AI approval. HTTP real-source acceptance still waits for an
