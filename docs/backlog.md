@@ -17,10 +17,11 @@ public tracking.
    acceptance. A separate derived store and explicit finite refresh of registered
    anchors are implemented. The [joint console](joint-console.md) adds optional
    mapping, explicit bounded discovery, recovery and a read-only paginated view.
-   Production activation and a refresh schedule remain pending. Search matches alone do not
-   identify one actor or prove an attack chain.
+   Optional bounded continuous refresh is implemented; scheduling remains opt-in.
+   Search matches alone do not identify one actor or prove an attack chain.
 3. Add manual AI review of those versioned joint dossiers. The saved-case adapter
-   and local preview are implemented; submission, history and approved transport
+   and local preview are implemented. The [local manual workflow](joint-ai-workflow.md)
+   adds durable offline submission/history; recorded and approved live transport
    remain separate increments.
 4. Continue Linux host evidence after the network foundation. Source inventory
    can run alongside investigation work; a pending AI data/budget decision need
@@ -57,8 +58,8 @@ paused. No date is promised for deferred product or exploratory work.
 | --- | --- | --- |
 | [#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145) | Make IP search visible and pivot from network findings to SSH evidence | deployed |
 | [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) | Add scoped IP lookup across network, HTTP and SSH records | planned |
-| [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147) | Correlate SSH and network evidence into traceable investigation cases | foundation, readers, derived observations, explicit discovery/recovery and console implemented; production activation pending |
-| [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148) | Extend manual AI review to network and correlated SSH evidence | [dossier contract and local saved-case preview](joint-ai-contract.md); manual submission/history and live field approval remain |
+| [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147) | Correlate SSH and network evidence into traceable investigation cases | foundation, readers, derived observations, explicit discovery/recovery, console and optional bounded refresh implemented |
+| [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148) | Extend manual AI review to network and correlated SSH evidence | [dossier contract and local preview](joint-ai-contract.md), plus [offline manual jobs/history](joint-ai-workflow.md); recorded/live integration and field approval remain |
 
 ## Detection, AI and operational follow-ups
 
@@ -126,7 +127,7 @@ paused. No date is promised for deferred product or exploratory work.
   then possibly reusable templates and isolated learner instances. Training is
   not production retest or compliance evidence by itself.
 - Review implementation and deployment separately. Each code increment gets a
-  focused PR, relevant checks/CI and maintainer review before merge/release.
+  focused PR, relevant local checks before upload and maintainer review before merge/release.
   This documentation sync changes no production service or model configuration.
 
 See [production plan](production-plan.md), [implementation status](implementation-status.md)

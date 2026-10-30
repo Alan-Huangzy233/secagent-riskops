@@ -1,7 +1,7 @@
 """Durable manual-analysis queue and total/daily budget reservations."""
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import secrets
 import sqlite3
+import stat
 import time
 
 from ..agents.model_triage import BudgetExceeded
@@ -17,17 +18,29 @@ from .ai_summary import canonical
 
 
 class Jobs:
-    def __init__(self, path: Path, *, clock=time.time):
+    def __init__(self, path: Path, *, clock=time.time, queue_kind="ssh"):
+        if queue_kind not in ("ssh", "joint"):
+            raise ValueError("invalid_analysis_queue_kind")
+        self.queue_kind = queue_kind
         self.path = path.resolve()
         self.clock = clock
+        # Reject a foreign queue before mkdir/open/WAL/DDL can alter it.
+        if path.exists():
+            if not stat.S_ISREG(path.stat().st_mode) or path.stat().st_mode & 0o077:
+                raise ValueError("analysis database must be private")
+            if path.stat().st_size:
+                # SQLite may create WAL/SHM read bookkeeping, but no queue
+                # schema, data or budgets are modified by this preflight.
+                with closing(sqlite3.connect(self.path.as_uri() + "?mode=ro", uri=True)) as db:
+                    self._kind_guard(db, initialize=True)
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         fd = os.open(path, os.O_CREAT | os.O_WRONLY, 0o600)
         os.close(fd)
         if path.stat().st_mode & 0o077:
             raise ValueError("analysis database must be private")
-        with self.connection() as db:
-            db.execute("PRAGMA journal_mode=WAL")
-            db.executescript("""
+        with self.connection(write=True, initializing=True) as db:
+            self._kind_guard(db, initialize=True)
+            schema = """
                 CREATE TABLE IF NOT EXISTS ai_meta (name TEXT PRIMARY KEY,value TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS ai_jobs (
                     id TEXT PRIMARY KEY,incident_id TEXT NOT NULL,cache_key TEXT UNIQUE NOT NULL,
@@ -52,15 +65,60 @@ class Jobs:
                     actor TEXT NOT NULL,event TEXT NOT NULL,details TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS ai_audit_job ON ai_audit(job_id,seq);
-            """)
+            """
+            for statement in schema.split(";"):
+                if statement.strip():
+                    db.execute(statement)
             db.execute("INSERT OR IGNORE INTO ai_meta VALUES('alias_secret',?)", (secrets.token_hex(32),))
             db.execute("INSERT OR IGNORE INTO ai_meta VALUES('halted','0')")
+            db.execute("INSERT OR IGNORE INTO ai_meta VALUES('queue_kind',?)", (queue_kind,))
+        with self.connection() as db:
+            db.execute("PRAGMA journal_mode=WAL")
+
+    def _kind_guard(self, db, *, initialize=False):
+        tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                  if not row[0].startswith("sqlite_")}
+        if not tables and initialize:
+            # A foreign view-only or branded empty database is not a new queue.
+            objects = [row[0] for row in db.execute("SELECT name FROM sqlite_master")
+                       if not row[0].startswith("sqlite_")]
+            if (objects or db.execute("PRAGMA application_id").fetchone()[0] != 0
+                    or db.execute("PRAGMA user_version").fetchone()[0] != 0):
+                raise ValueError("analysis_queue_kind_mismatch")
+            return
+        required = {"ai_meta", "ai_jobs", "ai_attempts", "ai_calls", "ai_audit"}
+        if tables != required:
+            raise ValueError("analysis_queue_kind_mismatch")
+        row = db.execute("SELECT value FROM ai_meta WHERE name='queue_kind'").fetchone()
+        if row is not None:
+            if row[0] != self.queue_kind:
+                raise ValueError("analysis_queue_kind_mismatch")
+            return
+        if not initialize or self.queue_kind != "ssh":
+            raise ValueError("analysis_queue_kind_mismatch")
+        # Only the existing manual SSH format may acquire its missing marker.
+        # Preserve its alias key, calls, uncertain reservations and audit rows.
+        alias_row = db.execute("SELECT value FROM ai_meta WHERE name='alias_secret'").fetchone()
+        if alias_row is None or not isinstance(alias_row[0], str) or len(alias_row[0]) != 64:
+            raise ValueError("analysis_queue_kind_mismatch")
+        try:
+            bytes.fromhex(alias_row[0])
+            for (raw,) in db.execute("SELECT dossier_json FROM ai_jobs"):
+                case = json.loads(raw)
+                if (not isinstance(case, dict) or case.get("dossier_version") not in (None, 3)
+                        or not isinstance(case.get("incident_id"), str)
+                        or not isinstance(case.get("revision"), str)):
+                    raise ValueError
+        except (ValueError, TypeError):
+            raise ValueError("analysis_queue_kind_mismatch") from None
 
     @contextmanager
-    def connection(self, *, write=False):
+    def connection(self, *, write=False, initializing=False):
         db = sqlite3.connect(self.path, timeout=30, isolation_level=None)
         db.row_factory = sqlite3.Row
         try:
+            if not initializing:
+                self._kind_guard(db)
             db.execute("PRAGMA synchronous=FULL")
             if write:
                 db.execute("BEGIN IMMEDIATE")

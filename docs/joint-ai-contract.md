@@ -3,7 +3,9 @@
 [Issue #148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148)
 extends advisory review to retained network and SSH evidence. The contract defines a bounded summary and deterministic response checks.
 An operator-only console preview now reads saved observations through that
-contract. It adds no queue, provider transport, automatic analysis or response action.
+contract. The preview itself creates no jobs and performs no provider transport. An optional
+[local manual workflow](joint-ai-workflow.md) adds separately enabled offline jobs
+and history; automatic analysis and response actions remain outside its scope.
 
 The existing SSH/HTTP dossier, provider fingerprints and manual SSH workflow
 retain their versions and behavior. A joint dossier carries a distinct
@@ -50,7 +52,7 @@ fixed capture time, builds the summary, then rereads and compares the full
 snapshot and refresh status. A detected change returns `joint_preview_changed`
 so the operator can retry. This optimistic check is not a cross-file atomic
 snapshot; the response describes its capture time, not a promise of continuing
-freshness. A future submission and result display must revalidate independently.
+freshness. Submission and result display revalidate independently in the optional workflow.
 
 Only a ready store, fresh error-free registration, and idle successful scheduler
 checkpoint within its age limit can establish `current`. Missing, disabled,
@@ -198,11 +200,11 @@ or proof that the narrative is correct.
 
 ## Remaining #148 work
 
-Follow-up increments must add manual submission and result history to the local
-preview, with job persistence and stale-result checks, recorded/fake provider
-integration and existing budget/retry guarantees. Network field policy,
-provider, budget and rollout approval precede live calls. Automatic analysis and
-automatic response remain separate work.
+The optional [local manual workflow](joint-ai-workflow.md) adds durable offline
+submission and result history with revision rechecks and stale-result indicators.
+Recorded/live provider integration and paid budget/recovery qualification remain
+follow-up increments. Network field policy, provider, budget and rollout approval
+precede live calls. Automatic analysis and automatic response remain separate work.
 
 Focused local checks use authored synthetic evidence and temporary stores:
 

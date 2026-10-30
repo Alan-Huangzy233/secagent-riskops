@@ -156,7 +156,13 @@ locally beside each aliased event. Switching case, revision or tab clears the
 preview; a changed snapshot requires a retry.
 
 This is a [local summary preview](joint-ai-contract.md), not a model judgment.
-It makes no model request, creates no job and performs no response action. The
+The preview makes no model request, creates no job and performs no response action. The
 capture time qualifies every freshness label. An already loaded local alias key
 is required; unavailable configuration produces an explicit error instead of
 falling back to unaliased evidence.
+
+
+The optional [local manual workflow](joint-ai-workflow.md) adds explicit offline
+submission and result history to this tab. A separately configured queue is
+required. Its built-in rehearsal always asks for human review and makes no model
+request; merely viewing a case or generating its preview does not enqueue work.

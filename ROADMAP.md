@@ -45,8 +45,9 @@ console notifications and UTC daily briefings are implemented. Current position:
   Its [offline evidence contract](./docs/joint-ai-contract.md) defines bounded
   aliased dossiers and revision-bound advisory checks. A saved-case adapter and
   local console preview now expose versioned summaries with explicit freshness
-  and coverage limits. Manual submission/history integration and approval of any
-  live network summaries remain subsequent steps.
+  and coverage limits. An optional [local manual workflow](./docs/joint-ai-workflow.md) now adds durable
+  offline submission and history with stale-result checks. Recorded/live provider
+  integration and approval of any live network summaries remain subsequent steps.
 - Linux #121 retains the Web → network → Linux detection order; source inventory
   can proceed alongside search/correlation. A missing business website or pending
   AI permission does not block already-authorized source engineering. Broader
