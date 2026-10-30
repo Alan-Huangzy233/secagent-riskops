@@ -182,7 +182,7 @@ recover all older history. A reboot alone is not classified as a history gap.
 | Operator pages | At most 200 rows, ordered by sequence with a source-scoped snapshot bound. |
 | Normalized events | Default 14 days by server receipt time; at most 1,000 expired events removed per new committed batch. Event count is also capped by `max_receipts`. |
 | Durable receipts | Default 100,000 event identities and 10,000 batches; receipts are not automatically pruned. |
-| SQLite files | Default 256 MiB total accounting; strict `max_page_count` reserves substantial headroom for WAL/SHM. The database cannot consume the entire configured total by itself. |
+| SQLite files | Configurable from 1 MiB to 2 GiB, default 256 MiB total accounting; strict `max_page_count` reserves substantial headroom for WAL/SHM. The database cannot consume the entire configured total by itself. |
 
 Subprocess output is bounded while reading, and cleanup terminates the process
 group even if the direct child has exited. The collector also applies a wall
@@ -203,6 +203,13 @@ batch ACKs remain replayable. WAL truncation occurs before a new write. An
 external reader holding an old snapshot can prevent truncation and stop new
 writes with `network_storage_busy`, while durable replay remains available.
 Do not delete pending files or receipts to bypass a capacity or integrity error.
+
+Increasing `max_storage_bytes` raises the storage ceiling without preallocating
+the full budget or deleting retained evidence. It does not change row quotas,
+retention, or per-run collection limits. Check filesystem headroom before
+raising it. A lower budget must still accommodate the existing database under
+the reserved-page calculation; after growth, rolling back the application may
+require retaining the larger budget and a version that accepts it.
 
 ## Inspection and visible uncertainty
 

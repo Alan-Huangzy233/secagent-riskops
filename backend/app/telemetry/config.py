@@ -119,7 +119,7 @@ class NetworkIngestConfig(BaseModel):
     max_receipts: int = Field(default=100_000, ge=1, le=1_000_000, strict=True)
     max_batches: int = Field(default=10_000, ge=1, le=100_000, strict=True)
     max_storage_bytes: int = Field(default=256 * 1024 * 1024, ge=1024 * 1024,
-                                   le=1024**3, strict=True)
+                                   le=2 * 1024**3, strict=True)
 
     @field_validator("database_path")
     @classmethod
