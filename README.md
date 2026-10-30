@@ -1,6 +1,6 @@
 # SecAgent RiskOps
 
-[![CI](https://github.com/Alan-Huangzy233/secagent-riskops/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Alan-Huangzy233/secagent-riskops/actions/workflows/ci.yml) [![Public repository audit](https://github.com/Alan-Huangzy233/secagent-riskops/actions/workflows/public-repo-audit.yml/badge.svg?branch=main)](https://github.com/Alan-Huangzy233/secagent-riskops/actions/workflows/public-repo-audit.yml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
+[![CI](https://github.com/Alan-Huangzy233/secagent-riskops/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Alan-Huangzy233/secagent-riskops/actions/workflows/ci.yml) [![Public repository audit](https://github.com/Alan-Huangzy233/secagent-riskops/actions/workflows/public-repo-audit.yml/badge.svg?branch=main)](https://github.com/Alan-Huangzy233/secagent-riskops/actions/workflows/public-repo-audit.yml) [![License: AGPL-3.0-only](https://img.shields.io/badge/license-AGPL--3.0--only-blue.svg)](./LICENSE)
 
 **What it is:** a pipeline that reduces a stream of raw security alerts to a much smaller set of incidents worth an analyst's time, and reports how many real attacks it misses.
 
@@ -174,4 +174,19 @@ issues and feedback are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## License
 
-[Apache-2.0](./LICENSE)
+Copyright (C) 2026 Alan-Huangzy233.
+
+SecAgent RiskOps is free software licensed under the
+[GNU Affero General Public License, version 3 only](./LICENSE)
+(`AGPL-3.0-only`). You may redistribute and modify it under those terms.
+It is provided without warranty; see the license for the full terms.
+
+Commercial use is permitted. If you modify the program and let users interact
+with that version over a network, section 13 requires you to prominently offer
+those users access to the Corresponding Source for that version. Distribution
+also carries the applicable source and notice obligations in the license.
+
+Earlier revisions published under Apache-2.0 remain available under that
+license; this change does not revoke those existing grants. Third-party
+components and data retain their own licenses and attribution requirements,
+including the separately obtained DB-IP Lite data under CC BY 4.0.

@@ -2,7 +2,7 @@
 name = "secagent-riskops"
 version = "0.2.0"
 description = "Reduces raw security alerts to a small set of incidents, with reproducible accuracy and miss-rate reporting"
-license = "Apache-2.0"
+license = "AGPL-3.0-only"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
