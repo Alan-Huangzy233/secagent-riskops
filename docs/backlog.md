@@ -19,7 +19,9 @@ public tracking.
    mapping, explicit bounded discovery, recovery and a read-only paginated view.
    Production activation and a refresh schedule remain pending. Search matches alone do not
    identify one actor or prove an attack chain.
-3. Add manual AI review of those versioned joint dossiers.
+3. Add manual AI review of those versioned joint dossiers. The saved-case adapter
+   and local preview are implemented; submission, history and approved transport
+   remain separate increments.
 4. Continue Linux host evidence after the network foundation. Source inventory
    can run alongside investigation work; a pending AI data/budget decision need
    not block already-authorized Linux engineering.
@@ -56,7 +58,7 @@ paused. No date is promised for deferred product or exploratory work.
 | [#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145) | Make IP search visible and pivot from network findings to SSH evidence | deployed |
 | [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) | Add scoped IP lookup across network, HTTP and SSH records | planned |
 | [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147) | Correlate SSH and network evidence into traceable investigation cases | foundation, readers, derived observations, explicit discovery/recovery and console implemented; production activation pending |
-| [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148) | Extend manual AI review to network and correlated SSH evidence | [offline dossier and advisory validation contract](joint-ai-contract.md); saved-case adapter, manual workflow and live field approval remain |
+| [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148) | Extend manual AI review to network and correlated SSH evidence | [dossier contract and local saved-case preview](joint-ai-contract.md); manual submission/history and live field approval remain |
 
 ## Detection, AI and operational follow-ups
 

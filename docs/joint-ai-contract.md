@@ -1,9 +1,9 @@
-# Offline evidence contract for joint AI review
+# Joint AI evidence contract and local preview
 
 [Issue #148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148)
-extends advisory review to retained network and SSH evidence. Its first increment
-defines a bounded summary and deterministic response checks. It has no console
-route, queue, provider transport, automatic analysis or response action.
+extends advisory review to retained network and SSH evidence. The contract defines a bounded summary and deterministic response checks.
+An operator-only console preview now reads saved observations through that
+contract. It adds no queue, provider transport, automatic analysis or response action.
 
 The existing SSH/HTTP dossier, provider fingerprints and manual SSH workflow
 retain their versions and behavior. A joint dossier carries a distinct
@@ -34,12 +34,36 @@ when the network revision stays unchanged or the new record falls outside the
 sample. Routine read timestamps do not change an otherwise identical summary
 revision. Hashes and keyed aliases are identifiers, not signatures.
 
-A later store adapter must capture a coherent pinned observation and its context,
-then revalidate them at preview/submission and result display. The current
-read-only `case_detail()` supplies the saved projection, metadata and current
-case fields; it does not alone provide the full context required here. Two
-separate API reads are not an atomic snapshot. This increment adds no live
-adapter and grants no permission to send its output.
+## Saved-case preview
+
+`GET /api/joint/cases/{case_id}/ai/preview?revision=N` requires operator
+credentials and an explicit saved revision. It accepts no browser-supplied
+dossier or freshness assertions. The route reuses the service's already loaded
+private alias key; absent alias configuration returns a fixed unavailable error.
+It does not initialize storage, inspect model budgets, create jobs or call a model.
+Successful responses use `Cache-Control: no-store`.
+
+`JointCaseQuery.ai_snapshot()` reads the full validated saved observation,
+current registration, store identity, query epoch and query status in one SQLite
+read transaction. The adapter evaluates the separate refresh checkpoint at a
+fixed capture time, builds the summary, then rereads and compares the full
+snapshot and refresh status. A detected change returns `joint_preview_changed`
+so the operator can retry. This optimistic check is not a cross-file atomic
+snapshot; the response describes its capture time, not a promise of continuing
+freshness. A future submission and result display must revalidate independently.
+
+Only a ready store, fresh error-free registration, and idle successful scheduler
+checkpoint within its age limit can establish `current`. Missing, disabled,
+unreadable, mismatched or future-dated checkpoints cannot establish freshness.
+Historical revisions, pending restore revalidation, source errors and expired
+observations remain explicit. Preview does not refresh evidence from source
+stores or fill gaps from the latest logs.
+
+The response adds `preview` metadata with `mode: "local"`, `external_calls: false`
+and `captured_at`. The console's **AI摘要** tab requests it only after an explicit
+button click, shows paginated aliased evidence and expandable local references,
+and clears results when leaving the tab, changing case/revision or closing the
+details. The preview grants no permission to transmit its contents.
 
 ## Output boundary
 
@@ -174,9 +198,9 @@ or proof that the narrative is correct.
 
 ## Remaining #148 work
 
-Follow-up increments must provide the coherent saved-case adapter, manual
-preview/submission UI, job persistence and stale-result checks, recorded/fake
-provider integration and existing budget/retry guarantees. Network field policy,
+Follow-up increments must add manual submission and result history to the local
+preview, with job persistence and stale-result checks, recorded/fake provider
+integration and existing budget/retry guarantees. Network field policy,
 provider, budget and rollout approval precede live calls. Automatic analysis and
 automatic response remain separate work.
 
