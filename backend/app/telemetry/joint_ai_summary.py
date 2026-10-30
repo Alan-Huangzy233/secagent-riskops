@@ -55,7 +55,7 @@ def _canonical(value):
 class SnapshotContext:
     """Trusted context for one saved revision, not a claim of source coverage.
 
-    A future store adapter must capture and validate these values with the saved
+    The store adapter must capture and validate these values with the saved
     observation. ``freshness`` must be assessed explicitly; a previous successful
     read alone does not establish it. Restore epochs invalidate old summaries.
     """

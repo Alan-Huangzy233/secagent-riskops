@@ -27,7 +27,7 @@ def test_joint_html_has_independent_accessible_table_and_default_off_boundary():
     assert not html.duplicates
     assert html.elements['workspace-tab-joint'][1]['aria-controls'] == 'workspace-joint'
     assert html.elements['joint-dialog'][0] == 'dialog'
-    for name in ('overview', 'timeline', 'sources'):
+    for name in ('overview', 'timeline', 'sources', 'ai'):
         assert html.elements['joint-tab-'+name][1]['aria-controls'] == 'joint-pane-'+name
     assert 'hidden' in html.elements['joint-pane-timeline'][1]
     assert '这里的刷新只读取已有结果' in DASHBOARD_HTML
@@ -222,9 +222,9 @@ const timeline=loadJointTimeline(1);for(let i=0;i<8;i++)await Promise.resolve();
 
 def test_detail_keyboard_tabs_and_current_ssh_pivot_are_read_only():
     run_dashboard(FIXTURE + r"""
-let focused='';for(const name of ['overview','timeline','sources'])$('joint-tab-'+name).focus=()=>{focused=name;};
-$('joint-tab-overview').listeners.keydown({key:'End',preventDefault(){}});assert.equal(focused,'sources');assert.equal($('joint-pane-overview').hidden,true);
-$('joint-tab-sources').listeners.keydown({key:'Home',preventDefault(){}});assert.equal(focused,'overview');assert.equal(calls.length,0);
+let focused='';for(const name of ['overview','timeline','sources','ai'])$('joint-tab-'+name).focus=()=>{focused=name;};
+$('joint-tab-overview').listeners.keydown({key:'End',preventDefault(){}});assert.equal(focused,'ai');assert.equal($('joint-pane-overview').hidden,true);
+$('joint-tab-ai').listeners.keydown({key:'Home',preventDefault(){}});assert.equal(focused,'overview');assert.equal(calls.length,0);
 await showJointCase(jointID,1);const normal=route;route=path=>path.startsWith('/api/incidents?')?response({items:[],page:1,total_pages:1,total:0}):normal(path);
 currentSource='wrong';incidentTriage='pending';await $('joint-source-actions').children[1].listeners.click();assert.equal(workspaceView,'incidents');assert.equal(jointDialog.open,false);assert.equal(currentSource,'');assert.equal(incidentTriage,'all');assert.equal(incidentFilters.ip,jointProjection.anchor.src_ip);assert.equal(calls.some(c=>c.path.includes('/ai/')||c.path.includes('/controls')),false);
 """)
@@ -276,8 +276,8 @@ const {chromium}=require(process.env.RISKOPS_PLAYWRIGHT_MODULE);
   assert.match(await page.locator('#joint-page').textContent(),/第 2/);
   await page.locator('#joint-rows').getByRole('button',{name:'查看详情',exact:true}).click();await page.waitForFunction(()=>document.getElementById('joint-revision').textContent.includes('历史观察'));
   assert.match(await page.locator('#joint-freshness').textContent(),/最近刷新失败/);
-  await page.locator('#joint-tab-overview').focus();await page.keyboard.press('End');assert.equal(await page.locator('#joint-tab-sources').evaluate(el=>el===document.activeElement),true);
-  await page.keyboard.press('ArrowLeft');await page.waitForFunction(()=>document.getElementById('joint-timeline').textContent.includes('<img'));
+  await page.locator('#joint-tab-overview').focus();await page.keyboard.press('End');assert.equal(await page.locator('#joint-tab-ai').evaluate(el=>el===document.activeElement),true);
+  await page.keyboard.press('ArrowLeft');await page.keyboard.press('ArrowLeft');await page.waitForFunction(()=>document.getElementById('joint-timeline').textContent.includes('<img'));
   assert.equal(await page.locator('#joint-timeline img').count(),0);assert.match(await page.locator('#joint-timeline-page').textContent(),/保存 26 \/ 观察 35.*截断/);
   await page.locator('#joint-timeline-next').click();await page.waitForFunction(()=>document.getElementById('joint-timeline').textContent.includes('认证成功'));
   assert(calls.includes('/api/joint/cases/'+jointID+'/timeline?revision=1&page=2&limit=25'));

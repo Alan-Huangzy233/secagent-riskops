@@ -145,3 +145,18 @@ store is not a collector ACK participant. For code rollback, stop explicit joint
 updates, remove the new configuration and retain the derived file; do not rewind
 source databases, cursors or pending deliveries. Production activation and any
 refresh schedule need a concrete reviewed mapping, capacity and recovery plan.
+
+## Local AI summary preview
+
+The detail drawer's **AI摘要** tab has an explicit **生成本地预览** button.
+It displays the selected saved revision's aliased SSH and network evidence in a
+paginated table, with observed/saved/included counts, missing evidence,
+truncation and freshness labels. Original source and incident references expand
+locally beside each aliased event. Switching case, revision or tab clears the
+preview; a changed snapshot requires a retry.
+
+This is a [local summary preview](joint-ai-contract.md), not a model judgment.
+It makes no model request, creates no job and performs no response action. The
+capture time qualifies every freshness label. An already loaded local alias key
+is required; unavailable configuration produces an explicit error instead of
+falling back to unaliased evidence.
