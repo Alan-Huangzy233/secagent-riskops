@@ -92,7 +92,10 @@ or proof of where a recording came from.
 ## Subsequent gates
 
 This completes a local fake/recorded-response qualification step for #148.
-Connecting recorded or live providers to the durable workflow, independent
-review of response explanations, approval of outgoing network fields, shared
-budget accounting and an explicitly approved live pilot remain separate work.
+The [manual workflow](joint-ai-workflow.md) has a separate optional adapter for
+local recordings. Its format binds saved dossiers rather than this fixed corpus;
+the two tape formats are not interchangeable. Neither adapter generates model
+responses. Live transport, independent review of response explanations, approval
+of outgoing network fields, shared budget accounting and an explicitly approved
+live pilot remain separate work.
 Automatic analysis and automatic response still belong to #149 and #150.

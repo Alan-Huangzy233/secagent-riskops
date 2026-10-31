@@ -74,8 +74,9 @@ derived-store migration/recovery and a read-only paginated view. Optional bounde
 continuous refresh is implemented. The current [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148)
 increment adds [local manual joint jobs/history](joint-ai-workflow.md);
 a separate [synthetic response replay](joint-ai-replay.md) now qualifies raw fake/local-recording
-responses. Workflow provider integration and live field/budget approval remain
-separate. Grouped cross-type search [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) ships in
+responses. An optional local recording adapter also revalidates saved raw
+responses through durable jobs with explicit playback provenance. Live transport,
+shared budget accounting and outgoing-field approval remain separate. Grouped cross-type search [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) ships in
 bounded increments; its raw-log index/migration work does not block retained-case
 correlation. Linux #121 source inventory can run alongside these steps and does
 not wait for paid AI approval. HTTP real-source acceptance still waits for an
