@@ -108,10 +108,11 @@ external transmission.
 
 ## Remaining work
 
-Recorded/fake-provider contract qualification, production network field policy,
-provider choice, shared budget accounting and explicit rollout approval precede
-any live joint-model call. Existing SSH approval does not authorize network
-summaries. Automatic analysis (#149) and automatic response (#150) remain separate.
+The [synthetic response replay](joint-ai-replay.md) now qualifies fake and local
+recorded responses separately from this workflow. Connecting a provider to the
+durable workflow, production network field policy, provider choice, shared budget
+accounting and explicit rollout approval still precede any live joint-model call.
+Existing SSH approval does not authorize network summaries. Automatic analysis (#149) and automatic response (#150) remain separate.
 
 Only code, general documentation and authored synthetic fixtures belong in the
 repository. Local check outputs and operating records stay outside it.

@@ -21,8 +21,9 @@ public tracking.
    Search matches alone do not identify one actor or prove an attack chain.
 3. Add manual AI review of those versioned joint dossiers. The saved-case adapter
    and local preview are implemented. The [local manual workflow](joint-ai-workflow.md)
-   adds durable offline submission/history; recorded and approved live transport
-   remain separate increments.
+   adds durable offline submission/history. [Synthetic response replay](joint-ai-replay.md)
+   adds fake/local-recording contract qualification; provider integration into the
+   workflow and approved live transport remain separate increments.
 4. Continue Linux host evidence after the network foundation. Source inventory
    can run alongside investigation work; a pending AI data/budget decision need
    not block already-authorized Linux engineering.
@@ -59,7 +60,7 @@ paused. No date is promised for deferred product or exploratory work.
 | [#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145) | Make IP search visible and pivot from network findings to SSH evidence | deployed |
 | [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) | Add scoped IP lookup across network, HTTP and SSH records | planned |
 | [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147) | Correlate SSH and network evidence into traceable investigation cases | foundation, readers, derived observations, explicit discovery/recovery, console and optional bounded refresh implemented |
-| [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148) | Extend manual AI review to network and correlated SSH evidence | [dossier contract and local preview](joint-ai-contract.md), plus [offline manual jobs/history](joint-ai-workflow.md); recorded/live integration and field approval remain |
+| [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148) | Extend manual AI review to network and correlated SSH evidence | [dossier contract and local preview](joint-ai-contract.md), plus [offline manual jobs/history](joint-ai-workflow.md) and [synthetic replay](joint-ai-replay.md); workflow provider integration and live field approval remain |
 
 ## Detection, AI and operational follow-ups
 
