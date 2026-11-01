@@ -168,9 +168,11 @@ external transmission.
 
 The [synthetic response replay](joint-ai-replay.md) qualifies fake and local
 recorded responses against a fixed corpus. This workflow can consume separately
-bound local recordings. Live transport, production network field policy, provider
-choice, shared budget accounting, independent explanation review and explicit
-rollout approval still precede any live joint-model call.
+bound local recordings. The [shared-budget foundation](joint-ai-budget.md) adds
+accounting and recovery at the queue layer but is not wired into this service.
+Live transport, service integration, production network field policy, provider
+choice, independent explanation review and explicit rollout approval still
+precede any live joint-model call.
 Existing SSH approval does not authorize network summaries. Automatic analysis (#149) and automatic response (#150) remain separate.
 
 Only code, general documentation and authored synthetic fixtures belong in the

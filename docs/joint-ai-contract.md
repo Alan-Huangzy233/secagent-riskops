@@ -202,7 +202,9 @@ or proof that the narrative is correct.
 
 The optional [local manual workflow](joint-ai-workflow.md) adds durable offline
 submission and result history with revision rechecks and stale-result indicators.
-Recorded/live provider integration and paid budget/recovery qualification remain
+The workflow also supports local recordings. A [shared-budget foundation](joint-ai-budget.md)
+provides owner-bound queue accounting and interruption recovery. Live-provider
+transport, service integration and end-to-end paid-call qualification remain
 follow-up increments. Network field policy, provider, budget and rollout approval
 precede live calls. Automatic analysis and automatic response remain separate work.
 
