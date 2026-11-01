@@ -23,8 +23,9 @@ public tracking.
    and local preview are implemented. The [local manual workflow](joint-ai-workflow.md)
    adds durable offline submission/history. [Synthetic response replay](joint-ai-replay.md)
    adds fake/local-recording contract qualification. An optional recording adapter
-   connects exact saved responses to durable jobs; live transport, shared budget
-   accounting and approval of outgoing fields remain separate increments.
+   connects exact saved responses to durable jobs. The [shared-budget foundation](joint-ai-budget.md)
+   adds owner-bound accounting and interruption recovery at the queue layer;
+   live transport, service wiring and outgoing-field approval remain separate.
 4. Continue Linux host evidence after the network foundation. Source inventory
    can run alongside investigation work; a pending AI data/budget decision need
    not block already-authorized Linux engineering.
@@ -61,7 +62,7 @@ paused. No date is promised for deferred product or exploratory work.
 | [#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145) | Make IP search visible and pivot from network findings to SSH evidence | deployed |
 | [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) | Add scoped IP lookup across network, HTTP and SSH records | planned |
 | [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147) | Correlate SSH and network evidence into traceable investigation cases | foundation, readers, derived observations, explicit discovery/recovery, console and optional bounded refresh implemented |
-| [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148) | Extend manual AI review to network and correlated SSH evidence | [dossier contract and local preview](joint-ai-contract.md), [offline manual jobs/history and recording adapter](joint-ai-workflow.md), and [synthetic replay](joint-ai-replay.md); live transport, shared budgets and outgoing-field approval remain |
+| [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148) | Extend manual AI review to network and correlated SSH evidence | [dossier contract and local preview](joint-ai-contract.md), [offline manual jobs/history and recording adapter](joint-ai-workflow.md), [synthetic replay](joint-ai-replay.md), and [shared-budget queue foundation](joint-ai-budget.md); live transport, service wiring and outgoing-field approval remain |
 
 ## Detection, AI and operational follow-ups
 

@@ -51,8 +51,10 @@ console notifications and UTC daily briefings are implemented. Current position:
   recorded responses against exact dossiers, with separate proposed/accepted
   decisions and explicit free-text limitations. An optional local recording
   adapter now connects raw responses to the durable workflow, binding each job
-  to an immutable recording snapshot. Live transport, shared budget accounting
-  and approval of outgoing network summaries remain subsequent steps.
+  to an immutable recording snapshot. A [shared-budget queue foundation](./docs/joint-ai-budget.md)
+  now binds separate joint jobs to an existing SSH allowance and recovers calls
+  through the same ledger. Live transport, service wiring and approval of
+  outgoing network summaries remain subsequent steps.
 - Linux #121 retains the Web → network → Linux detection order; source inventory
   can proceed alongside search/correlation. A missing business website or pending
   AI permission does not block already-authorized source engineering. Broader
