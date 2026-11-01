@@ -68,10 +68,13 @@ rewound database contents. Reconciliation and any reauthorization after such a
 restore require separate design; this foundation does not automatically rebind,
 reset limits, discard calls or repair financial history.
 
-Live transport and service wiring remain separate work, together with outgoing
-network-field policy, provider selection, independent explanation review and
-explicit pilot approval. That integration must reuse this ledger contract and
-qualify request/receipt handling end to end before sending a joint dossier.
+The independent [HTTP transport foundation](joint-ai-transport.md) now accepts
+an explicitly bound shared ledger and uses its original call for reservations,
+receipt settlement and recovery. It creates no allowance and does not wire
+this binding into the joint service. Service/Settings/UI integration, outgoing
+network-field policy, provider qualification, independent explanation review
+and explicit pilot approval remain. That integration must preserve this ledger
+contract and qualify request/receipt handling end to end before live use.
 Automatic analysis (#149) and enforcement (#150) remain later stages.
 
 Only general code, documentation and authored synthetic tests belong in version

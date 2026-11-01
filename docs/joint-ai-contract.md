@@ -9,8 +9,11 @@ and history; automatic analysis and response actions remain outside its scope.
 
 The existing SSH/HTTP dossier, provider fingerprints and manual SSH workflow
 retain their versions and behavior. A joint dossier carries a distinct
-`dossier_version: "joint-v1"`; the existing provider adapter rejects it. Existing
-permission to send SSH summaries does not authorize network or joint summaries.
+`dossier_version: "joint-v1"`; the existing SSH provider adapter rejects it. A
+separate [HTTP transport foundation](joint-ai-transport.md) consumes only this
+typed joint input when explicitly called with its bound shared ledger. It is
+not wired into the joint service. Existing permission to send SSH summaries
+does not authorize network or joint summaries.
 
 ## Inputs and version binding
 
@@ -74,7 +77,7 @@ The builder returns a local envelope marked
 
 | Object | Purpose |
 | --- | --- |
-| `case` | Strict aliased dossier; candidate input for a future, separately approved transport |
+| `case` | Strict aliased dossier; sole dossier input accepted by the independent transport, subject to separate live-use approval |
 | `local_refs` | Original source/event identities and retained incident references for each included event |
 | `meta` | Local store/revision binding, projection hash, time origin and sampling policy |
 
@@ -103,7 +106,7 @@ identities, absolute timestamps, arbitrary coverage-code text, logs, paths,
 headers and database locations are excluded from `case`. Aliases preserve
 equality within the key's scope; this is pseudonymization, not anonymity.
 Destination ports and relative timing may still reveal behavior and require an
-explicit field-policy review before any future live transport.
+explicit field-policy review before any live use of the transport.
 
 ## Bounds and missing evidence
 
@@ -203,10 +206,13 @@ or proof that the narrative is correct.
 The optional [local manual workflow](joint-ai-workflow.md) adds durable offline
 submission and result history with revision rechecks and stale-result indicators.
 The workflow also supports local recordings. A [shared-budget foundation](joint-ai-budget.md)
-provides owner-bound queue accounting and interruption recovery. Live-provider
-transport, service integration and end-to-end paid-call qualification remain
-follow-up increments. Network field policy, provider, budget and rollout approval
-precede live calls. Automatic analysis and automatic response remain separate work.
+provides owner-bound queue accounting and interruption recovery. The separate
+[HTTP transport foundation](joint-ai-transport.md) binds the exact dossier and
+profile to that ledger, settles raw receipts and revalidates advisory output.
+Joint Service/Settings/UI integration and end-to-end provider qualification
+remain follow-up increments. Outgoing-field, provider, shared-budget and
+explicit rollout approval precede live joint use. Automatic analysis and
+automatic response remain separate work.
 
 Focused local checks use authored synthetic evidence and temporary stores:
 
