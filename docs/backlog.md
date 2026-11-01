@@ -24,8 +24,11 @@ public tracking.
    adds durable offline submission/history. [Synthetic response replay](joint-ai-replay.md)
    adds fake/local-recording contract qualification. An optional recording adapter
    connects exact saved responses to durable jobs. The [shared-budget foundation](joint-ai-budget.md)
-   adds owner-bound accounting and interruption recovery at the queue layer;
-   live transport, service wiring and outgoing-field approval remain separate.
+   adds owner-bound accounting and interruption recovery at the queue layer.
+   The independent [HTTP transport foundation](joint-ai-transport.md) adds exact
+   request binding and receipt-first shared accounting. Service/Settings/UI
+   integration, outgoing-field approval, provider qualification and explicit
+   pilot approval remain; available joint modes are still offline and recorded.
 4. Continue Linux host evidence after the network foundation. Source inventory
    can run alongside investigation work; a pending AI data/budget decision need
    not block already-authorized Linux engineering.
@@ -62,7 +65,7 @@ paused. No date is promised for deferred product or exploratory work.
 | [#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145) | Make IP search visible and pivot from network findings to SSH evidence | deployed |
 | [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) | Add scoped IP lookup across network, HTTP and SSH records | planned |
 | [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147) | Correlate SSH and network evidence into traceable investigation cases | foundation, readers, derived observations, explicit discovery/recovery, console and optional bounded refresh implemented |
-| [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148) | Extend manual AI review to network and correlated SSH evidence | [dossier contract and local preview](joint-ai-contract.md), [offline manual jobs/history and recording adapter](joint-ai-workflow.md), [synthetic replay](joint-ai-replay.md), and [shared-budget queue foundation](joint-ai-budget.md); live transport, service wiring and outgoing-field approval remain |
+| [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148) | Extend manual AI review to network and correlated SSH evidence | [dossier contract and local preview](joint-ai-contract.md), [offline manual jobs/history and recording adapter](joint-ai-workflow.md), [synthetic replay](joint-ai-replay.md), [shared-budget queue foundation](joint-ai-budget.md), and [independent HTTP transport](joint-ai-transport.md) implemented; Service/Settings/UI wiring, outgoing-field approval, provider qualification and explicit pilot approval remain |
 
 ## Detection, AI and operational follow-ups
 

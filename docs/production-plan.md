@@ -77,8 +77,12 @@ a separate [synthetic response replay](joint-ai-replay.md) now qualifies raw fak
 responses. An optional local recording adapter also revalidates saved raw
 responses through durable jobs with explicit playback provenance. The
 [shared-budget queue foundation](joint-ai-budget.md) binds separate queues to one
-existing allowance with owner-based call recovery. Live transport, service wiring
-and outgoing-field approval remain separate. Grouped cross-type search [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) ships in
+existing allowance with owner-based call recovery. An independent
+[HTTP transport foundation](joint-ai-transport.md) adds exact request binding,
+bounded provider requests and receipt-first accounting. It is not connected
+to joint Service/Settings/UI; those still support only offline and recorded
+work. Service integration, outgoing-field approval, provider qualification
+and explicit pilot approval remain separate. Grouped cross-type search [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) ships in
 bounded increments; its raw-log index/migration work does not block retained-case
 correlation. Linux #121 source inventory can run alongside these steps and does
 not wait for paid AI approval. HTTP real-source acceptance still waits for an

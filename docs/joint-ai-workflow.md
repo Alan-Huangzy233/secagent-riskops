@@ -5,7 +5,8 @@ to durable manual jobs and bounded result history. It implements the offline
 submission increment of [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148).
 It does not call a model. The built-in rehearsal always asks for human review;
 an optional recording adapter revalidates previously supplied raw responses.
-Live-provider integration remains follow-up work.
+A separate [HTTP transport foundation](joint-ai-transport.md) exists at the
+code layer; wiring it into this workflow remains follow-up work.
 
 ## Operator flow
 
@@ -169,10 +170,14 @@ external transmission.
 The [synthetic response replay](joint-ai-replay.md) qualifies fake and local
 recorded responses against a fixed corpus. This workflow can consume separately
 bound local recordings. The [shared-budget foundation](joint-ai-budget.md) adds
-accounting and recovery at the queue layer but is not wired into this service.
-Live transport, service integration, production network field policy, provider
-choice, independent explanation review and explicit rollout approval still
-precede any live joint-model call.
+accounting and recovery at the queue layer. The independent
+[HTTP transport foundation](joint-ai-transport.md) adds request-bound provider
+calls and receipt-first settlement. Neither foundation is wired into this
+service, its settings or the console. Service/Settings/UI integration,
+production network-field approval, provider qualification, independent
+explanation review and explicit rollout approval still precede a live joint
+workflow. The optional configuration continues to accept only `offline` and
+`recorded`, both with `allow_external: false`.
 Existing SSH approval does not authorize network summaries. Automatic analysis (#149) and automatic response (#150) remain separate.
 
 Only code, general documentation and authored synthetic fixtures belong in the
