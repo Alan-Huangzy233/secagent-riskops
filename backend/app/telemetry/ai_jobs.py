@@ -21,6 +21,13 @@ from .ai_summary import canonical
 SHARED_QUEUE_KIND = "joint-shared-budget-v1"
 
 
+class InvalidAnalysisReceipt(ValueError):
+    """A paid row exists but its saved JSON cannot represent a receipt."""
+
+    def __init__(self):
+        super().__init__("invalid_analysis_receipt")
+
+
 class Jobs:
     def __init__(self, path: Path, *, clock=time.time, queue_kind="ssh", budget_owner: Jobs | None = None):
         if queue_kind not in ("ssh", "joint"):
@@ -341,11 +348,16 @@ class Jobs:
                            (state, self.clock(), job["call_id"]))
                 self._audit(db, job["id"], "lease_recovered", state=state)
 
-    def claim(self, *, lease_seconds=300, max_attempts=2):
+    def claim(self, *, lease_seconds=300, max_attempts=2, recover_only=False):
+        if type(recover_only) is not bool:
+            raise ValueError("invalid analysis recovery selector")
         with self.connection(write=True) as db:
             self._recover(db, max_attempts)
-            row = db.execute("SELECT * FROM ai_jobs WHERE state IN ('queued','recoverable') "
-                             "ORDER BY created,id LIMIT 1").fetchone()
+            # A paused caller may settle/display existing paid work without
+            # claiming an unpaid queue item or spending another attempt.
+            states = "state='recoverable'" if recover_only else "state IN ('queued','recoverable')"
+            row = db.execute("SELECT * FROM ai_jobs WHERE " + states +
+                             " ORDER BY created,id LIMIT 1").fetchone()
             if not row:
                 return None
             job = dict(row)
@@ -370,7 +382,15 @@ class Jobs:
             with self.accounting(db) as account:
                 row = account.execute("SELECT record FROM ai_calls WHERE id=? AND charged IS NOT NULL",
                                       (job["call_id"],)).fetchone()
-                return json.loads(row[0]) if row else None
+                if row is None:
+                    return None
+                try:
+                    record = json.loads(row[0])
+                    if type(record) is not dict:
+                        raise ValueError
+                except (ValueError, TypeError, RecursionError):
+                    raise InvalidAnalysisReceipt() from None
+                return record
 
     def _finish(self, db, job, state, *, record=None, error=None):
         changed = db.execute("""UPDATE ai_jobs SET state=?,result_json=?,error_code=?,updated=?

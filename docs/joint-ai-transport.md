@@ -4,10 +4,10 @@
 joint dossier in [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148).
 It connects the [evidence contract](joint-ai-contract.md) to the
 [shared-budget ledger](joint-ai-budget.md) through an explicit code interface.
-It is not connected to the joint Service, Settings, console or API routes.
-The [manual workflow](joint-ai-workflow.md) continues to accept only `offline`
-and `recorded`, with external calls disabled. No configuration example in this
-increment enables live joint review.
+The [manual workflow](joint-ai-workflow.md) connects it to separately approved
+API jobs and console results. Offline and recorded modes retain their behavior;
+the workflow remains disabled by default. No repository example enables external
+joint calls.
 
 ## Explicit inputs and request identity
 
@@ -15,7 +15,8 @@ A caller supplies a validated, aliased `joint-v1` dossier, a selected provider
 profile and an existing job attempt's ledger bound to the shared SSH budget
 owner. The adapter does not load source stores, generate aliases, construct a
 queue, read a key file, allocate a new budget or accept a browser submission.
-Credentials must be supplied explicitly by the future integrating component.
+The manual service supplies credentials only for a new approved request;
+receipt recovery requires no credential.
 The existing SSH provider client and its accepted dossier versions remain
 unchanged.
 
@@ -30,9 +31,8 @@ and the original job.
 
 Hash binding proves consistency between the supplied objects; it does not prove
 that evidence is still current or that transmission has been approved. The
-future service integration must rebuild and check the saved case before
-submission and after receiving a result, using the existing revision and
-freshness rules. Aliasing is pseudonymization, not anonymity. Destination ports,
+manual service rebuilds and checks the saved case before a new request and
+after receiving a result, using the existing revision and freshness rules. Aliasing is pseudonymization, not anonymity. Destination ports,
 relative timing and relationships still require an approved outgoing-field
 policy.
 
@@ -79,17 +79,16 @@ paid receipt's old profile or prompt after the caller's profile changes. It
 reports the original charge and zero additional cost; it does not describe the
 original generation as free. If the provider outcome or receipt persistence is uncertain, the original reservation remains committed;
 recovery cannot infer that no request was sent. An unavailable or incompatible
-owner fails closed. Existing total/daily limits, unresolved calls and halted
+owner fails closed. Deterministically invalid paid receipts are distinguished
+from temporary ledger access failures, so the manual service can retain the
+charge and end invalid recovery in human review without starving later jobs. Existing total/daily limits, unresolved calls and halted
 state remain shared with SSH.
 
-## Remaining integration and approval
+## Integration and remaining approval
 
-This foundation does not add a live mode to joint settings or expose a submission
-button for external calls. The next integration must:
-
-- Connect manual saved-case jobs, preview bindings, shared-budget ownership and
-  transport results through the Service, Settings and UI, preserving offline and
-  recorded job history.
+The manual service connects saved-case jobs, preview bindings, shared ownership
+and transport results. Its console requires explicit confirmation, while paused
+API mode retains history and receipt recovery. Live use still requires:
 - Define permitted outgoing network/joint fields and handling of credentials;
   existing permission for SSH summaries does not authorize joint transmission.
 - Qualify the chosen provider and model, request/receipt behavior and independent

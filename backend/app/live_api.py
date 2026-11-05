@@ -157,7 +157,7 @@ class TelemetryBatch(BaseModel):
 
 
 def _joint_ai_service(config, ai, control):
-    """Load the optional local workflow without broadening SSH authorization."""
+    """Load joint review with separate approval and the existing budget owner."""
     from .telemetry.joint_ai_service import Service
     if not os.environ.get("RISKOPS_JOINT_AI_CONFIG"):
         return Service(None)
@@ -172,9 +172,10 @@ def _joint_ai_service(config, ai, control):
                          getattr(control, "path", None),
                          getattr(getattr(control, "transport", None), "config_path", None)))
         return Service.from_environment(compile_joint_config(config),
-            aliases=getattr(ai, "aliases", None), excluded_paths=tuple(p for p in excluded if p))
+            aliases=getattr(ai, "aliases", None), ssh_service=ai,
+            excluded_paths=tuple(p for p in excluded if p))
     except Exception:
-        # Optional local rehearsal must not stop telemetry on invalid configuration.
+        # Invalid optional review settings must not stop telemetry collection.
         return Service(None, error="joint_ai_configuration_unavailable")
 
 

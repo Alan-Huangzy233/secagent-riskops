@@ -1,7 +1,7 @@
-"""Explicitly enabled, local-only manual review of saved joint observations.
+"""Opt-in manual joint review with a separately approved summary contract.
 
-A separate typed queue reuses leases and audit records. No provider client,
-credentials, paid ledger or automatic response action is available here.
+API mode reuses the existing SSH profile, credentials reference and budget.
+It never submits automatically or authorizes a response action.
 """
 from __future__ import annotations
 
@@ -18,8 +18,12 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from ..agents import joint_triage
-from .ai_jobs import Jobs
+from ..agents import joint_triage, joint_triage_api
+from ..agents.model_triage import BudgetExceeded
+from ..agents.triage_api import APIConfig, APIError, read_key
+from ..agents.triage_budget import CallUncertain
+from .ai_jobs import Jobs, Ledger, InvalidAnalysisReceipt
+from .ai_triage import Service as SSHService, Settings as SSHSettings
 from .ai_summary import Aliases, canonical
 from . import joint_ai_recorded
 from .joint_ai_preview import preview as saved_preview
@@ -28,18 +32,27 @@ from .joint_config import JointRuntimeSpec
 from .joint_case_query import open_query
 
 
+class JointAIPausedError(RuntimeError):
+    def __init__(self):
+        super().__init__("joint_ai_paused")
+
+
 class Settings(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
-    mode: Literal["offline", "recorded"] = "offline"
+    mode: Literal["offline", "recorded", "api"] = "offline"
     database_path: Path
     recording_path: Path | None = None
-    allow_external: Literal[False] = False
+    allow_external: bool = Field(default=False, strict=True)
+    approved_summary_version: str | None = Field(default=None, strict=True,
+                                                  pattern=r"^joint-summary-v[0-9]{1,4}$")
     queue_limit: int = Field(default=100, strict=True, ge=1, le=1000)
     lease_seconds: int = Field(default=300, strict=True, ge=240, le=600)
     max_attempts: int = Field(default=2, strict=True, ge=1, le=3)
 
     @model_validator(mode="after")
     def valid(self):
+        if self.mode != "api" and (self.allow_external or self.approved_summary_version is not None):
+            raise ValueError("invalid_joint_ai_configuration")
         if not self.database_path.is_absolute() or "\x00" in str(self.database_path):
             raise ValueError("invalid_joint_ai_configuration")
         if self.mode == "recorded":
@@ -85,9 +98,11 @@ def _validate_paths(path, spec, excluded_paths):
 
 class Service:
     def __init__(self, spec, settings=None, *, aliases=None, clock=time.time,
-                 provider=None, error=None, excluded_paths=()):
+                 provider=None, error=None, excluded_paths=(), ssh_service=None, transport=None):
         self.spec, self.settings, self.aliases = spec, settings, aliases
         self.clock, self.provider, self.error = clock, provider, error
+        self.ssh_service, self.transport = ssh_service, transport
+        self.profile = self._ssh_binding = None
         self.jobs = None
         self.recording = None
         self.thread = None
@@ -95,6 +110,27 @@ class Service:
         if settings is None:
             return
         settings = Settings.model_validate(settings.model_dump())
+        owner = None
+        if settings.mode == "api":
+            if provider is not None or not isinstance(ssh_service, SSHService):
+                raise ValueError("joint_ai_existing_api_required")
+            ssh_settings = SSHSettings.model_validate(ssh_service.settings.model_dump())
+            owner = ssh_service.jobs
+            if (ssh_settings.mode != "api" or type(owner) is not Jobs or owner.queue_kind != "ssh"
+                    or owner.budget_owner is not None or type(ssh_service.profile) is not APIConfig):
+                raise ValueError("joint_ai_existing_api_required")
+            self.profile = APIConfig.model_validate(ssh_service.profile.model_dump())
+            self._ssh_binding = canonical([ssh_settings.model_dump(mode="json"),
+                                           self.profile.model_dump(mode="json"), ssh_service.config_sha])
+            owner_aliases = ssh_service.aliases
+            if (type(owner_aliases) is not Aliases or owner_aliases.secret != owner.secret()
+                    or (aliases is not None and (type(aliases) is not Aliases
+                                                or aliases.secret != owner_aliases.secret))):
+                raise ValueError("joint_ai_alias_owner_mismatch")
+            aliases = self.aliases = owner_aliases
+            excluded_paths = (*excluded_paths, *self._ssh_paths(ssh_service))
+        elif transport is not None:
+            raise ValueError("joint_ai_configuration_unavailable")
         if not isinstance(spec, JointRuntimeSpec) or type(aliases) is not Aliases:
             raise ValueError("joint_ai_configuration_unavailable")
         if not isinstance(aliases.secret, bytes) or not 32 <= len(aliases.secret) <= 128:
@@ -109,6 +145,8 @@ class Service:
             self.recording = joint_ai_recorded.RecordedResponses.load(settings.recording_path)
         self.settings = settings
         settings_material = settings.model_dump(mode="json")
+        if settings.mode != "api":
+            settings_material.pop("approved_summary_version")
         if settings.mode == "offline":
             # Preserve the exact existing offline binding and idempotence keys.
             settings_material.pop("recording_path")
@@ -119,11 +157,21 @@ class Service:
         if self.recording is not None:
             material.update(recording_sha256=self.recording.digest,
                             recording_protocol=joint_ai_recorded.protocol())
+        if self.profile is not None:
+            material.update(profile=self.profile.model_dump(mode="json"),
+                            ssh_configuration_sha256=ssh_service.config_sha,
+                            protocol=joint_triage_api.protocol())
         self.config_sha = hashlib.sha256(canonical(material).encode()).hexdigest()
-        self.jobs = Jobs(settings.database_path, clock=clock, queue_kind="joint")
+        self.jobs = Jobs(settings.database_path, clock=clock, queue_kind="joint", budget_owner=owner)
+
+    @staticmethod
+    def _ssh_paths(service):
+        settings = service.settings
+        return tuple(path for path in (service.jobs.path, settings.context_file, settings.profile_path,
+                                       settings.recording_path, settings.keys_file) if path is not None)
 
     @classmethod
-    def from_environment(cls, spec, *, aliases=None, excluded_paths=()):
+    def from_environment(cls, spec, *, aliases=None, excluded_paths=(), ssh_service=None, transport=None):
         value = os.environ.get("RISKOPS_JOINT_AI_CONFIG")
         if not value:
             return cls(spec)
@@ -131,13 +179,16 @@ class Service:
             path = Path(value)
             if not isinstance(spec, JointRuntimeSpec):
                 raise ValueError("joint_ai_configuration_unavailable")
+            if isinstance(ssh_service, SSHService) and ssh_service.jobs is not None:
+                excluded_paths = (*excluded_paths, *cls._ssh_paths(ssh_service))
             _validate_paths(path, spec, excluded_paths)
             info = path.stat()
             if (not path.is_absolute() or path.is_symlink() or not stat.S_ISREG(info.st_mode)
                     or info.st_mode & 0o077 or info.st_size > 16 * 1024):
                 raise ValueError
             settings = Settings.model_validate_json(path.read_bytes())
-            return cls(spec, settings, aliases=aliases, excluded_paths=(*excluded_paths, path))
+            return cls(spec, settings, aliases=aliases, excluded_paths=(*excluded_paths, path),
+                       ssh_service=ssh_service, transport=transport)
         except Exception:
             # Optional configuration must not disable collection or existing AI.
             return cls(spec, error="joint_ai_configuration_unavailable")
@@ -148,9 +199,38 @@ class Service:
 
     def status(self):
         mode = self.settings.mode if self.enabled else "disabled"
-        return {"enabled": self.enabled, "mode": mode,
-                "external_calls": False, "model": mode + "-review" if self.enabled else None,
-                "summary_version": VERSION, "error": self.error}
+        status = {"enabled": self.enabled, "mode": mode,
+                  "external_calls": False, "model": mode + "-review" if self.enabled else None,
+                  "summary_version": VERSION, "error": self.error}
+        if mode == "api":
+            reason, budget = self._api_state()
+            status.update(provider=self.profile.provider, model=self.profile.model,
+                          external_calls=reason is None, paused=reason is not None, pause_reason=reason,
+                          approved_summary_version=self.settings.approved_summary_version,
+                          budget=budget, execution_binding=self.config_sha)
+        return status
+
+    def _api_state(self):
+        # No key read, network request or budget mutation is needed for status.
+        budget = None
+        try:
+            ssh = self.ssh_service
+            current = canonical([ssh.settings.model_dump(mode="json"), ssh.profile.model_dump(mode="json"),
+                                 ssh.config_sha])
+            if ssh.jobs is not self.jobs.budget_owner or current != self._ssh_binding:
+                return "joint_ai_existing_api_changed", None
+            budget = self.jobs.budget()
+        except Exception:
+            return "joint_ai_shared_budget_unavailable", None
+        if not self.settings.allow_external:
+            return "joint_ai_external_calls_paused", budget
+        if self.settings.approved_summary_version != VERSION:
+            return "joint_ai_summary_approval_required", budget
+        reservation = self.profile.reservation() / 1_000_000
+        if (budget["halted"] or budget["charged_usd"] + budget["reserved_usd"] + reservation > budget["total_usd"]
+                or budget["today_committed_usd"] + reservation > budget["daily_usd"]):
+            return "joint_ai_shared_budget_exhausted", budget
+        return None, budget
 
     def _require(self):
         if not self.enabled:
@@ -168,6 +248,8 @@ class Service:
         # The dossier revision already binds the complete saved projection,
         # scope, epochs and freshness context. Capture time is deliberately out.
         result["meta"].update(execution_mode=self.settings.mode, envelope_version=ENVELOPE_VERSION)
+        if self.profile is not None:
+            result["meta"].update(model=self.profile.model, provider=self.profile.provider)
         if self.recording is not None:
             result["meta"]["recording_sha256"] = self.recording.digest
         result["preview_key"] = hashlib.sha256(canonical([result["case"], self.config_sha]).encode()).hexdigest()
@@ -182,12 +264,19 @@ class Service:
             raise ValueError("joint_ai_request_changed")
         if not isinstance(actor, str) or not 1 <= len(actor) <= 256:
             raise ValueError("joint_ai_invalid_request")
+        if self.settings.mode == "api":
+            if self._api_state()[0] is not None:
+                raise JointAIPausedError()
+            if bundle["case"]["review_state"] != "current":
+                raise ValueError("joint_ai_request_changed")
         request_sha = self._request_sha(bundle["case"])
         job_id = self.jobs.enqueue(case_id, bundle, self.config_sha, request_sha, actor,
                                    queue_limit=self.settings.queue_limit)
         return self.job(job_id)
 
     def _request_sha(self, case):
+        if self.settings.mode == "api":
+            return joint_triage_api.fingerprint(self.profile, case)
         request_kind = "joint-" + self.settings.mode + "-request-v1"
         return hashlib.sha256(canonical([request_kind, self.config_sha, case]).encode()).hexdigest()
 
@@ -263,7 +352,8 @@ class Service:
         if not self.enabled:
             return False
         job = self.jobs.claim(lease_seconds=self.settings.lease_seconds,
-                              max_attempts=self.settings.max_attempts)
+                              max_attempts=self.settings.max_attempts,
+                              recover_only=self.settings.mode == "api" and self._api_state()[0] is not None)
         if job is None:
             return False
         try:
@@ -271,6 +361,9 @@ class Service:
             joint_triage.parse_dossier(case)
             meta = json.loads(job["local_json"])["meta"]
             revision = meta["case_revision"]
+            if self.settings.mode == "api":
+                self._run_api(job, case, meta, revision)
+                return True
             current = self._current(job["incident_id"], revision)
             if (current is None or current["preview_key"] != job["cache_key"]
                     or job["config_sha"] != self.config_sha
@@ -308,6 +401,48 @@ class Service:
             self.jobs.retry_unsubmitted(job, max_attempts=self.settings.max_attempts)
         return True
 
+    def _run_api(self, job, case, meta, revision):
+        try:
+            if meta.get("execution_mode") != "api":
+                self.jobs.finish(job, "stale", error="joint_ai_request_changed")
+                return
+            cached = self.jobs.cached_call(job)
+            key = None
+            if cached is None:
+                current = self._current(job["incident_id"], revision)
+                if (current is None or current["preview_key"] != job["cache_key"]
+                        or current["case"]["review_state"] != "current"
+                        or job["config_sha"] != self.config_sha
+                        or canonical(case) != canonical(current["case"])
+                        or job["request_sha"] != self._request_sha(case)):
+                    self.jobs.finish(job, "stale", error="joint_ai_request_changed")
+                    return
+                if self._api_state()[0] is not None:
+                    # A concurrent pause must not authorize a send. The queued
+                    # attempt remains unsubmitted and can be inspected locally.
+                    self.jobs.finish(job, "queued", error="joint_ai_paused")
+                    return
+                key = read_key(self.ssh_service.settings.keys_file, self.profile.key_name)
+            record = joint_triage_api.JointAPITriage(
+                self.profile, key, ledger=Ledger(self.jobs, job), transport=self.transport).triage(case)
+            record["metadata"]["stale_at_completion"] = self._freshness(job, revision)["stale"]
+            if len(canonical(record).encode()) > 256 * 1024:
+                self.jobs.finish(job, "review", error="invalid_analysis_record")
+                return
+            self.jobs.finish(job, "review" if record["verdict"] == "abstain" else "complete", record=record)
+        except (InvalidAnalysisReceipt, joint_triage_api.InvalidJointAPIReceipt):
+            # Preserve the paid owner row for local inspection, but do not let
+            # an invalid receipt repeatedly take precedence over queued work.
+            self.jobs.finish(job, "review", error="invalid_analysis_record")
+        except BudgetExceeded:
+            self.jobs.finish(job, "budget_exhausted", error="budget_exhausted")
+        except (APIError, CallUncertain):
+            self.jobs.finish(job, "uncertain", error="provider_outcome_unknown")
+        except Exception:
+            # A saved receipt is retained in the owner for local revalidation;
+            # retry_unsubmitted never creates another attempt after reservation.
+            self.jobs.retry_unsubmitted(job, max_attempts=self.settings.max_attempts)
+
     def start(self):
         if not self.enabled or self.thread is not None:
             return
@@ -318,7 +453,7 @@ class Service:
                 except Exception:
                     busy = False
                 self.stop.wait(0.1 if busy else 1)
-        self.thread = threading.Thread(target=work, name="joint-offline-review", daemon=True)
+        self.thread = threading.Thread(target=work, name="joint-manual-review", daemon=True)
         try:
             self.thread.start()
         except BaseException:

@@ -378,3 +378,4 @@ def test_loader_passes_private_component_paths_before_queue_initialization(
         )
     )
     assert captured["aliases"] is ai.aliases
+    assert captured["ssh_service"] is ai

@@ -21,6 +21,13 @@ MAX_RECEIPT_RESPONSE_BYTES = MAX_RESPONSE_BYTES * 12
 _HEX = re.compile(r"[0-9a-f]{64}")
 
 
+class InvalidJointAPIReceipt(ValueError):
+    """A readable receipt fails its immutable structure or accounting binding."""
+
+    def __init__(self):
+        super().__init__("invalid_joint_api_receipt")
+
+
 def _hash(value):
     return hashlib.sha256(joint_triage.canonical(value).encode("ascii")).hexdigest()
 
@@ -229,13 +236,18 @@ class JointAPITriage:
             if (type(receipt["charged_micro_usd"]) is not int or receipt["charged_micro_usd"] != charged
                     or joint_triage.canonical(receipt["usage"]) != joint_triage.canonical(usage)):
                 raise ValueError
-            with self.ledger.jobs.connection() as db, self.ledger.jobs.accounting(db) as account:
-                saved = account.execute("SELECT charged,reserved,record FROM ai_calls WHERE id=?", (job["call_id"],)).fetchone()
-                if (saved is None or saved["charged"] != charged or saved["reserved"] != saved_config.reservation()
-                        or _hash(_decode(saved["record"])) != _hash(receipt)):
-                    raise ValueError
-        except Exception:
-            raise ValueError("invalid_joint_api_receipt") from None
+        except (ValueError, TypeError, KeyError, AttributeError, APIError, OverflowError, RecursionError):
+            raise InvalidJointAPIReceipt() from None
+        # Keep owner availability/identity and read failures distinct from a
+        # definitively invalid receipt. A temporary read failure can recover.
+        with self.ledger.jobs.connection() as db, self.ledger.jobs.accounting(db) as account:
+            saved = account.execute("SELECT charged,reserved,record FROM ai_calls WHERE id=?", (job["call_id"],)).fetchone()
+        try:
+            if (saved is None or saved["charged"] != charged or saved["reserved"] != saved_config.reservation()
+                    or _hash(_decode(saved["record"])) != _hash(receipt)):
+                raise ValueError
+        except (ValueError, TypeError, KeyError, AttributeError, APIError, OverflowError, RecursionError):
+            raise InvalidJointAPIReceipt() from None
         try:
             _, stop, text, _ = normalize(saved_config, payload)
         except Exception:

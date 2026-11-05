@@ -98,8 +98,8 @@ the two tape formats are not interchangeable. Neither adapter generates model
 responses. The [shared-budget queue foundation](joint-ai-budget.md) separately
 provides owner-bound accounting and interruption recovery. The independent
 [HTTP transport foundation](joint-ai-transport.md) now handles request binding
-and receipt-first settlement without changing this offline replay CLI. Joint
-Service/Settings/UI wiring, provider qualification, independent explanation
-review, outgoing network-field approval and an explicitly approved live pilot
-remain separate work.
+and receipt-first settlement without changing this offline replay CLI. The
+manual service and console integrate separately approved API jobs. Live provider
+qualification, independent explanation review, outgoing network-field approval
+and an explicitly approved pilot remain separate work.
 Automatic analysis and automatic response still belong to #149 and #150.

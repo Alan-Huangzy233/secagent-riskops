@@ -133,7 +133,7 @@ await $('joint-ai-job-refresh').listeners.click();assert.equal(calls.at(-1).path
     "{case_id:'wrong',items:historyJobs.map(historyRow)}",
     '{case_id:jointID,items:[historyRow(offlineJob),historyRow(offlineJob)]}',
     '{case_id:jointID,items:Array.from({length:21},()=>historyRow(offlineJob))}',
-    "{case_id:jointID,items:[{...historyRow(offlineJob),execution_mode:'api'}]}",
+    "{case_id:jointID,items:[{...historyRow(offlineJob),execution_mode:'unknown'}]}",
     "{case_id:jointID,items:[{...historyRow(offlineJob),case_id:'wrong'}]}",
 ])
 def test_invalid_history_replaces_no_old_rows(replacement):
