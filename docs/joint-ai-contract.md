@@ -4,15 +4,15 @@
 extends advisory review to retained network and SSH evidence. The contract defines a bounded summary and deterministic response checks.
 An operator-only console preview now reads saved observations through that
 contract. The preview itself creates no jobs and performs no provider transport. An optional
-[local manual workflow](joint-ai-workflow.md) adds separately enabled offline jobs
-and history; automatic analysis and response actions remain outside its scope.
+[manual workflow](joint-ai-workflow.md) adds separately enabled offline, recorded
+or explicitly approved API jobs and history; automatic analysis and response actions remain outside its scope.
 
 The existing SSH/HTTP dossier, provider fingerprints and manual SSH workflow
 retain their versions and behavior. A joint dossier carries a distinct
 `dossier_version: "joint-v1"`; the existing SSH provider adapter rejects it. A
 separate [HTTP transport foundation](joint-ai-transport.md) consumes only this
-typed joint input when explicitly called with its bound shared ledger. It is
-not wired into the joint service. Existing permission to send SSH summaries
+typed joint input when explicitly called with its bound shared ledger. The
+manual service integrates it behind separate approval. Existing permission to send SSH summaries
 does not authorize network or joint summaries.
 
 ## Inputs and version binding
@@ -209,9 +209,10 @@ The workflow also supports local recordings. A [shared-budget foundation](joint-
 provides owner-bound queue accounting and interruption recovery. The separate
 [HTTP transport foundation](joint-ai-transport.md) binds the exact dossier and
 profile to that ledger, settles raw receipts and revalidates advisory output.
-Joint Service/Settings/UI integration and end-to-end provider qualification
-remain follow-up increments. Outgoing-field, provider, shared-budget and
-explicit rollout approval precede live joint use. Automatic analysis and
+The service and console now integrate those interfaces for explicit manual API
+submissions, with pause-safe history and paid recovery. Outgoing-field approval,
+live provider qualification, independent explanation review and explicit pilot
+approval precede live joint use; local synthetic checks do not establish accuracy. Automatic analysis and
 automatic response remain separate work.
 
 Focused local checks use authored synthetic evidence and temporary stores:

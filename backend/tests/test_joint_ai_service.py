@@ -354,13 +354,12 @@ def test_bad_optional_config_disables_without_touching_existing_queue(
 @pytest.mark.parametrize(
     "change",
     [
-        {"mode": "api"},
         {"mode": "recorded"},
         {"allow_external": True},
         {"keys_file": "/synthetic/key"},
     ],
 )
-def test_no_external_mode_or_credentials_can_be_configured(tmp_path, change):
+def test_offline_external_calls_or_credentials_cannot_be_configured(tmp_path, change):
     with pytest.raises(ValueError):
         Settings(database_path=tmp_path / "queue.sqlite", **change)
 

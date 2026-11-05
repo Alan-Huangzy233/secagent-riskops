@@ -55,9 +55,11 @@ console notifications and UTC daily briefings are implemented. Current position:
   now binds separate joint jobs to an existing SSH allowance and recovers calls
   through the same ledger. An independent [HTTP transport foundation](./docs/joint-ai-transport.md)
   adds request binding, shared reservations and receipt-first response handling.
-  Joint Service/Settings/UI wiring, outgoing-field approval, provider qualification
-  and explicit pilot approval remain subsequent steps; joint settings still accept
-  only offline and recorded work.
+  The manual service and console now connect those interfaces in separately
+  approved API mode, with explicit confirmation, shared limits and pause-safe
+  history/recovery. Outgoing-field approval, live provider qualification,
+  explanation review and explicit pilot approval remain before live joint use.
+  The optional workflow remains disabled by default.
 - Linux #121 retains the Web → network → Linux detection order; source inventory
   can proceed alongside search/correlation. A missing business website or pending
   AI permission does not block already-authorized source engineering. Broader

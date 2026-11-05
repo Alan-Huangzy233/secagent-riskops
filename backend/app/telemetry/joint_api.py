@@ -1,4 +1,4 @@
-"""Operator-only saved observations and an optional local rehearsal workflow.
+"""Operator-only saved observations and an optional manual review workflow.
 
 Reads never initialize storage, run a model or refresh evidence. Explicit workflow
 submission writes only the separately configured queue, never source evidence.
@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from .ai_summary import Aliases
 from .joint_ai_preview import JointPreviewError, preview
+from .joint_ai_service import JointAIPausedError
 from .joint_ai_summary import JointSummaryError
 from .joint_case_contract import CaseStoreError
 from .joint_case_query import open_query
@@ -119,6 +120,8 @@ def _workflow_result(action):
         raise HTTPException(409, "joint_preview_changed") from None
     except KeyError:
         raise HTTPException(404, "joint_ai_record_not_found") from None
+    except JointAIPausedError:
+        raise HTTPException(409, "joint_ai_paused") from None
     except (JointSummaryError, CaseStoreError):
         raise HTTPException(409, "joint_ai_request_changed") from None
     except ValueError:

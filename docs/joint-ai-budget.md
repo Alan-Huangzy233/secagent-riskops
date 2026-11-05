@@ -1,9 +1,9 @@
 # Shared budget foundation for joint AI jobs
 
 The queue layer can bind an independent joint queue to an existing SSH budget
-owner. This is a foundation for [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148),
-not a live-provider configuration. The joint service still accepts only `offline`
-and `recorded` modes. Neither mode uses this binding or makes paid calls.
+owner. This supplies accounting for [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148).
+The [manual service](joint-ai-workflow.md) uses this binding only in separately
+approved API mode. Offline and recorded modes make no paid calls.
 
 ## One budget owner
 
@@ -70,11 +70,12 @@ reset limits, discard calls or repair financial history.
 
 The independent [HTTP transport foundation](joint-ai-transport.md) now accepts
 an explicitly bound shared ledger and uses its original call for reservations,
-receipt settlement and recovery. It creates no allowance and does not wire
-this binding into the joint service. Service/Settings/UI integration, outgoing
-network-field policy, provider qualification, independent explanation review
-and explicit pilot approval remain. That integration must preserve this ledger
-contract and qualify request/receipt handling end to end before live use.
+receipt settlement and recovery. The [manual service](joint-ai-workflow.md) now
+reuses the existing SSH owner/profile behind separate API approval and creates
+no allowance. Pausing preserves history and charged receipt recovery without
+claiming unsubmitted jobs. Outgoing network-field policy, live provider
+qualification, independent explanation review and explicit pilot approval
+remain before live use.
 Automatic analysis (#149) and enforcement (#150) remain later stages.
 
 Only general code, documentation and authored synthetic tests belong in version

@@ -97,7 +97,7 @@ def test_recorded_deduplication_survives_concurrency_and_restart(replay_world):
 
 
 def test_offline_config_binding_is_exactly_backward_compatible(world):
-    settings = world.settings.model_dump(mode="json", exclude={"recording_path"})
+    settings = world.settings.model_dump(mode="json", exclude={"recording_path", "approved_summary_version"})
     material = {"settings": settings, "summary_version": VERSION, "envelope_version": ENVELOPE_VERSION,
                 "dossier_version": joint_triage.VERSION, "validator_version": joint_triage.VALIDATOR_VERSION,
                 "system_sha256": hashlib.sha256(joint_triage.SYSTEM.encode()).hexdigest()}
