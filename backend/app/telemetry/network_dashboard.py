@@ -4,19 +4,33 @@ SECTION = """<section id="network-section" aria-busy="false"><h2>网络检测</h
 <p id="network-boundary">目前检测已核验本机入站日志中的 TCP 多端口探测模式。命中不代表入侵成功；来源 IP 不等于人员身份，日志条数不等于独立连接数。没有事件也不代表安全或完整覆盖。</p>
 <p id="network-health" role="status" aria-live="polite">切换到此页后读取网络检测状态。</p>
 <details id="network-source-quality"><summary id="network-quality-summary">采集来源与覆盖限制</summary><p>采集问题与检测结果分开显示。采集心跳正常不代表覆盖完整；来源未接入或日志缺失时不能据此判断没有异常。</p><div class="table-wrap"><table><thead><tr><th>来源</th><th>采集状态</th><th>接收 / 拒收</th><th>覆盖限制</th></tr></thead><tbody id="network-sources"></tbody></table></div><p id="network-coverage"></p></details>
-<div class="actions"><label for="network-source">网络来源</label><select id="network-source"><option value="">全部</option></select><label for="network-focus">事件筛选</label><select id="network-focus"><option value="all">全部事件</option><option value="attention">优先核查</option><option value="low">低分事件</option><option value="stale">待重新核验</option><option value="retracted">已撤回</option></select><button id="network-refresh" type="button">刷新网络检测</button></div>
+<div class="detail-tabs" role="tablist" aria-label="网络内容"><button id="network-view-findings" type="button" role="tab" aria-controls="network-findings" aria-selected="true">检测事件</button><button id="network-view-logs" type="button" role="tab" aria-controls="network-logs" aria-selected="false" tabindex="-1">原始日志</button></div>
+<div id="network-findings" role="tabpanel" aria-labelledby="network-view-findings"><div class="actions"><label for="network-source">网络来源</label><select id="network-source"><option value="">全部</option></select><label for="network-focus">事件筛选</label><select id="network-focus"><option value="all">全部事件</option><option value="attention">优先核查</option><option value="low">低分事件</option><option value="stale">待重新核验</option><option value="retracted">已撤回</option></select><button id="network-refresh" type="button">刷新网络检测</button></div>
 <div class="table-wrap"><table aria-describedby="network-boundary"><thead><tr><th>最近证据</th><th>来源</th><th>源 IP → 目的 IP</th><th>检测模式</th><th>评分 / 状态</th><th>详情</th></tr></thead><tbody id="network-rows"></tbody></table></div>
-<div class="pager"><button id="network-prev" type="button" disabled>上一页</button><span id="network-page"></span><button id="network-next" type="button" disabled>下一页</button></div><p id="network-status" class="list-status" role="status" aria-live="polite"></p></section>"""
+<div class="pager"><button id="network-prev" type="button" disabled>上一页</button><span id="network-page"></span><button id="network-next" type="button" disabled>下一页</button></div><p id="network-status" class="list-status" role="status" aria-live="polite"></p></div>
+<div id="network-logs" role="tabpanel" aria-labelledby="network-view-logs" aria-busy="false" hidden>
+<p id="network-log-boundary">查询已保留的规范化网络日志，按完整源 IP 精确匹配（IPv4 / IPv6）。无匹配不代表没有活动；相同 IP 不代表已确认关联。</p>
+<form id="network-log-form" novalidate><div class="search-fields">
+<label for="network-log-source">网络来源（必选）<select id="network-log-source" required><option value="">请先读取已登记来源</option></select></label>
+<label for="network-log-ip">源 IP（必填）<input id="network-log-ip" type="text" required maxlength="128" autocomplete="off" placeholder="完整 IPv4 / IPv6，不支持网段" aria-describedby="network-log-boundary"></label>
+<label for="network-log-window">日志时间范围<select id="network-log-window"><option value="24h">最近 24 小时</option><option value="1h">最近 1 小时</option><option value="7d">最近 7 天</option><option value="custom">自定义（最多 7 天）</option></select></label></div>
+<div id="network-log-dates" class="search-fields" hidden><label for="network-log-start">开始时间（本地，含）<input id="network-log-start" type="datetime-local" step="1"></label><label for="network-log-end">结束时间（本地，含）<input id="network-log-end" type="datetime-local" step="1"></label></div>
+<p id="network-log-timezone" class="muted"></p><div class="actions"><button id="network-log-submit" type="submit" disabled>查询网络日志</button><button id="network-log-refresh" type="button" disabled>刷新此查询</button></div></form>
+<p id="network-log-scope" aria-live="polite">选择来源并输入源 IP 后提交查询。</p><p id="network-log-coverage">仅查询当前保留的日志；采集缺口、日志限速与过期记录可能限制覆盖。</p>
+<div class="table-wrap"><table aria-describedby="network-log-boundary network-log-coverage"><thead><tr><th>日志时间 / 来源</th><th>源 IP / 端口</th><th>目的 IP / 端口</th><th>协议 / 标志</th><th>采集位置 / 限制</th></tr></thead><tbody id="network-log-rows"></tbody></table></div>
+<div class="pager"><button id="network-log-prev" type="button" disabled>上一页</button><span id="network-log-page"></span><button id="network-log-next" type="button" disabled>下一页</button></div><p id="network-log-status" class="list-status" role="status" aria-live="polite"></p></div></section>"""
 
 DIALOG = """<dialog id="network-dialog" aria-labelledby="network-detail-title"><div class="network-detail-body"><div class="drawer-heading"><h2 id="network-detail-title">网络事件详情</h2><button id="network-close" type="button" aria-label="关闭网络详情">关闭 ✕</button></div>
 <p id="network-detail-status" role="status" aria-live="polite"></p><div class="actions"><button id="network-revision-prev" type="button" disabled>上一版本</button><span id="network-revision"></span><button id="network-revision-next" type="button" disabled>下一版本</button><button id="network-current" type="button" disabled>读取当前版本</button></div>
 <div class="detail-tabs" role="tablist" aria-label="网络详情内容"><button id="network-tab-overview" type="button" role="tab" aria-controls="network-pane-overview" aria-selected="true">概览</button><button id="network-tab-evidence" type="button" role="tab" aria-controls="network-pane-evidence" aria-selected="false" tabindex="-1">证据</button></div>
-<div id="network-pane-overview" class="network-detail-scroll" role="tabpanel" aria-labelledby="network-tab-overview"><div id="network-ssh-search"></div><p>查证入口查询全部 SSH 来源及处置状态，默认网络证据前后各 30 分钟，可在搜索页调整；命中相同 IP 不代表已确认关联。</p><dl id="network-fields" class="detail-fields"></dl><details><summary>版本与关联标识</summary><dl id="network-provenance" class="detail-fields"></dl></details></div>
+<div id="network-pane-overview" class="network-detail-scroll" role="tabpanel" aria-labelledby="network-tab-overview"><div id="network-ssh-search"></div><div id="network-log-search"></div><p>查证入口查询全部 SSH 来源及处置状态，默认网络证据前后各 30 分钟，可在搜索页调整；命中相同 IP 不代表已确认关联。</p><dl id="network-fields" class="detail-fields"></dl><details><summary>版本与关联标识</summary><dl id="network-provenance" class="detail-fields"></dl></details></div>
 <div id="network-pane-evidence" class="network-detail-scroll" role="tabpanel" aria-labelledby="network-tab-evidence" hidden><p>只显示该版本保存的规范化证据。时间来自来源主机日志，可能发生时钟跳变；关联使用同一次启动内的单调时钟。拒绝相关日志标签不证明最终防火墙处置结果。</p><div class="table-wrap"><table><thead><tr><th>日志时间</th><th>源 IP / 端口</th><th>目的 IP / 端口</th><th>协议 / 标志</th><th>采集位置 / 限制</th></tr></thead><tbody id="network-evidence"></tbody></table></div><div class="pager"><button id="network-evidence-prev" type="button" disabled>上一页</button><span id="network-evidence-page"></span><button id="network-evidence-next" type="button" disabled>下一页</button><button id="network-evidence-retry" type="button" disabled>重试证据</button></div><p id="network-evidence-status" role="status" aria-live="polite"></p></div></div></dialog>"""
 
 STYLE = """
-#network-health,#network-coverage{white-space:pre-line}#network-coverage{max-height:160px;overflow:auto}#network-source-quality{margin:10px 0;color:#a9bacd;font-size:13px}#network-source-quality summary{cursor:pointer;padding:8px 0}#network-section>.table-wrap table{min-width:820px}#network-source-quality .table-wrap{max-height:220px}#network-source-quality table{min-width:560px}#network-section .actions select{max-width:100%}
+#network-health,#network-coverage{white-space:pre-line}#network-coverage{max-height:160px;overflow:auto}#network-source-quality{margin:10px 0;color:#a9bacd;font-size:13px}#network-source-quality summary{cursor:pointer;padding:8px 0}#network-findings>.table-wrap table{min-width:820px}#network-source-quality .table-wrap{max-height:220px}#network-source-quality table{min-width:560px}#network-section .actions select{max-width:100%}
+#network-logs table{min-width:760px}#network-log-dates{margin-top:12px;grid-template-columns:repeat(2,minmax(0,1fr))}#network-log-scope,#network-log-coverage,#network-log-timezone{font-size:13px;overflow-wrap:anywhere}#network-log-scope{white-space:pre-line}#network-logs [hidden],#network-findings[hidden],#network-logs[hidden]{display:none!important}#network-log-rows td{white-space:pre-line}#network-log-search{margin-top:8px}
 #network-dialog{position:fixed;inset:0 0 0 auto;margin:0;width:min(920px,100vw);max-width:100vw;height:100dvh;max-height:100dvh;border:0;border-left:1px solid #385475;background:#101d2e;color:#e7edf5;padding:22px}#network-dialog::backdrop{background:#030b17a6}.network-detail-body{height:100%;display:flex;flex-direction:column;gap:12px;min-width:0}.network-detail-scroll{min-height:0;overflow:auto;flex:1}#network-dialog .actions{margin:0;flex-shrink:0}#network-dialog .detail-tabs{margin:0;padding:0 0 10px;flex-shrink:0}#network-pane-evidence{display:flex;flex-direction:column;overflow:hidden}.network-detail-scroll .table-wrap{overflow:auto;min-height:0;flex:1}.network-detail-scroll .table-wrap table{min-width:720px}.network-detail-scroll .pager{flex-shrink:0}.network-detail-scroll p{font-size:13px}.network-detail-scroll details>summary{cursor:pointer;margin:12px 0}#network-detail-status:empty,#network-evidence-status:empty{display:none}#network-detail-status,#network-evidence-status{font-size:13px;margin:0}#network-provenance{margin-top:16px}
+@media(max-width:480px){#network-log-dates{grid-template-columns:1fr}#network-logs .pager{gap:8px}}
 @media(max-width:850px){#network-dialog{padding:16px}#network-dialog .drawer-heading h2{font-size:17px}#network-dialog .actions,#network-dialog .pager{gap:6px;font-size:12px}#network-dialog button{font-size:12px;padding:7px 9px}#network-section .actions{gap:8px}#network-source-quality .table-wrap{max-height:180px}}
 """
 
@@ -47,6 +61,7 @@ function networkPager(){
  $('network-section').setAttribute('aria-busy',String(networkLoading));
 }
 function networkHealth(status){
+ networkLogSources(status);
  if(!status.enabled){text('network-health','网络来源尚未配置，当前没有在线网络检测覆盖。');$('network-sources').replaceChildren();empty($('network-sources'),4,'尚未接入网络来源。');text('network-coverage','');text('network-quality-summary','采集来源与覆盖限制 · 尚未配置');return;}
  const analysis=status.analysis||{},sources=status.sources||[],select=$('network-source'),previous=select.value;
  select.replaceChildren();for(const item of [{source_id:'',hostname:'全部'},...sources]){const option=document.createElement('option');option.value=item.source_id;option.textContent=item.source_id?`${item.hostname||item.source_id} · ${item.source_id}`:'全部';select.append(option);}select.value=sources.some(s=>s.source_id===previous)?previous:'';
@@ -73,7 +88,7 @@ async function loadNetwork(page=networkPage){
   const query=new URLSearchParams({page:String(page),limit:'50',focus:$('network-focus').value||'all'});if($('network-source').value)query.set('source_id',$('network-source').value);
   const data=await get('/api/network/incidents?'+query);if(request!==networkRequest)return;
   if(!networkPageValid(data,page)||!data.items.every(networkItemValid))throw new Error('网络事件返回异常，请刷新重试。');
-  const rows=[];for(const item of data.items){const tr=document.createElement('tr');cell(tr,when(item.last_seen));cell(tr,item.source_id);const peers=cell(tr,`${item.src_ip} → ${item.dst_ip}`);peers.append(networkSSHSearchActions(item));cell(tr,item.rules.map(rule=>rule.label).join('、')||'模式已撤回');cell(tr,`${item.assessment.score} 分 · ${item.stale?'待重新核验':item.active?(item.assessment.priority||'低分'):'已撤回'}`);const button=document.createElement('button');button.type='button';button.textContent='查看详情';button.addEventListener('click',()=>showNetworkIncident(item.incident_id,item.revision));cell(tr,'').append(button);rows.push(tr);}
+  const rows=[];for(const item of data.items){const tr=document.createElement('tr');cell(tr,when(item.last_seen));cell(tr,item.source_id);const peers=cell(tr,`${item.src_ip} → ${item.dst_ip}`);peers.append(networkSSHSearchActions(item),networkLogAction(item));cell(tr,item.rules.map(rule=>rule.label).join('、')||'模式已撤回');cell(tr,`${item.assessment.score} 分 · ${item.stale?'待重新核验':item.active?(item.assessment.priority||'低分'):'已撤回'}`);const button=document.createElement('button');button.type='button';button.textContent='查看详情';button.addEventListener('click',()=>showNetworkIncident(item.incident_id,item.revision));cell(tr,'').append(button);rows.push(tr);}
   $('network-rows').replaceChildren(...rows);if(!rows.length)empty($('network-rows'),6,'暂无符合条件的事件；没有命中不代表安全或完整覆盖。');
   networkPage=data.page;networkPages=data.total_pages;networkAvailable=data.total>0;text('network-page',`第 ${data.page} / ${data.total_pages} 页 · 共 ${data.total} 个事件`);text('network-status','');
  }catch(error){if(request===networkRequest)text('network-status',error.message+' 已保留上次读取的网络事件与页码；可能不符合新筛选条件。');}
@@ -81,7 +96,7 @@ async function loadNetwork(page=networkPage){
 }
 function renderNetworkDetail(item){
  networkDetail=item;
- $('network-ssh-search').replaceChildren(networkSSHSearchActions(item));
+ $('network-ssh-search').replaceChildren(networkSSHSearchActions(item));$('network-log-search').replaceChildren(networkLogAction(item));
  networkFields('network-fields',[
   ['标题',item.title],['来源',item.source_id],['源 IP → 目的 IP',`${item.src_ip} → ${item.dst_ip}`],
   ['日志显示时段',`${when(item.first_seen)} — ${when(item.last_seen)}`],['版本',`${item.revision} · ${when(item.updated_at)}`],
@@ -118,7 +133,7 @@ async function loadNetworkEvidence(page=1){
 async function showNetworkIncident(identity,revision=null){
  const dialog=$('network-dialog');if(!dialog.open){networkReturnFocus=document.activeElement;setNetworkDetailTab('overview');if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','');}
  const request=++networkDetailRequest;++networkEvidenceRequest;networkDetail=null;networkEvidencePage=networkEvidencePages=1;networkEvidenceLoading=false;networkEvidenceAvailable=false;
- for(const id of ['network-fields','network-provenance','network-evidence','network-ssh-search'])$(id).replaceChildren();for(const id of ['network-revision','network-evidence-page','network-evidence-status'])text(id,'');
+ for(const id of ['network-fields','network-provenance','network-evidence','network-ssh-search','network-log-search'])$(id).replaceChildren();for(const id of ['network-revision','network-evidence-page','network-evidence-status'])text(id,'');
  for(const id of ['network-revision-prev','network-revision-next','network-current'])$(id).disabled=true;networkEvidencePager();text('network-detail-status','正在读取网络事件版本…');
  try{
   const path='/api/network/incidents/'+encodeURIComponent(identity),latest=await get(path);if(request!==networkDetailRequest)return;
@@ -130,8 +145,117 @@ async function showNetworkIncident(identity,revision=null){
 }
 function clearNetworkDetail(){++networkDetailRequest;++networkEvidenceRequest;networkDetail=null;networkEvidenceLoading=false;networkEvidenceAvailable=false;networkEvidencePager();if(networkReturnFocus?.isConnected&&typeof networkReturnFocus.focus==='function')networkReturnFocus.focus();}
 function setNetworkDetailTab(name){if(!['overview','evidence'].includes(name))return;for(const key of ['overview','evidence']){$('network-pane-'+key).hidden=key!==name;$('network-tab-'+key).setAttribute('aria-selected',String(key===name));$('network-tab-'+key).tabIndex=key===name?0:-1;}}
+
+let networkLogSourceList=[],networkLogEnabled=false,networkLogQuery=null,networkLogPages=[],networkLogIndex=-1,networkLogRequest=0,networkLogController=null,networkLogLoading=false;
+const networkLogRetention='仅查询当前保留的日志；采集缺口、日志限速与过期记录可能限制覆盖。';
+const networkLogLimitations={retained_observations_only:'仅包括已保留的观测记录',history_may_be_incomplete:'历史记录可能不完整',logging_coverage_limited:'采集与日志覆盖有限',observed_source_ip_only:'仅匹配观测到的源 IP，不能确认人员身份',late_receipts_excluded:'翻页沿用首次查询范围，之后收到的日志需刷新查询'};
+function setNetworkView(name){
+ if(!['findings','logs'].includes(name))return;
+ for(const key of ['findings','logs']){$('network-'+key).hidden=key!==name;$('network-view-'+key).setAttribute('aria-selected',String(key===name));$('network-view-'+key).tabIndex=key===name?0:-1;}
+}
+function networkLogSourceAvailable(){return networkLogEnabled&&networkLogSourceList.some(source=>source.source_id===$('network-log-source').value);}
+function networkLogPager(){
+ const available=networkLogSourceAvailable();$('network-log-submit').disabled=networkLogLoading||!available;
+ $('network-log-refresh').disabled=networkLogLoading||!available||!networkLogQuery;
+ $('network-log-prev').disabled=networkLogLoading||!available||networkLogIndex<=0;
+ $('network-log-next').disabled=networkLogLoading||!available||!networkLogPages[networkLogIndex]?.next;
+ $('network-logs').setAttribute('aria-busy',String(networkLogLoading));
+}
+function invalidateNetworkLogs(message='条件已修改，请提交查询。'){
+ ++networkLogRequest;if(networkLogController)networkLogController.abort();networkLogController=null;networkLogLoading=false;
+ networkLogQuery=null;networkLogPages=[];networkLogIndex=-1;$('network-log-rows').replaceChildren();
+ text('network-log-page','');text('network-log-scope',message);text('network-log-status','');text('network-log-coverage',networkLogRetention);networkLogPager();
+}
+function networkLogSources(status){
+ const select=$('network-log-source'),previous=select.value;
+ networkLogEnabled=status.enabled===true;networkLogSourceList=networkLogEnabled?(status.sources||[]).filter(source=>source.enabled!==false&&source.hidden!==true):[];
+ select.replaceChildren();const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent=networkLogSourceList.length?'选择一个已登记网络来源':'没有可用的已登记网络来源';select.append(placeholder);
+ for(const source of networkLogSourceList){const option=document.createElement('option');option.value=source.source_id;option.textContent=`${source.hostname||source.source_id} · ${source.source_id}`;select.append(option);}
+ select.value=networkLogSourceList.some(source=>source.source_id===previous)?previous:!previous&&networkLogSourceList.length===1?networkLogSourceList[0].source_id:'';
+ select.disabled=!networkLogSourceList.length;
+ if(!networkLogEnabled||!networkLogSourceList.length||previous&&select.value!==previous)invalidateNetworkLogs('网络来源未配置、已停用或不再可用；无法查询，请核对来源登记。');
+ else networkLogPager();
+}
+function networkLogLocal(value){const date=new Date(value),pad=n=>String(n).padStart(2,'0');return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;}
+function networkLogReadQuery(){
+ const source_id=$('network-log-source').value,ip=$('network-log-ip').value.trim();
+ if(!networkLogSourceAvailable())throw new Error('请选择一个可用的已登记网络来源。');
+ if(!ip)throw new Error('请输入完整源 IP（IPv4 / IPv6）；不能进行空 IP 查询。');
+ const mode=$('network-log-window').value||'24h',hours={'1h':1,'24h':24,'7d':168};let start,end;
+ if(mode==='custom'){
+  const first=$('network-log-start').value,last=$('network-log-end').value;start=new Date(first);end=new Date(last);
+  if(!first||!last||!Number.isFinite(start.valueOf())||!Number.isFinite(end.valueOf())||networkLogLocal(start).slice(0,first.length)!==first||networkLogLocal(end).slice(0,last.length)!==last)throw new Error('请输入有效的本地开始、结束时间；请避开夏令时跳过的时间。');
+ }else{if(!hours[mode])throw new Error('请选择有效的时间范围。');end=new Date();start=new Date(end.valueOf()-hours[mode]*3600000);}
+ if(start>=end||end-start>604800000)throw new Error('开始时间必须早于结束时间，查询范围最多 7 天。');
+ return {source_id,ip,start:start.toISOString(),end:end.toISOString()};
+}
+function networkLogScope(query){text('network-log-scope',`当前查询：来源 ${query.source_id} · 完整源 IP ${query.ip}\n${when(query.start)} 至 ${when(query.end)}（浏览器本地时间，起止时间均含）。`);}
+async function getNetworkLogs(query,signal){
+ const response=await fetch('/api/network/events/search?'+query,{credentials:'same-origin',cache:'no-store',signal});
+ if(!response.ok){
+  if(response.status===422)throw new Error('查询条件无效或来源不可用：请核对已登记来源、完整 IPv4 / IPv6（不支持网段）及最多 7 天的有效时间范围。');
+  if(response.status===404)throw new Error('网络来源未配置或已移除，当前查询未完成；请刷新网络检测以更新来源列表。');
+  if(response.status===503)throw new Error('查询暂不可用，请缩小时间范围或重试；本次未展示结果。');
+  if(response.status===401)throw new Error('登录已失效，请刷新页面重新登录。');
+  throw new Error('网络日志读取失败，请重试或检查中控服务。');
+ }
+ try{return await response.json();}catch{throw new Error('网络日志返回异常，请重新提交查询。');}
+}
+function networkLogIPKey(value){
+ const ipv4=address=>{const parts=address.split('.');return parts.length===4&&parts.every(part=>/^\d{1,3}$/.test(part)&&Number(part)<=255&&String(Number(part))===part)?parts.map(Number):null;};
+ let address=String(value).toLowerCase();if(!address.includes(':')){const parts=ipv4(address);return parts?'v4:'+parts.join('.'):null;}
+ if(address.includes('.')){const split=address.lastIndexOf(':'),parts=ipv4(address.slice(split+1));if(!parts)return null;address=address.slice(0,split+1)+(parts[0]*256+parts[1]).toString(16)+':'+(parts[2]*256+parts[3]).toString(16);}
+ const halves=address.split('::');if(halves.length>2)return null;const first=halves[0]?halves[0].split(':'):[],last=halves.length===2&&halves[1]?halves[1].split(':'):[];
+ if(![...first,...last].every(part=>/^[0-9a-f]{1,4}$/.test(part)))return null;
+ const missing=8-first.length-last.length;if(halves.length===1&&missing!==0||halves.length===2&&missing<1)return null;
+ return 'v6:'+[...first,...Array(missing).fill('0'),...last].map(part=>parseInt(part,16).toString(16)).join(':');
+}
+function networkLogPageValid(data,query,index){
+ return data&&Array.isArray(data.items)&&data.items.length<=50&&typeof data.page_cursor==='string'&&data.page_cursor.length>0&&(data.next_cursor===null||typeof data.next_cursor==='string'&&data.next_cursor.length>0)&&Number.isSafeInteger(data.snapshot)&&data.snapshot>=0&&Array.isArray(data.limitations)&&data.query&&data.query.source_id===query.source_id&&typeof data.query.ip==='string'&&networkLogIPKey(query.ip)!==null&&networkLogIPKey(data.query.ip)===networkLogIPKey(query.ip)&&Date.parse(data.query.start)===Date.parse(query.start)&&Date.parse(data.query.end)===Date.parse(query.end)&&(index===0&&!networkLogPages.length||data.snapshot===networkLogPages[0]?.snapshot)&&data.items.every(item=>item.source_id===data.query.source_id&&item.src_ip===data.query.ip&&typeof item.dst_ip==='string'&&Number.isSafeInteger(item.journal_realtime_us)&&item.journal_realtime_us>=Date.parse(query.start)*1000&&item.journal_realtime_us<=Date.parse(query.end)*1000&&Array.isArray(item.coverage));
+}
+async function loadNetworkLogPage(index,cursor=null){
+ if(!networkLogQuery||!networkLogSourceAvailable())return;
+ const request=++networkLogRequest,query={...networkLogQuery};if(networkLogController)networkLogController.abort();networkLogController=new AbortController();networkLogLoading=true;networkLogPager();
+ $('network-log-rows').replaceChildren();text('network-log-page','');text('network-log-status','正在查询已保留的网络日志…');networkLogScope(query);
+ try{
+  const params=new URLSearchParams({...query,limit:'50'});if(cursor)params.set('cursor',cursor);
+  const data=await getNetworkLogs(params,networkLogController.signal);if(request!==networkLogRequest)return;
+  if(!networkLogPageValid(data,query,index))throw new Error('网络日志返回异常，请重新提交查询。');
+  const rows=[];for(const item of data.items){const tr=document.createElement('tr');cell(tr,`${networkDate(item.journal_realtime_us)}\n${item.source_id}`);cell(tr,`${item.src_ip} / ${item.src_port??'未知'}`);cell(tr,`${item.dst_ip} / ${item.dst_port??'未知'}`);cell(tr,`${item.protocol} · ${(item.tcp_flags||[]).join(', ')||'未知标志'}`);cell(tr,`${item.direction==='inbound'?'入站':item.direction==='local_input'?'本机入站':item.direction} · ${item.observation_point==='local_input'?'本机入站位置':'采集位置未知'} · ${item.ingress_interface||'未知接口'}\n${networkQuality(item.coverage)||'无额外记录限制'}；最终处置${item.final_outcome==='unknown'?'未知':item.final_outcome}`);rows.push(tr);}
+  $('network-log-rows').replaceChildren(...rows);if(!rows.length)empty($('network-log-rows'),5,'没有匹配的已保留网络日志；无匹配不代表没有活动或完整覆盖。');
+  networkLogQuery={...data.query};networkLogIndex=index;networkLogPages[index]={cursor:data.page_cursor,next:data.next_cursor,snapshot:data.snapshot};networkLogPages.length=index+1;
+  networkLogScope(networkLogQuery);text('network-log-page',`第 ${index+1} 页 · 本页 ${data.items.length} 条${data.next_cursor?' · 还有下一页':''}`);
+  text('network-log-coverage',networkLogRetention+(data.limitations.length?' '+[...new Set(data.limitations.map(code=>networkLogLimitations[code]||'存在额外覆盖限制，请核对采集来源。'))].join('；'):''));text('network-log-status','');
+ }catch(error){if(request===networkLogRequest&&error.name!=='AbortError'){
+  networkLogQuery=null;networkLogPages=[];networkLogIndex=-1;$('network-log-rows').replaceChildren();empty($('network-log-rows'),5,'当前查询未完成，未展示结果；不能据此判断有无活动。');text('network-log-page','');text('network-log-status',error.message);
+ }}finally{if(request===networkLogRequest){networkLogLoading=false;networkLogController=null;networkLogPager();}}
+}
+function submitNetworkLogs(){
+ invalidateNetworkLogs();try{networkLogQuery=networkLogReadQuery();return loadNetworkLogPage(0);}catch(error){text('network-log-status',error.message);networkLogPager();}
+}
+function networkLogAction(item){
+ const button=document.createElement('button');button.type='button';button.textContent='查网络日志';button.setAttribute('aria-label',`查网络日志：${item.src_ip}`);button.title='查询此网络来源与源 IP，默认证据前后各 30 分钟；相同 IP 不代表已确认关联。';
+ button.addEventListener('click',async event=>{event.stopPropagation();const dialog=$('network-dialog');if(dialog.open){if(typeof dialog.close==='function')dialog.close();else{dialog.removeAttribute('open');clearNetworkDetail();}}setWorkspace('network');setNetworkView('logs');
+  invalidateNetworkLogs('正在准备此来源的网络日志查询…');const request=networkLogRequest;
+  if(!networkLogEnabled||!networkLogSourceList.some(source=>source.source_id===item.source_id)){await loadNetwork();if(request!==networkLogRequest)return;}
+  $('network-log-source').value=networkLogSourceList.some(source=>source.source_id===item.source_id)?item.source_id:'';$('network-log-ip').value=item.src_ip;
+  const first=Date.parse(item.first_seen),last=Date.parse(item.last_seen);$('network-log-window').value=Number.isFinite(first)&&Number.isFinite(last)&&first<=last?'custom':'24h';$('network-log-dates').hidden=$('network-log-window').value!=='custom';
+  if($('network-log-window').value==='custom'){$('network-log-start').value=networkLogLocal(first-1800000);$('network-log-end').value=networkLogLocal(last+1800000);}
+  const pending=submitNetworkLogs();$('network-log-ip').focus?.();return pending;
+ });return button;
+}
+function initializeNetworkLogs(){
+ setNetworkView('findings');$('network-log-window').value='24h';text('network-log-timezone',`时间按浏览器时区 ${Intl.DateTimeFormat().resolvedOptions().timeZone} 输入并转换为 UTC 查询；夏令时重复时刻使用浏览器的较早偏移。`);
+ for(const name of ['findings','logs']){$('network-view-'+name).addEventListener('click',()=>setNetworkView(name));$('network-view-'+name).addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const next=event.key==='Home'?'findings':event.key==='End'?'logs':name==='findings'?'logs':'findings';setNetworkView(next);$('network-view-'+next).focus?.();}});}
+ for(const id of ['network-log-source','network-log-ip','network-log-start','network-log-end'])$(id).addEventListener(id==='network-log-source'?'change':'input',()=>invalidateNetworkLogs());
+ $('network-log-window').addEventListener('change',()=>{$('network-log-dates').hidden=$('network-log-window').value!=='custom';invalidateNetworkLogs();});
+ $('network-log-form').addEventListener('submit',event=>{event.preventDefault();return submitNetworkLogs();});$('network-log-refresh').addEventListener('click',submitNetworkLogs);
+ $('network-log-prev').addEventListener('click',()=>{const index=networkLogIndex-1;if(!networkLogLoading&&index>=0)return loadNetworkLogPage(index,networkLogPages[index].cursor);});
+ $('network-log-next').addEventListener('click',()=>{const cursor=networkLogPages[networkLogIndex]?.next;if(!networkLogLoading&&cursor)return loadNetworkLogPage(networkLogIndex+1,cursor);});networkLogPager();
+}
+
 function initializeNetwork(){
- setNetworkDetailTab('overview');
+ setNetworkDetailTab('overview');initializeNetworkLogs();
  for(const id of ['network-source','network-focus'])$(id).addEventListener('change',()=>loadNetwork(1));
  $('network-refresh').addEventListener('click',()=>loadNetwork());$('network-prev').addEventListener('click',()=>loadNetwork(networkPage-1));$('network-next').addEventListener('click',()=>loadNetwork(networkPage+1));
  $('network-close').addEventListener('click',()=>{const dialog=$('network-dialog');if(typeof dialog.close==='function')dialog.close();else{dialog.removeAttribute('open');clearNetworkDetail();}});$('network-dialog').addEventListener('close',clearNetworkDetail);

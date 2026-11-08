@@ -42,7 +42,10 @@ console notifications and UTC daily briefings are implemented. Current position:
   adds resumable steps and full-round freshness indicators, with scheduling off
   by default. Scoped cross-type lookup ([#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146)) can progress alongside it;
   manual joint AI review ([#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148)) follows separately.
-  Its [offline evidence contract](./docs/joint-ai-contract.md) defines bounded
+  [Scoped network log lookup](./docs/network-search.md) adds exact source-IP search
+  within one configured network source and a bounded time range, with a separate
+  raw-log console view. All-source, HTTP and grouped cross-type lookup remain in #146.
+  The joint AI review's [offline evidence contract](./docs/joint-ai-contract.md) defines bounded
   aliased dossiers and revision-bound advisory checks. A saved-case adapter and
   local console preview now expose versioned summaries with explicit freshness
   and coverage limits. An optional [local manual workflow](./docs/joint-ai-workflow.md) now adds durable
