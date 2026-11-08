@@ -61,6 +61,11 @@ paused. No date is promised for deferred product or exploratory work.
 
 ## Next investigation increments
 
+[HTTP incident lookup](http-search.md) adds exact connection-IP filtering to
+retained analyzed cases, with source/service scope and explicit address provenance.
+This is a partial #146 increment; raw HTTP logs and grouped cross-type results
+remain separate work.
+
 | Issue | Work | Stage |
 | --- | --- | --- |
 | [#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145) | Make IP search visible and pivot from network findings to SSH evidence | deployed |

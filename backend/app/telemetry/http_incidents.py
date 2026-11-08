@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS http_incidents(
     coverage TEXT NOT NULL,updated_at REAL NOT NULL,payload_json TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS http_incidents_page ON http_incidents(hour DESC,seq DESC);
+CREATE INDEX IF NOT EXISTS http_incidents_peer ON http_incidents(client_ip,hour DESC,seq DESC);
 CREATE INDEX IF NOT EXISTS http_incidents_stream ON http_incidents(source_id,service_id,hour DESC,seq DESC);
 CREATE TABLE IF NOT EXISTS http_incident_revisions(
     incident_id TEXT NOT NULL,revision INTEGER NOT NULL,payload_json TEXT NOT NULL,

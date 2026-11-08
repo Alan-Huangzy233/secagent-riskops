@@ -29,6 +29,9 @@ console notifications and UTC daily briefings are implemented. Current position:
 - **IP search and investigation pivots delivered** ([#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145), PR #172).
   Visible SSH alert/log filters and network-to-SSH pivots are deployed and checked
   on desktop/mobile, including protected-address search and exact-IP paging.
+  [HTTP incident lookup](./docs/http-search.md) adds exact connection-IP filtering
+  with source/service scope; raw HTTP logs and grouped cross-type results remain
+  separate increments in #146.
 - **SSH + network joint cases** ([#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147)).
   The [offline evidence foundation](./docs/joint-evidence.md) defines explicit
   asset ownership, typed evidence, bounded time association and reproducible
