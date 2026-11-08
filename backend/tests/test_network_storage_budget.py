@@ -1,5 +1,6 @@
 """Synthetic storage-budget boundaries and receipt-preserving expansion."""
 from dataclasses import asdict
+from pathlib import Path
 import sqlite3
 from types import SimpleNamespace
 
@@ -28,7 +29,7 @@ def configuration(tmp_path, **changes):
     })
 
 
-@pytest.mark.parametrize("budget", [MIB, GIB, 2 * GIB])
+@pytest.mark.parametrize("budget", [MIB, GIB, 2 * GIB, 2 * GIB + 1, 3 * GIB, 8 * GIB])
 def test_explicit_network_storage_budget_accepts_supported_boundaries(tmp_path, budget):
     config = configuration(tmp_path, max_storage_bytes=budget)
     assert config.max_storage_bytes == budget
@@ -40,7 +41,7 @@ def test_network_storage_default_remains_unchanged(tmp_path):
     assert configuration(tmp_path).max_storage_bytes == 256 * MIB
 
 
-@pytest.mark.parametrize("budget", [2 * GIB + 1, MIB - 1, -1, True, False,
+@pytest.mark.parametrize("budget", [8 * GIB + 1, MIB - 1, -1, True, False,
                                     float(GIB), str(GIB), None])
 def test_network_storage_budget_rejects_out_of_bounds_or_non_integer_values(tmp_path, budget):
     with pytest.raises(ValidationError) as error:
@@ -49,7 +50,8 @@ def test_network_storage_budget_rejects_out_of_bounds_or_non_integer_values(tmp_
 
 
 
-def test_explicit_storage_budget_reaches_the_application_store(tmp_path, monkeypatch):
+@pytest.mark.parametrize("budget", [2 * GIB, 3 * GIB, 8 * GIB])
+def test_explicit_storage_budget_reaches_the_application_store(tmp_path, monkeypatch, budget):
     # The real application startup applies this validated budget. No analysis
     # worker, AI service, provider, external request or large allocation is needed.
     monkeypatch.setattr(NetworkWorker, "start", lambda self: None)
@@ -61,15 +63,22 @@ def test_explicit_storage_budget_reaches_the_application_store(tmp_path, monkeyp
                   "token_sha256": "a" * 64}],
         operator_username="operator",
         operator_password_pbkdf2=hash_operator_password("synthetic-budget-test-password"),
-        network_ingest=configuration(tmp_path, max_storage_bytes=2 * GIB),
+        network_ingest=configuration(tmp_path, max_storage_bytes=budget),
     )
-    application = create_app(config, control=SimpleNamespace(block_listener=None),
-                             ai=SimpleNamespace())
+    config_path = tmp_path / "synthetic-config.json"
+    config_path.write_text(config.model_dump_json())
+    monkeypatch.setenv("RISKOPS_CONFIG", str(config_path))
+    application = create_app(control=SimpleNamespace(block_listener=None), ai=SimpleNamespace())
     with TestClient(application):
         store = application.state.network_store
-        assert store.max_storage_bytes == 2 * GIB
-        assert store.status()["limits"]["storage_bytes"] == 2 * GIB
-        assert store.status()["database_bytes"] < MIB
+        assert store.max_storage_bytes == budget
+        status = store.status()
+        assert status["limits"]["storage_bytes"] == budget
+        with sqlite3.connect(Path(store.path).as_uri() + "?mode=ro", uri=True) as db:
+            page_size = db.execute("PRAGMA page_size").fetchone()[0]
+        assert status["page_limit"] == (budget // 3 - 65536) // page_size
+        assert status["capacity_available"] is True
+        assert status["database_bytes"] < MIB
 
 
 def saved_database(path):
