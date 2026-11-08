@@ -51,7 +51,10 @@ console notifications and UTC daily briefings are implemented. Current position:
   recorded responses against exact dossiers, with separate proposed/accepted
   decisions and explicit free-text limitations. An optional local recording
   adapter now connects raw responses to the durable workflow, binding each job
-  to an immutable recording snapshot. A [shared-budget queue foundation](./docs/joint-ai-budget.md)
+  to an immutable recording snapshot. [Source-to-service synthetic qualification](./docs/joint-ai-replay.md#source-to-service-qualification)
+  exercises positive associations and host, peer and time counterexamples through
+  saved previews, manual API jobs and shared accounting with simulated HTTP.
+  This remains separate from live model qualification. A [shared-budget queue foundation](./docs/joint-ai-budget.md)
   now binds separate joint jobs to an existing SSH allowance and recovers calls
   through the same ledger. An independent [HTTP transport foundation](./docs/joint-ai-transport.md)
   adds request binding, shared reservations and receipt-first response handling.

@@ -89,6 +89,25 @@ counts. Raw responses, rationales, local paths and arbitrary provider errors are
 not copied into them. A protocol hash is a reproducibility check, not a signature
 or proof of where a recording came from.
 
+## Source-to-service qualification
+
+The separate [cross-source workflow tests](../backend/tests/test_joint_ai_cross_source_flow.py)
+start with authored TCP and SSH events in disposable source stores. They follow
+the readers, saved-case refresh, aliased preview, manual API queue and shared
+accounting through an in-memory HTTP response. This exercises the service path
+in addition to the hand-authored dossier replay above.
+
+The scenarios pair in-window evidence from the mapped host and peer with
+different-host, different-peer and outside-window controls. Explicit SSH
+authentication success is checked separately from failed authentication.
+Unsupported association claims must fall back to human review, while supported
+network-only observations remain usable when no SSH evidence is associated.
+
+All source events, credentials and provider responses in these tests are
+synthetic. They neither send provider requests nor establish model accuracy,
+narrative truth or acceptance of a real cross-source deployment sample. Test
+outputs remain local; live qualification and permission are separate gates.
+
 ## Subsequent gates
 
 This completes a local fake/recorded-response qualification step for #148.
