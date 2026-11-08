@@ -13,6 +13,8 @@ from pydantic import BaseModel, Field, StrictBool, field_validator
 from typing import Literal
 
 from .http_parse import normalize_http
+from . import http_incident_search
+from .http_incident_search import HttpIncidentSearchUnavailable as HttpIncidentSearchUnavailable
 from . import http_incidents, http_briefings, http_restores
 
 IDENTITY = r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
@@ -212,7 +214,9 @@ class HttpStore:
         with self.connection() as db:
             return {**http_incidents.status(db), **http_briefings.status(db)}
 
-    def incidents(self, **kwargs):
+    def incidents(self, *, ip=None, **kwargs):
+        if ip is not None:
+            return http_incident_search.search_cases(self, ip=ip, **kwargs)
         with self.connection() as db:
             db.execute("BEGIN")
             return http_incidents.list_cases(db, **kwargs)

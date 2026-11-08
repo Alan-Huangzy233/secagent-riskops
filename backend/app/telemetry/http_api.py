@@ -108,6 +108,7 @@ def register_routes(application, operator):
     @application.get("/api/http/incidents", dependencies=[Depends(operator)])
     def incidents(request: Request, source_id: str | None = Query(None, max_length=64),
                   service_id: str | None = Query(None, max_length=64),
+                  ip: str | None = Query(None, min_length=1, max_length=45),
                   focus: str = Query("all", pattern="^(all|attention|low|retracted)$"),
                   page: int = Query(1, ge=1, le=1000000), limit: int = Query(50, ge=1, le=200)):
         config = enabled(request)
@@ -115,6 +116,15 @@ def register_routes(application, operator):
             raise HTTPException(404, "HTTP source is not configured")
         if service_id and not any(service_id in s.services and (source_id is None or source_id == s.id) for s in config.sources):
             raise HTTPException(404, "HTTP service is not configured")
+        if ip is not None:
+            try:
+                return request.app.state.http_store.incidents(ip=ip, source_id=source_id,
+                                                              service_id=service_id, focus=focus,
+                                                              page=page, limit=limit)
+            except ValueError:
+                raise HTTPException(422, "invalid_http_incident_search") from None
+            except Exception:
+                raise HTTPException(503, "http_incident_search_unavailable") from None
         return request.app.state.http_store.incidents(source_id=source_id, service_id=service_id,
                                                       focus=focus, page=page, limit=limit)
 

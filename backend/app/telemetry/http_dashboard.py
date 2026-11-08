@@ -4,7 +4,8 @@ SECTION = """<section id="http-section"><h2>HTTP 检测</h2>
 <div id="http-pane-incidents" role="tabpanel" aria-labelledby="http-view-incidents">
 <p>按来源、服务、连接 IP 和 UTC 小时关联请求。跨小时模式可能在相邻事件中共用证据；分数表示探测迹象，不能证明入侵成功。</p>
 <p id="http-health" role="status">正在读取 HTTP 检测状态…</p>
-<div class="actions"><label for="http-source">HTTP 来源</label><select id="http-source"><option value="">全部</option></select><label for="http-service">服务</label><select id="http-service"><option value="">全部</option></select><label for="http-focus">事件</label><select id="http-focus"><option value="all">全部</option><option value="attention">需关注（≥30 分）</option><option value="low">低分</option><option value="retracted">已撤回</option></select><button id="http-refresh" type="button">刷新 HTTP</button></div>
+<form id="http-search-form" class="actions"><label for="http-ip">连接 IP</label><input id="http-ip" type="text" maxlength="45" inputmode="text" autocomplete="off" spellcheck="false" placeholder="完整 IPv4 / IPv6" aria-describedby="http-search-note"><label for="http-source">HTTP 来源</label><select id="http-source"><option value="">全部</option></select><label for="http-service">服务</label><select id="http-service"><option value="">全部</option></select><label for="http-focus">事件</label><select id="http-focus"><option value="all">全部</option><option value="attention">需关注（≥30 分）</option><option value="low">低分</option><option value="retracted">已撤回</option></select><button id="http-search" type="submit">搜索</button><button id="http-search-clear" type="button">清除 IP</button><button id="http-refresh" type="button">刷新 HTTP</button></form>
+<p id="http-search-note">按完整连接 IP 精确匹配已保留、已分析的 HTTP 事件；不是原始日志搜索。代理后的连接 IP 不代表原始访客或攻击者。分页结果可能随分析与保留变化。</p><p id="http-search-scope" role="status"></p>
 <div class="table-wrap"><table><thead><tr><th>最近证据</th><th>来源 / 服务</th><th>连接 IP</th><th>模式</th><th>评分 / 状态</th><th>详情</th></tr></thead><tbody id="http-rows"></tbody></table></div>
 <div class="pager"><button id="http-prev" type="button" disabled>上一页</button><span id="http-page"></span><button id="http-next" type="button" disabled>下一页</button></div><p id="http-status" role="status"></p></div>
 <div id="http-pane-restores" role="tabpanel" aria-labelledby="http-view-restores" hidden>
@@ -20,12 +21,13 @@ DIALOG = """<dialog id="http-dialog" aria-labelledby="http-detail-title"><div cl
 <div id="http-pane-overview" class="http-detail-scroll" role="tabpanel" aria-labelledby="http-tab-overview"><dl id="http-fields" class="detail-fields"></dl></div><div id="http-pane-evidence" class="http-detail-scroll" role="tabpanel" aria-labelledby="http-tab-evidence" hidden><h3>该版本的证据</h3><p>路径已移除查询串。响应状态码只描述 HTTP 响应。</p><div class="table-wrap"><table><thead><tr><th>时间</th><th>方法</th><th>路径</th><th>状态码</th></tr></thead><tbody id="http-evidence"></tbody></table></div><div class="pager"><button id="http-evidence-prev" type="button" disabled>上一页</button><span id="http-evidence-page"></span><button id="http-evidence-next" type="button" disabled>下一页</button></div></div></div></dialog>"""
 
 STYLE = """
-#http-pane-restores{min-width:0}#http-pane-restores .table-wrap{max-width:100%}#http-pane-restores table{table-layout:fixed}#http-pane-restores th,#http-pane-restores td{overflow-wrap:anywhere}#http-pane-restores th:last-child{width:12%}#http-section>.detail-tabs{padding-top:0}@media(max-width:850px){#http-pane-restores th,#http-pane-restores td{padding:8px 5px;font-size:12px}#http-section .actions{flex-wrap:wrap}}
+#http-search-form{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0}#http-search-form input{width:20em;max-width:100%;min-width:0;box-sizing:border-box}#http-search-form select{max-width:100%;min-width:0}#http-search-scope,#http-search-note{overflow-wrap:anywhere}#http-pane-restores{min-width:0}#http-pane-restores .table-wrap{max-width:100%}#http-pane-restores table{table-layout:fixed}#http-pane-restores th,#http-pane-restores td{overflow-wrap:anywhere}#http-pane-restores th:last-child{width:12%}#http-section>.detail-tabs{padding-top:0}@media(max-width:850px){#http-pane-restores th,#http-pane-restores td{padding:8px 5px;font-size:12px}#http-section .actions{flex-wrap:wrap}}
 #http-dialog{position:fixed;inset:0 0 0 auto;margin:0;width:min(900px,100vw);max-width:100vw;height:100dvh;max-height:100dvh;box-sizing:border-box;border:0;border-left:1px solid #385475;background:#101d2e;color:#e7edf5;padding:22px}#http-dialog::backdrop{background:#030b17a6}.http-detail-body{height:100%;display:flex;flex-direction:column;gap:12px;min-width:0}.http-detail-scroll{overflow:auto;min-height:0;flex:1}#http-pane-evidence{display:flex;flex-direction:column;overflow:hidden}.http-detail-scroll .table-wrap{overflow:auto;min-height:0;flex:1}.http-detail-scroll .pager{flex-shrink:0}.http-detail-scroll td{overflow-wrap:anywhere;max-width:430px}.http-detail-scroll .pager{display:flex;align-items:center;gap:12px;margin:14px 0}#http-dialog .actions{flex-wrap:wrap}#http-dialog .detail-tabs{margin:0;padding:0 0 10px}#http-detail-status:empty{display:none}#http-health{white-space:pre-line}.http-detail-scroll h3{font-size:16px}@media(max-width:850px){#http-dialog{padding:16px}.http-detail-scroll .table-wrap table{min-width:580px}}
 """
 
 SCRIPT = r"""
 let httpSources=[],httpPage=1,httpPages=1,httpRequest=0,httpDetailRequest=0,httpEvidenceRequest=0;
+let httpSubmittedIP='',httpIPDirty=false,httpLoading=false,httpAvailable=false,httpController=null;
 let httpDetail=null,httpLatest=0,httpEvidencePage=1,httpEvidencePages=1,httpReturnFocus=null;
 let httpView='incidents',httpRestorePage=1,httpRestorePages=1,httpRestoreRequest=0,httpRestoreLoading=false,httpRestoreAvailable=false;
 const httpCollection={never_seen:'尚未收到日志',stale:'采集心跳过期',delayed:'采集延迟',degraded:'采集有缺口或拒收',current:'采集正常'};
@@ -47,26 +49,87 @@ function httpHealth(status){
  if(status.coverage_issues.length)notes.push(`近期有 ${status.coverage_issues.length===50?'至少 50':status.coverage_issues.length} 个关联窗口不完整；相关事件保留上次可核验的结果。`);
  text('http-health',notes.join('\n'));
 }
+function httpIPKey(value){
+ if(typeof value!=='string'||!value||value.length>45)return null;
+ const ipv4=address=>{const parts=address.split('.');return parts.length===4&&parts.every(part=>/^\d{1,3}$/.test(part)&&Number(part)<=255&&String(Number(part))===part)?parts.map(Number):null;};
+ let address=value.toLowerCase();if(!address.includes(':')){const parts=ipv4(address);return parts?'v4:'+parts.join('.'):null;}
+ if(address.includes('.')){const split=address.lastIndexOf(':'),parts=ipv4(address.slice(split+1));if(!parts)return null;address=address.slice(0,split+1)+(parts[0]*256+parts[1]).toString(16)+':'+(parts[2]*256+parts[3]).toString(16);}
+ const halves=address.split('::');if(halves.length>2)return null;const first=halves[0]?halves[0].split(':'):[],last=halves.length===2&&halves[1]?halves[1].split(':'):[];
+ if(![...first,...last].every(part=>/^[0-9a-f]{1,4}$/.test(part)))return null;
+ const missing=8-first.length-last.length;if(halves.length===1&&missing!==0||halves.length===2&&missing<1)return null;
+ const words=[...first,...Array(missing).fill('0'),...last].map(part=>parseInt(part,16));
+ if(words.slice(0,5).every(word=>word===0)&&words[5]===65535)return 'v4:'+[(words[6]>>8),words[6]&255,(words[7]>>8),words[7]&255].join('.');
+ return 'v6:'+words.map(word=>word.toString(16)).join(':');
+}
+function httpIncidentPager(){
+ $('http-prev').disabled=httpLoading||httpIPDirty||!httpAvailable||httpPage<=1;
+ $('http-next').disabled=httpLoading||httpIPDirty||!httpAvailable||httpPage>=httpPages;
+ $('http-pane-incidents').setAttribute('aria-busy',String(httpLoading));
+}
+function httpClearRows(message=''){
+ $('http-rows').replaceChildren();if(message)empty($('http-rows'),6,message);text('http-page','');httpPage=httpPages=1;httpAvailable=false;httpIncidentPager();
+}
+function httpInvalidate(){
+ ++httpRequest;if(httpController)httpController.abort();httpController=null;httpLoading=false;httpClearRows();text('http-status','');
+}
+function httpScope(query){
+ const labels={all:'全部',attention:'需关注',low:'低分',retracted:'已撤回'};
+ text('http-search-scope',`当前查询：${query.ip?'连接 IP '+query.ip:'未限制连接 IP'} · 来源 ${query.source_id||'全部'} · 服务 ${query.service_id||'全部'} · 事件 ${labels[query.focus]||query.focus}`);
+}
+function httpEditIP(){httpIPDirty=true;httpInvalidate();text('http-search-scope','条件已修改，请点击搜索；当前尚未展示结果。');}
+function httpFilterChanged(source=false){
+ httpInvalidate();if(source)httpServices();
+ if(httpIPDirty){text('http-search-scope','条件已修改，请点击搜索；当前尚未展示结果。');return;}
+ return loadHttpIncidents(1);
+}
+async function submitHttpSearch(){
+ const ip=$('http-ip').value.trim();httpInvalidate();
+ if(ip&&!httpIPKey(ip)){httpIPDirty=true;text('http-search-scope','当前尚未展示结果。');text('http-status','请输入完整 IPv4 / IPv6 地址；不支持网段、端口或接口后缀。');return;}
+ httpSubmittedIP=ip;httpIPDirty=false;$('http-ip').value=ip;return loadHttpIncidents(1);
+}
+async function clearHttpSearch(){
+ $('http-ip').value='';httpSubmittedIP='';httpIPDirty=false;httpInvalidate();return loadHttpIncidents(1);
+}
+function httpSearchError(message){const error=new Error(message);error.httpSearchSafe=true;return error;}
+async function httpIncidentGet(path,signal,searched){
+ if(!searched)return get(path,signal);
+ const result=await fetch(path,{credentials:'same-origin',cache:'no-store',signal});
+ if(!result.ok){
+  if(result.status===422)throw httpSearchError('查询条件无效，请检查完整连接 IP 和筛选条件；本次未展示结果。');
+  if(result.status===401)throw httpSearchError('登录已失效，请刷新页面重新登录。');
+  if(result.status===404)throw httpSearchError('HTTP 来源或服务已不可用，请重新选择；本次未展示结果。');
+  throw httpSearchError('HTTP 搜索暂不可用，请稍后重试；本次未展示结果。');
+ }
+ try{return await result.json();}catch{throw httpSearchError('HTTP 搜索返回异常，请重新搜索；本次未展示结果。');}
+}
+function httpSearchPageValid(data,query,page){
+ return data&&Array.isArray(data.items)&&data.items.length<=50&&Number.isSafeInteger(data.page)&&data.page>=1&&Number.isSafeInteger(data.total_pages)&&data.total_pages>=1&&Number.isSafeInteger(data.total)&&data.total>=0&&data.page===Math.min(page,data.total_pages)&&data.total_pages===Math.max(1,Math.ceil(data.total/50))&&data.items.length===Math.min(50,data.total-(data.page-1)*50)&&data.query&&typeof data.query.ip==='string'&&httpIPKey(data.query.ip)!==null&&httpIPKey(data.query.ip)===httpIPKey(query.ip)&&data.query.source_id===query.source_id&&data.query.service_id===query.service_id&&data.query.focus===query.focus&&Array.isArray(data.limitations)&&['retained_cases_only','connection_peer_only','analysis_coverage_limited','pages_may_change'].every(value=>data.limitations.includes(value))&&data.items.every(item=>item&&httpIPKey(item.client_ip)===httpIPKey(query.ip)&&(!query.source_id||item.source_id===query.source_id)&&(!query.service_id||item.service_id===query.service_id));
+}
 async function loadHttp(page){return httpView==='restores'?loadHttpRestores(page):loadHttpIncidents(page);}
 async function loadHttpIncidents(page=httpPage){
- if(httpView!=='incidents')return;
- const request=++httpRequest,source=$('http-source').value,service=$('http-service').value,focus=$('http-focus').value;
- text('http-status','正在读取 HTTP 事件…');
+ if(httpView!=='incidents'||httpIPDirty)return;
+ const request=++httpRequest,source=$('http-source').value,service=$('http-service').value,focus=$('http-focus').value,ip=httpSubmittedIP,scope={ip,source_id:source||null,service_id:service||null,focus};
+ if(httpController)httpController.abort();httpController=new AbortController();const signal=httpController.signal;httpLoading=true;if(ip)httpClearRows();httpIncidentPager();httpScope(scope);
+ text('http-status',ip?'正在搜索已分析的 HTTP 事件…':'正在读取 HTTP 事件…');
  try{
-  const status=await get('/api/http/status');if(request!==httpRequest)return;httpHealth(status);
-  if(!status.enabled){$('http-rows').replaceChildren();empty($('http-rows'),6,'暂无 HTTP 来源。');text('http-page','');httpPage=httpPages=1;$('http-prev').disabled=$('http-next').disabled=true;text('http-status','');return;}
-  const query=new URLSearchParams({page:String(page),limit:'50',focus});if(source)query.set('source_id',source);if(service)query.set('service_id',service);
-  const data=await get('/api/http/incidents?'+query);if(request!==httpRequest)return;
-  if(!Array.isArray(data.items)||!Number.isInteger(data.page)||!Number.isInteger(data.total_pages))throw new Error('HTTP 事件返回异常');
-  httpPage=data.page;httpPages=data.total_pages;const rows=$('http-rows');rows.replaceChildren();
-  for(const item of data.items){const tr=document.createElement('tr');cell(tr,when(item.last_seen));cell(tr,item.source_id+' / '+item.service_id);cell(tr,item.client_ip);cell(tr,item.rules.map(r=>r.label).join('、')||'模式已撤回');cell(tr,`${item.assessment.score} 分 · ${item.stale?'待重新核验':item.active?(item.assessment.priority||'低分'):'已撤回'}`);const button=document.createElement('button');button.type='button';button.textContent='查看详情';button.addEventListener('click',()=>showHttpIncident(item.incident_id));cell(tr,'').append(button);rows.append(tr);}
-  if(!data.items.length)empty(rows,6,'暂无符合条件的 HTTP 事件。');
-  text('http-page',`第 ${data.page} / ${data.total_pages} 页 · 共 ${data.total} 个事件`);$('http-prev').disabled=data.page<=1;$('http-next').disabled=data.page>=data.total_pages;text('http-status','');
- }catch(error){if(request===httpRequest)text('http-status',error.message+' 已保留上次读取的 HTTP 事件。');}
+  const status=await get('/api/http/status',signal);if(request!==httpRequest)return;httpHealth(status);
+  if(!status.enabled){httpClearRows('暂无 HTTP 来源。');text('http-status','');return;}
+  if(source!==$('http-source').value||service!==$('http-service').value){httpClearRows();text('http-search-scope','原筛选条件已不可用，请重新选择后搜索。');text('http-status','本次未展示结果。');return;}
+  const query=new URLSearchParams({page:String(page),limit:'50',focus});if(source)query.set('source_id',source);if(service)query.set('service_id',service);if(ip)query.set('ip',ip);
+  const data=await httpIncidentGet('/api/http/incidents?'+query,signal,Boolean(ip));if(request!==httpRequest)return;
+  if(ip?!httpSearchPageValid(data,scope,page):!Array.isArray(data.items)||!Number.isInteger(data.page)||!Number.isInteger(data.total_pages))throw httpSearchError('HTTP 事件返回异常，请重新搜索；本次未展示结果。');
+  const rows=[];
+  for(const item of data.items){const tr=document.createElement('tr');cell(tr,when(item.last_seen));cell(tr,item.source_id+' / '+item.service_id);cell(tr,item.client_ip);cell(tr,item.rules.map(r=>r.label).join('、')||'模式已撤回');cell(tr,`${item.assessment.score} 分 · ${item.stale?'待重新核验':item.active?(item.assessment.priority||'低分'):'已撤回'}`);const button=document.createElement('button');button.type='button';button.textContent='查看详情';button.addEventListener('click',()=>showHttpIncident(item.incident_id));cell(tr,'').append(button);rows.push(tr);}
+  httpPage=data.page;httpPages=data.total_pages;httpAvailable=data.total>0;$('http-rows').replaceChildren(...rows);
+  if(!data.items.length)empty($('http-rows'),6,ip?'已保留、已分析的 HTTP 事件中没有匹配；不代表没有请求或活动。':'暂无符合条件的 HTTP 事件。');
+  if(ip)httpScope(data.query);
+  text('http-page',`第 ${data.page} / ${data.total_pages} 页 · 共 ${data.total} 个事件`);text('http-status','');
+ }catch(error){if(request===httpRequest){if(ip){httpClearRows('本次未展示结果。');text('http-status',error.httpSearchSafe?error.message:'HTTP 搜索暂不可用，请稍后重试；本次未展示结果。');}else text('http-status',error.message+' 已保留上次读取的 HTTP 事件。');}}
+ finally{if(request===httpRequest){httpLoading=false;httpController=null;httpIncidentPager();}}
 }
 function setHttpView(name){
  if(!['incidents','restores'].includes(name))return;
- if(httpView!==name){++httpRequest;++httpRestoreRequest;httpRestoreLoading=false;}
+ if(httpView!==name){++httpRequest;if(httpController)httpController.abort();httpLoading=false;++httpRestoreRequest;httpRestoreLoading=false;}
  httpView=name;
  for(const key of ['incidents','restores']){$('http-pane-'+key).hidden=key!==name;$('http-view-'+key).setAttribute('aria-selected',String(key===name));$('http-view-'+key).tabIndex=key===name?0:-1;}
  httpRestorePager();
@@ -137,8 +200,9 @@ function initializeHttp(){
   $('http-tab-'+name).addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const next=event.key==='Home'?'overview':event.key==='End'?'evidence':name==='overview'?'evidence':'overview';setHttpDetailTab(next);$('http-tab-'+next).focus();}});
  }
 
- $('http-source').addEventListener('change',()=>{httpServices();return loadHttpIncidents(1);});for(const id of ['http-service','http-focus'])$(id).addEventListener('change',()=>loadHttpIncidents(1));
- $('http-refresh').addEventListener('click',()=>loadHttpIncidents());$('http-prev').addEventListener('click',()=>loadHttpIncidents(httpPage-1));$('http-next').addEventListener('click',()=>loadHttpIncidents(httpPage+1));
+ $('http-search-form').addEventListener('submit',event=>{event.preventDefault();return submitHttpSearch();});$('http-ip').addEventListener('input',httpEditIP);$('http-search-clear').addEventListener('click',clearHttpSearch);
+ $('http-source').addEventListener('change',()=>httpFilterChanged(true));for(const id of ['http-service','http-focus'])$(id).addEventListener('change',()=>httpFilterChanged());
+ $('http-refresh').addEventListener('click',()=>httpIPDirty?submitHttpSearch():loadHttpIncidents());$('http-prev').addEventListener('click',()=>loadHttpIncidents(httpPage-1));$('http-next').addEventListener('click',()=>loadHttpIncidents(httpPage+1));
  $('http-close').addEventListener('click',()=>{const dialog=$('http-dialog');if(typeof dialog.close==='function')dialog.close();else{dialog.removeAttribute('open');clearHttpDetail();}});$('http-dialog').addEventListener('close',clearHttpDetail);
  $('http-current').addEventListener('click',()=>{if(httpDetail)showHttpIncident(httpDetail.incident_id);});
  $('http-revision-prev').addEventListener('click',()=>{if(httpDetail)showHttpIncident(httpDetail.incident_id,httpDetail.revision-1);});$('http-revision-next').addEventListener('click',()=>{if(httpDetail)showHttpIncident(httpDetail.incident_id,httpDetail.revision+1);});
