@@ -37,9 +37,10 @@ public tracking.
    automatic response. Formal product identity, approvals and real executors
    remain distinct later increments.
 
-Grouped network/HTTP IP lookup (#146) can ship alongside investigation work;
-its raw cross-store search needs separate indexes/migrations and does not block
-retained-evidence correlation.
+[Scoped network raw-log lookup](network-search.md) implements the first slice of
+#146: exact source-IP search in one configured source and a bounded time window.
+All-source, HTTP and grouped cross-type lookup remain; their indexes/migrations
+can progress alongside retained-evidence correlation.
 
 Network sustained operation and storage/resource work run alongside these steps;
 necessary reliability fixes take priority. HTTP real-source activation still
@@ -64,7 +65,7 @@ paused. No date is promised for deferred product or exploratory work.
 | Issue | Work | Stage |
 | --- | --- | --- |
 | [#145](https://github.com/Alan-Huangzy233/secagent-riskops/issues/145) | Make IP search visible and pivot from network findings to SSH evidence | deployed |
-| [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) | Add scoped IP lookup across network, HTTP and SSH records | planned |
+| [#146](https://github.com/Alan-Huangzy233/secagent-riskops/issues/146) | Add scoped IP lookup across network, HTTP and SSH records | [single-source/time-bounded network log search](network-search.md); all-source, HTTP and grouped cross-type lookup remain |
 | [#147](https://github.com/Alan-Huangzy233/secagent-riskops/issues/147) | Correlate SSH and network evidence into traceable investigation cases | foundation, readers, derived observations, explicit discovery/recovery, console and optional bounded refresh implemented |
 | [#148](https://github.com/Alan-Huangzy233/secagent-riskops/issues/148) | Extend manual AI review to network and correlated SSH evidence | [dossier contract and local preview](joint-ai-contract.md), [offline manual jobs/history and recording adapter](joint-ai-workflow.md), [synthetic replay](joint-ai-replay.md), [shared-budget queue foundation](joint-ai-budget.md), and [HTTP transport](joint-ai-transport.md) and separately approved manual API integration implemented; outgoing-field approval, live provider qualification, explanation review and explicit pilot approval remain |
 

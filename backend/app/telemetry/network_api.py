@@ -10,6 +10,7 @@ from starlette.concurrency import run_in_threadpool
 
 from .network_protocol import MAX_BATCH_BYTES, decode, validate_batch
 from .network_store import NetworkStoreError
+from .network_search import NetworkSearchInvalid, NetworkSearchUnavailable, search_events
 
 
 def register_routes(application, operator):
@@ -74,6 +75,26 @@ def register_routes(application, operator):
                 snapshot=snapshot, batches=request.url.path.endswith("/batches"))
         except Exception:
             raise HTTPException(503, "Network evidence unavailable") from None
+
+    @application.get("/api/network/events/search", dependencies=[Depends(operator)])
+    def event_search(request: Request, source_id: str = Query(min_length=1, max_length=64),
+                     ip: str = Query(min_length=1, max_length=64),
+                     start: str = Query(min_length=1, max_length=64),
+                     end: str = Query(min_length=1, max_length=64),
+                     limit: int = Query(50, ge=1, le=100),
+                     cursor: str | None = Query(None, min_length=1, max_length=2048)):
+        config = enabled(request)
+        if not any(source.id == source_id for source in config.sources):
+            raise HTTPException(404, "Network source is not configured")
+        try:
+            return search_events(request.app.state.network_store, source_id=source_id,
+                                 ip=ip, start=start, end=end, limit=limit, cursor=cursor)
+        except NetworkSearchInvalid:
+            raise HTTPException(422, "invalid_network_search") from None
+        except NetworkSearchUnavailable:
+            raise HTTPException(503, "network_search_unavailable") from None
+        except Exception:
+            raise HTTPException(503, "network_search_unavailable") from None
 
     def source_status(request):
         config = enabled(request)
