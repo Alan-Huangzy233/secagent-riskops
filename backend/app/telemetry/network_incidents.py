@@ -156,9 +156,16 @@ def _loss(db, row, reason, now):
                 row["journal_monotonic_us"], reason))
     # No peer/profile is known once raw context expires before intake. The
     # conservative uncertainty is restricted to this source/boot/time window.
+    # A settled window already carrying this loss reason cannot change again
+    # from another loss of the same kind. Re-dirtying it on each expiry can
+    # starve the finite intake barrier. Pending windows keep their queue order.
+    # Compare decoded coverage items so escaped text cannot match a reason.
     for bucket in _buckets(row["journal_monotonic_us"]):
         db.execute("UPDATE network_windows SET dirty=1,updated_at=? WHERE source_id=? "
-                   "AND boot_id=? AND monotonic_hour_us=?", (now, row["source_id"], row["boot_id"], bucket))
+                   "AND boot_id=? AND monotonic_hour_us=? AND dirty=0 "
+                   "AND NOT EXISTS (SELECT 1 FROM json_each(network_windows.coverage_json) "
+                   "WHERE value=?)",
+                   (now, row["source_id"], row["boot_id"], bucket, reason))
 
 
 def _source_coverage(db, source_id, coverage, last=None):
