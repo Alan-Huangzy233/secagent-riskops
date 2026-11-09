@@ -1,6 +1,7 @@
 """Continuous network analysis: durable bounds, provenance and exact history."""
 from __future__ import annotations
 
+import json
 import sqlite3
 from contextlib import contextmanager
 
@@ -444,3 +445,90 @@ def test_other_process_starting_partial_cycle_cannot_be_analyzed_by_old_loop(sto
     drain(store)
     current = store.incident(case['incident_id'])
     assert current['revision'] == 2 and current['evidence_count'] == 20
+
+
+def test_repeated_context_expiry_cannot_starve_the_next_intake_snapshot(store):
+    def receive(index, events, moment):
+        previous = store.sources()
+        batch = payload(index, events, before=previous[0]["checkpoint"] if previous else None)
+        batch["collected_at_us"] = int(moment * 1_000_000)
+        store.ingest(batch, profile(), now_us=int(moment * 1_000_000))
+
+    receive(1, [event(index, src_ip=f"198.51.100.{index + 1}") for index in range(12)], NOW)
+    for index in range(12):
+        receive(index + 2, [event(100 + index, src_ip="198.51.100.1")], NOW + index + 1)
+    drain(store, NOW + 20, window_limit=20)
+    expiry = NOW + 14 * DAY + .5
+    first = analysis.process(store, expiry)
+    assert first["windows_processed"] == 5 and not first["caught_up"]
+    receive(14, [event(200, src_ip="203.0.113.99")], expiry)
+    for step in range(1, 13):
+        analysis.process(store, expiry + step)
+    with store.connection() as db:
+        assert analysis.meta(db, "cursor") == 25
+        assert analysis.meta(db, "batch_cursor") == 14
+        assert analysis.meta(db, "missing_raw_records") == 0
+        assert db.execute("SELECT count(*) FROM network_analysis_losses").fetchone()[0] == 24
+        assert db.execute("SELECT count(*) FROM network_context").fetchone()[0] == 1
+        assert db.execute("SELECT count(*) FROM network_windows WHERE dirty=1").fetchone()[0] == 0
+    assert store.analysis_status()["pending"] is False
+
+
+@pytest.mark.parametrize("offset,adjacent", [
+    (analysis.WINDOW_US, -1),
+    (analysis.HOUR_US - analysis.WINDOW_US, 1),
+])
+def test_loss_dirtying_preserves_scope_queue_order_and_new_reasons(store, offset, adjacent):
+    hour = 2 * analysis.HOUR_US
+    loss = event(0, offset_us=hour + offset - 1_000_000)
+    base = (loss.source_id, loss.boot_id, loss.source_profile_revision, loss.src_ip, loss.dst_ip)
+    keys = [(*base, hour + delta * analysis.HOUR_US) for delta in (-1, 0, 1)]
+    other_profile = (base[0], base[1], "b" * 64, "198.51.100.43", base[4], hour)
+    other_source = ("sensor-b", *base[1:], hour)
+    other_boot = (base[0], "2" * 32, *base[2:], hour)
+    keys += [other_profile, other_source, other_boot]
+    affected = {(*base, hour), (*base, hour + adjacent * analysis.HOUR_US), other_profile}
+    with store.write_connection() as db:
+        for key in keys:
+            analysis._dirty(db, key, NOW)
+        db.execute("UPDATE network_windows SET dirty=0")
+        analysis._loss(db, event_to_dict(loss), "expired_context", NOW + 1)
+        rows = db.execute("SELECT * FROM network_windows WHERE dirty=1").fetchall()
+        assert {tuple(row[name] for name in analysis.KEY_COLUMNS) for row in rows} == affected
+        second = event(1, offset_us=hour + offset - 1_000_000)
+        analysis._loss(db, event_to_dict(second), "expired_context", NOW + 2)
+        assert {row[0] for row in db.execute("SELECT updated_at FROM network_windows WHERE dirty=1")} == {NOW + 1}
+        for row in rows:
+            analysis.analyze_window(db, row, NOW + 3)
+        third = event(2, offset_us=hour + offset - 1_000_000)
+        analysis._loss(db, event_to_dict(third), "expired_context", NOW + 4)
+        assert db.execute("SELECT count(*) FROM network_windows WHERE dirty=1").fetchone()[0] == 0
+        fourth = event(3, offset_us=hour + offset - 1_000_000)
+        analysis._loss(db, event_to_dict(fourth), "raw_history_expired_before_analysis", NOW + 5)
+        rows = db.execute("SELECT * FROM network_windows WHERE dirty=1").fetchall()
+        assert {tuple(row[name] for name in analysis.KEY_COLUMNS) for row in rows} == affected
+        for row in rows:
+            analysis.analyze_window(db, row, NOW + 6)
+        assert db.execute("SELECT count(*) FROM network_analysis_losses").fetchone()[0] == 4
+        for row in db.execute("SELECT * FROM network_windows"):
+            coverage = json.loads(row["coverage_json"])
+            if tuple(row[name] for name in analysis.KEY_COLUMNS) in affected:
+                assert {"expired_context", "raw_history_expired_before_analysis"} <= set(coverage)
+            else:
+                assert coverage == []
+
+
+@pytest.mark.parametrize("coverage,expected_dirty", [
+    ([], 1), (["expired_context"], 0),
+    (["expired_context_suffix"], 1), (["prefix_expired_context"], 1),
+    (['prefix"expired_context"suffix'], 1), (['prefix"expired_context'], 1),
+])
+def test_loss_reason_matches_a_complete_coverage_item(store, coverage, expected_dirty):
+    loss = event(0)
+    key = (loss.source_id, loss.boot_id, loss.source_profile_revision, loss.src_ip, loss.dst_ip, 0)
+    with store.write_connection() as db:
+        analysis._dirty(db, key, NOW)
+        db.execute("UPDATE network_windows SET dirty=0,coverage_json=?", (analysis.canonical(coverage),))
+        analysis._loss(db, event_to_dict(loss), "expired_context", NOW + 1)
+        assert db.execute("SELECT dirty FROM network_windows").fetchone()[0] == expected_dirty
+        assert db.execute("SELECT count(*) FROM network_analysis_losses").fetchone()[0] == 1
